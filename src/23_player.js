@@ -36,7 +36,7 @@ function newGameState({ name, race, style, aff }) {
     maxHp: R.hp, hp: R.hp, maxStamina: 100, stamina: 100, maxMana: R.mana, mana: R.mana,
     prof: { fire: 0, water: 0, wind: 0, earth: 0, heal: 0, [aff]: 3 },
     flags: {}, discovered: {}, waystones: { village: true }, lastWaystone: 'village',
-    pos: null, hour: 17.2, quests: {}, pages: [], cds: {},
+    pos: null, hour: 17.2, quest: 'findRoxy', pages: [], cds: {},
     deaths: 0, playTime: 0,
   };
 }
@@ -77,7 +77,7 @@ function spawnPlayer(x, z, face = 0) {
   if (PL.actor) scene.remove(PL.actor.root);
   PL.actor = buildPlayerActor();
   scene.add(PL.actor.root);
-  PL.body.pos.set(x, heightAt(x, z), z);
+  PL.body.pos.set(x, floorAt(x, z), z);
   PL.body.vel.set(0, 0, 0);
   PL.body.grounded = true;
   PL.face = face;

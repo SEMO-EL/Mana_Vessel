@@ -322,6 +322,7 @@ async function buildTrees() {
 
 function updateTrees(time) {
   FOL.windTime.value = time;
+  if (FOL.hidden) { for (const c of FOL.cells) for (const p of c.parts) p.hi.visible = p.lo.visible = false; return; }
   const cp = camera.position;
   for (const c of FOL.cells) {
     const d = Math.hypot(c.center.x - cp.x, c.center.z - cp.z);
@@ -364,6 +365,7 @@ function scatterRocks() {
       im.castShadow = true; im.receiveShadow = true;
       im.computeBoundingSphere();
       scene.add(im);
+      (FOL.rockMeshes || (FOL.rockMeshes = [])).push(im);
     });
   });
 }

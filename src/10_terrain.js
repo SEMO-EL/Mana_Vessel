@@ -147,6 +147,9 @@ async function buildTerrain() {
       h = Math.min(h, lerp(h, LAKE.bed, lb));
       const rim = (1 - smooth(LAKE.r, LAKE.r + 30, dl)) * smooth(LAKE.r * 0.9, LAKE.r, dl);
       h = Math.max(h, lerp(h, WORLD.lakeLevel + 0.8, rim));
+      // the island: a mound breaking the surface, far from any wadeable shallows
+      const di = Math.hypot(x - ISLAND.x, z - ISLAND.z);
+      if (di < ISLAND.r + 12) h = Math.max(h, lerp(LAKE.bed, ISLAND.h, 1 - smooth(ISLAND.r * 0.4, ISLAND.r + 12, di)));
 
       // river: levee keeps the banks above the water, channel cuts below it
       const rv = TER.RIVD[i], L = TER.RIVL[i];
@@ -166,7 +169,7 @@ async function buildTerrain() {
 
       // water surface
       if (rv < hw + 2.5) TER.WATER[i] = L;
-      else if (dl < LAKE.r + 4 && h < WORLD.lakeLevel + 0.5) TER.WATER[i] = WORLD.lakeLevel;
+      else if (dl < LAKE.r + 4 && h < WORLD.lakeLevel + 0.05) TER.WATER[i] = WORLD.lakeLevel;
     }
     if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / N * 100) + '%'); await nextFrame(); }
   }

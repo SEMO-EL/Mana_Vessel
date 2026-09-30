@@ -47,6 +47,10 @@ const PLACES = {
 
 // Terrain sculpt features.
 const LAKE = { x: -560, z: 620, r: 115, bed: 9 };
+// a small island mid-lake — no way there on foot; you freeze your own path
+const ISLAND = { x: -598, z: 648, r: 10, h: 21 };
+// a ledge under the falls, 4.2 m up the cliff: an earth pillar plus a jump reaches it
+const FALLS_LEDGE = { x: -272, z: -532, w: 5, d: 3.5, up: 4.2 };
 const VILLAGE_BASIN = { x: -420, z: 370, r: 170, h: 24 };
 const RIDGE = { ax: -240, az: 30, bx: 30, bz: 262, h: 52, w: 95 };   // watchtower on top
 const ROXY_HILL = { x: -250, z: 520, h: 20, r: 75 };

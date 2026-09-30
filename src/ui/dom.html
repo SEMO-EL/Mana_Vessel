@@ -1,2 +1,120 @@
 <canvas id="gl"></canvas>
-<div id="boot"><div class="t">Mana Vessel</div><div id="bootMsg">Unpacking the world</div></div>
+
+<!-- ═════════ HUD ═════════ -->
+<div id="hud" class="off">
+  <div id="hudTL">
+    <canvas id="vessel" width="150" height="186"></canvas>
+    <div id="bars">
+      <div id="who"><span id="whoName">Rudeus</span><span id="whoLvl">Lv 1</span><span id="whoRank">Rank F</span></div>
+      <div class="bar hp"><i class="lag" id="hpLag"></i><i class="fill" id="hpFill"></i></div>
+      <div class="bar st"><i class="fill" id="stFill"></i></div>
+      <div class="bar xp"><i class="fill" id="xpFill"></i></div>
+    </div>
+  </div>
+  <div id="compass"><div id="compassStrip"></div><div id="compassNeedle"></div></div>
+  <div id="objective"><b id="objTitle"></b><span id="objText"></span></div>
+  <div id="spellBar"></div>
+  <div id="chantMeter"><i></i><span>Incanting</span></div>
+  <div id="hudBR"><div id="styleName"></div><div id="keyHints"></div></div>
+  <div id="bossBar"><div id="bossName"></div><div class="bar boss"><i class="lag" id="bossLag"></i><i class="fill" id="bossFill"></i></div></div>
+  <div id="prompt"><kbd id="promptKey">E</kbd><span id="promptText"></span></div>
+  <div id="reticle"></div>
+  <div id="lockMark">◆</div>
+  <div id="floaters"></div>
+  <div id="hint"></div>
+</div>
+<div id="toasts"></div>
+<div id="banner"><div class="line"></div><div id="bannerTitle"></div><div id="bannerSub"></div><div class="line"></div></div>
+<div id="letterbox"><i></i><i></i></div>
+<div id="dialogue">
+  <div id="dlgPortrait"><img id="dlgImg" alt=""></div>
+  <div id="dlgBox"><div id="dlgName"></div><div id="dlgText"></div><div id="dlgNext">Space · E · Click</div></div>
+</div>
+<div id="splash"><img id="splashImg" alt=""><div class="sc"><div id="splashTitle"></div><div class="line"></div><div id="splashSub"></div></div></div>
+
+<!-- ═════════ SCREENS ═════════ -->
+<div id="title" class="screen">
+  <div class="titleBlock">
+    <h1>Mana Vessel</h1>
+    <div class="sub">The Borderlands of Fittoa</div>
+    <div class="rule"></div>
+    <div class="menu" id="titleMenu">
+      <button id="bContinue">Continue</button>
+      <button id="bNew">New Journey</button>
+      <button id="bSettings">Settings</button>
+    </div>
+    <div class="fine">Milestone 1 · Keyboard &amp; mouse or controller · Headphones recommended</div>
+  </div>
+</div>
+
+<div id="creator" class="screen">
+  <div class="panel left">
+    <div class="h">The Reincarnate</div>
+    <p class="flavor">You remember dying. You remember a life you did not use. This time you will not waste it — but first, what are you?</p>
+    <label class="step">I · Name</label>
+    <input type="text" id="ccName" maxlength="14" value="Rudeus" spellcheck="false">
+    <label class="step">II · Blood</label><div class="chips" id="ccRace"></div>
+    <label class="step">III · Sword</label><div class="chips" id="ccStyle"></div>
+    <label class="step">IV · First Affinity</label><div class="chips" id="ccAff"></div>
+    <label class="step">V · Difficulty</label><div class="chips" id="ccDiff"></div>
+    <p class="desc" id="ccDesc"></p>
+    <div class="row"><button id="ccBack">Back</button><button id="ccStart" class="primary">Take the First Breath</button></div>
+  </div>
+</div>
+
+<div id="pause" class="screen dim">
+  <div class="panel center">
+    <div class="h">Paused</div>
+    <div class="menu">
+      <button id="pResume">Resume</button>
+      <button id="pMap">Map</button>
+      <button id="pGrimoire">Grimoire</button>
+      <button id="pSettings">Settings</button>
+      <button id="pSave">Save</button>
+      <button id="pQuit">Quit to Title</button>
+    </div>
+  </div>
+</div>
+
+<div id="grimoire" class="screen dim">
+  <div class="panel wide">
+    <div class="h">Grimoire</div>
+    <div id="grimBody"></div>
+    <div class="row"><button id="gBack">Back</button></div>
+  </div>
+</div>
+
+<div id="settingsScreen" class="screen dim">
+  <div class="panel wide scroll">
+    <div class="h">Settings</div>
+    <div id="setBody"></div>
+    <div class="row"><button id="sBack">Back</button><button id="sReset">Reset to defaults</button></div>
+  </div>
+</div>
+
+<div id="death" class="screen">
+  <div class="deathTitle">Dead End</div>
+  <div class="rule red"></div>
+  <p class="flavor" id="deathText"></p>
+  <div class="menu row"><button id="dRise">Rise at the waystone</button></div>
+</div>
+
+<div id="rest" class="screen dim">
+  <div class="panel center">
+    <div class="h" id="restName">Waystone</div>
+    <p class="flavor">Your wounds close. The vessel fills. Somewhere out there, what you killed stands up again.</p>
+    <div class="menu" id="restMenu"></div>
+  </div>
+</div>
+
+<div id="endcard" class="screen">
+  <div class="titleBlock">
+    <div class="sub">End of Milestone 1</div>
+    <h1 id="endTitle">The Road to Roa</h1>
+    <div class="rule"></div>
+    <p class="flavor" id="endText"></p>
+    <div class="menu row"><button id="eKeep">Keep exploring</button><button id="eTitle">Title</button></div>
+  </div>
+</div>
+
+<div id="boot"><div class="t">Mana Vessel</div><div id="bootMsg">Unpacking the world</div><div class="bootBar"><i></i></div></div>

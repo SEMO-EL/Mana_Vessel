@@ -64,8 +64,9 @@ function updateCamera(dt, target, opts = {}) {
   CAM.arm = arm < CAM.arm ? arm : damp(CAM.arm, arm, 5, dt);   // snap in, ease out
   camera.position.copy(start).addScaledVector(_cd, CAM.arm);
   // never below the ground under the lens
-  const gy = heightAt(camera.position.x, camera.position.z) + 0.35;
+  const gy = floorAt(camera.position.x, camera.position.z) + 0.35;
   if (camera.position.y < gy) camera.position.y = gy;
+  if (GAME.inCave) { const cy = caveCeilAt(camera.position.x, camera.position.z) - 0.4; if (camera.position.y > cy) camera.position.y = Math.max(gy, cy); }
   const look = _cp.copy(start).addScaledVector(_cf, 10);
   camera.lookAt(look);
 

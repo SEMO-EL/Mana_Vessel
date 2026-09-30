@@ -1,6 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════
    MAIN — boot sequence and the frame loop.
    (GAME itself is declared in 00_core.js so earlier files can use it.)
+
+   Dev switches (URL):  ?play        skip the title, start as a default char
+                        ?view=NAME   free-fly camera at a named viewpoint
+                        ?test        run the self-tests and report
    ═══════════════════════════════════════════════════════════════════════ */
 const QS = new URLSearchParams(location.search);
 
@@ -15,6 +19,8 @@ const VIEWS = {
   ridge:    { p: [-110, 95, 230],  look: [-420, 30, 360] },
   lake:     { p: [-430, 40, 560],  look: [-600, 18, 660] },
   ground:   { p: [-380, 27, 400],  look: [-420, 26, 340] },
+  plaza:    { p: [-400, 40, 400],  look: [-440, 26, 330] },
+  gate:     { p: [700, 50, 420],   look: [800, 40, 380] },
 };
 function setView(name) {
   const v = VIEWS[name]; if (!v) return false;
@@ -23,6 +29,7 @@ function setView(name) {
   DEVCAM.yaw = Math.atan2(-d.x, -d.z); DEVCAM.pitch = Math.asin(d.y);
   camera.rotation.set(DEVCAM.pitch, DEVCAM.yaw, 0, 'YXZ');
   GAME.state = 'dev';
+  closeAllScreens(); $('hud').classList.add('off');
   return true;
 }
 function updateDevCam(dt) {
@@ -41,6 +48,7 @@ async function boot() {
   const t0 = performance.now();
   loadSettings();
   initInput();
+  await loadFonts();
   applyQuality();
   await nextFrame();
   await buildTerrain();
@@ -51,34 +59,49 @@ async function boot() {
   buildGrass();
   await buildTrees();
   await nextFrame();
-  bootStatus('Carrying stones');
+  bootStatus('Raising Buena');
   await loadPropsLibrary();
   scatterRocks();
-  bootStatus('Waking the people');
   await loadCharacters();
+  buildStructures();
+  bootStatus('Hollowing the cave');
+  await nextFrame();
+  buildCave();
+  bootStatus('Waking the people');
+  buildPeople();
+  defineEncounters();
+  buildPages();
   initVFX();
+  initMenus();
+  if (typeof mapBuild === 'function') { bootStatus('Drawing the map'); await nextFrame(); try { mapBuild(); } catch (e) { console.error('map', e); } }
+  if (typeof initAudio === 'function') initAudio();
   GAME.bootMs = Math.round(performance.now() - t0);
   $('boot').classList.add('gone');
   canvas.addEventListener('click', () => { if (GAME.state === 'play' || GAME.state === 'dev') lockPointer(); });
 
   if (QS.has('view')) setView(QS.get('view'));
-  else startDevPlay();
+  else if (QS.has('play')) startDevPlay();
+  else showTitle();
   requestAnimationFrame(loop);
   if (TEST) setTimeout(runTests, 50);
 }
 
-/* until the menus exist: jump straight into play as a default character */
+/* ?play: straight into the world as a default character (for testing) */
 function startDevPlay() {
   G = newGameState({ name: 'Rudeus', race: QS.get('race') || 'human', style: QS.get('style') || 'sword', aff: QS.get('aff') || 'fire' });
+  if (QS.has('quest')) G.quest = QS.get('quest');
   if (QS.has('allspells')) for (const k in G.prof) G.prof[k] = 130;
-  const w = WAYSTONES[0];
-  spawnPlayer(w.x + 4, w.z + 6, Math.PI * 0.75);
-  GAME.state = 'play';
+  TOD.hour = +(QS.get('hour') || 16.5); TOD.frozen = QS.has('freeze');
+  const W = WSTONE.list[0];
+  spawnPlayer(W.x + 4, W.z + 6, Math.PI * 0.75);
+  resetWorldState();
+  enterPlay();
   const list = (QS.get('enemies') || '').split(',').filter(Boolean);
-  list.forEach((k, i) => new Enemy(k, w.x + 10 + i * 3, w.z - 14 + (i % 2) * 4));
+  list.forEach((k, i) => new Enemy(k, W.x + 10 + i * 3, W.z - 14 + (i % 2) * 4));
 }
 
 let _last = performance.now();
+const SIM_STATES = new Set(['play', 'rest']);
 function frame(dtReal) {
   GAME.frame++;
   pollInput();
@@ -86,25 +109,43 @@ function frame(dtReal) {
   let dt = dtReal;
   if (GAME.hitstop > 0) { GAME.hitstop -= dtReal; dt = 0; }
   else if (GAME.slowmo > 0) { GAME.slowmo -= dtReal; dt = dtReal * 0.3; }
-  GAME.time += dt;
+  const s = GAME.state;
+  if (SIM_STATES.has(s)) GAME.time += dt; else GAME.time += dtReal * 0.2;   // menus: the world idles gently
 
-  if (GAME.state === 'dev') updateDevCam(dtReal);
-  if (GAME.state === 'play') {
+  if (s === 'dev') updateDevCam(dtReal);
+  else if (s === 'title') titleCamera(dtReal);
+  else if (s === 'creator') creatorCamera(dtReal);
+  else if (s === 'intro') { if (GAME.cine && GAME.cine(dtReal) && GAME.cineDone) { const r = GAME.cineDone; GAME.cineDone = null; r(); } }
+  if (SIM_STATES.has(s) && G) {
     if (dt > 0) {
       updatePlayer(dt);
       updateEncounters();
       updateEnemies(dt);
       updateMagic(dt);
+      updateStory(dt);
     }
     lockSwitch(dtReal);
-    updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0 });
+    updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
     GAME.focus.copy(PL.body.pos);
+    if (typeof mapRevealUpdate === 'function') mapRevealUpdate(dtReal);
   }
-  updateSky(dt, GAME.focus, GAME.time);
-  updateWater(GAME.time);
-  updateGrass(GAME.time, camera.position, GAME.state === 'play' ? PL.body.pos : null);
+  if (UI.dlg) updateDialogue(dtReal);
+  if (s === 'map' && typeof mapIsOpen === 'function' && !mapIsOpen()) enterPlay();   // closed from its own UI
+
+  updateSky(dt || dtReal * 0.2, GAME.focus, GAME.time);
+  caveAtmosphere();
+  if (!GAME.inCave) {
+    updateWater(GAME.time);
+    updateGrass(GAME.time, camera.position, G ? PL.body.pos : null);
+    updateLamps(); updateFires(dtReal);
+  }
   updateTrees(GAME.time);
+  updateCave(dtReal);
+  if (G) updateWaystones(dtReal);
   updateVFX(dt);
+  if (G && (s === 'play' || s === 'rest')) updateHUD(dtReal, GAME.time);
+  updateFlash(dtReal);
+  if (typeof updateAudio === 'function') { try { updateAudio(dtReal); } catch (e) { console.error('audio', e); } }
   assignLights();
   flushPools();
   renderer.info.reset();
@@ -125,11 +166,11 @@ function reportFatal(e) {
 
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
-  THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, get G() { return G; }, Enemy, spawnPlayer, castPlayerSpell, SPELL,
-  // run N frames synchronously (rAF doesn't fire in a hidden tab)
+  THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, PROPS_LIB, propSize,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES,
+  get G() { return G; }, set G(v) { G = v; },
+  Enemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
-  // simulate held keys for a number of frames: keys = ['KeyW', 'Mouse0', ...]
   hold(keys, n = 30, dt = 1 / 60) {
     for (const k of keys) { IN.keys.add(k); IN.edgesDown.add(k); }
     for (let i = 0; i < n; i++) frame(dt);
@@ -141,13 +182,13 @@ window.__mv = {
 function runTests() {
   const report = { bootMs: GAME.bootMs, ok: true };
   try { if (typeof selfTests === 'function') Object.assign(report, selfTests()); } catch (e) { report.ok = false; report.error = String(e.stack || e); }
-  const pre = document.createElement('pre'); pre.id = '__report';
+  const pre = document.createElement('pre'); pre.id = '__report'; pre.style.display = 'none';
   pre.textContent = JSON.stringify(report); document.body.appendChild(pre);
   document.title = 'MV-TEST-DONE';
 }
 
 boot().catch(e => {
-  $('boot').classList.add('err');
+  $('boot').classList.remove('gone'); $('boot').classList.add('err');
   bootStatus('Boot failed: ' + (e && (e.stack || e.message) || e));
   console.error(e);
 });

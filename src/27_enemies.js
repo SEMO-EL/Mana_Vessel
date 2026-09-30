@@ -177,7 +177,7 @@ class Enemy {
     this.key = key;
     const sc = opts.scale || 1;               // def r/h are final sizes; bosses pass a scale
     this.r = d.r * sc; this.h = d.h * sc;
-    this.body = { pos: new THREE.Vector3(x, heightAt(x, z), z), vel: new THREE.Vector3(), r: this.r, h: this.h, grounded: true, groundY: 0 };
+    this.body = { pos: new THREE.Vector3(x, floorAt(x, z), z), vel: new THREE.Vector3(), r: this.r, h: this.h, grounded: true, groundY: 0 };
     this.pos = this.body.pos;
     this.home = new THREE.Vector3(x, 0, z);
     this.face = opts.face ?? rnd(0, TAU);
@@ -197,8 +197,14 @@ class Enemy {
     if (d.rig === 'wolf') {
       this.rig = buildWolfRig(d.scale || 1, key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168']));
       this.root = this.rig.root;
+    } else if (d.rig === 'treant') {
+      this.rig = buildTreantRig();
+      this.root = this.rig.root;
+    } else if (d.rig === 'stone') {
+      this.rig = buildStoneRig();
+      this.root = this.rig.root;
     } else {
-      this.actor = new Actor({ base: d.base, recolor: d.recolor, show: d.show || [], scale: opts.scale || 1 });
+      this.actor = new Actor({ base: d.base, recolor: d.recolor, show: d.show || [], hide: d.hide || [], scale: opts.scale || 1 });
       for (const [from, mesh, bone] of d.borrow || []) { borrowMesh(this.actor, from, mesh, bone); this.actor.show(mesh, true); }
       this.root = this.actor.root;
       if (this.state === 'dormant') this.actor.once('Skeletons_Inactive_Floor_Pose', { fade: 0 });
@@ -249,7 +255,7 @@ class Enemy {
       this.burnT -= dt;
       this.hp -= this.burn * dt;
       if (Math.random() < 0.5) emit(1, { pos: this.lockPoint(), col: '#ff8030', vel: { x: 0, y: 1.5, z: 0 }, velSpread: 0.5, life: 0.5, size: 0.3, bright: 2 });
-      if (this.hp <= 0) killEnemy(this);
+      if (this.hp <= 0) { if (d.spar) this.hp = 1; else killEnemy(this); }
     }
 
     if (this.state === 'dead') {
@@ -259,7 +265,7 @@ class Enemy {
       this.sync(dt);
       return;
     }
-    if (this.state !== 'dormant') this.think(dt);
+    if (this.state !== 'dormant' && !d.static) this.think(dt);
     // steering is done; physics does the rest
     if (this.rootT > 0) { this.body.vel.x = 0; this.body.vel.z = 0; }
     moveBody(this.body, dt);
@@ -279,9 +285,29 @@ class Enemy {
     this.removed = true;
   }
 
+  /* A boss's second phase: new moves, faster, and a roar that raises the dead. */
+  enterPhase2() {
+    const P2 = this.def.phase2;
+    this.phase2 = true;
+    this.def = { ...this.def, attacks: [...this.def.attacks, ...P2.attacks], walk: this.def.walk * P2.speedMul, run: this.def.run * P2.speedMul };
+    this.releaseToken();
+    this.set('recover'); this.recoverT = 2.2;
+    if (this.actor) this.actor.once('Taunt', { speed: 0.8, fade: 0.1 });
+    BUS.emit('bossPhase', this);
+    BUS.emit('sfx', { id: 'howl', pos: this.pos });
+    shake(0.5);
+    for (let i = 0; i < 3; i++) {
+      const a = i / 3 * TAU, x = this.pos.x + Math.cos(a) * 7, z = this.pos.z + Math.sin(a) * 7;
+      const t = new Enemy('thrall', x, z, { dormant: true });
+      t.aggro = true; t.lockable = false; t.set('awaken');
+      t.actor.once('Spawn_Ground_Skeletons', { speed: 1.4, fade: 0 });
+    }
+  }
+
   /* ───── the brain ───── */
   think(dt) {
     const d = this.def, dist = this.dist(), p = PL.body.pos;
+    if (d.phase2 && !this.phase2 && this.hp / this.maxHp < d.phase2.at && this.state !== 'windup' && this.state !== 'active') { this.enterPhase2(); return; }
     const speedMul = this.slow ? 1 - this.slow : 1;
     const playerDown = PL.state === 'dead';
     const steer = (tx, tz, spd, k = 8) => {
@@ -416,6 +442,15 @@ class Enemy {
       }
     } else { this.windup = a.windup; this.activeT = a.active; this.recoverT = a.recover; }
     if (SETTINGS.difficulty === 'story') this.windup *= 1.25;
+    if (a.activeMul) this.activeT *= a.activeMul;
+    if (a.aoe) {
+      // area attack: the ring on the ground is the tell, and the ring does the damage
+      const p = a.aoe.at === 'self' ? this.pos.clone()
+        : a.aoe.at === 'target' ? PL.body.pos.clone()
+        : this.pos.clone().add(new THREE.Vector3(Math.sin(this.face) * a.aoe.dist, 0, Math.cos(this.face) * a.aoe.dist));
+      hostileAoE(p, a.aoe.r, this.windup + (a.aoe.delay || 0), a.dmg, { poise: a.poise, unblockable: a.unblockable, roots: a.name === 'roots' });
+      this.hits = true;
+    }
   }
   enterActive() {
     const a = this.attack;
@@ -434,6 +469,10 @@ class Enemy {
       BUS.emit('sfx', { id: a.chant ? 'enemyCast' : 'crossbow', pos: this.pos });
     }
     if (a.name === 'pounce' || a.leap) BUS.emit('sfx', { id: 'snarl', pos: this.pos });
+    if (a.shock) {
+      const p = this.pos.clone().add(new THREE.Vector3(Math.sin(this.face) * 3.5, 0, Math.cos(this.face) * 3.5));
+      hostileAoE(p, a.shock, 0.12, a.dmg * 0.6, { poise: 40 });
+    }
   }
   tryHit(a) {
     const b = PL.body;
@@ -470,7 +509,8 @@ function defineEncounter(id, x, z, list, opts = {}) {
 function updateEncounters() {
   const p = PL.body.pos;
   for (const enc of ENCOUNTERS) {
-    if (enc.opts.cave !== !!GAME.inCave) { if (enc.active && !enc.live.some(e => e.aggro)) despawnEncounter(enc); continue; }
+    // cave encounters live only underground; every other encounter only outside
+    if (!!enc.opts.cave !== !!GAME.inCave) { if (enc.active && !enc.live.some(e => e.aggro)) despawnEncounter(enc); continue; }
     const d = Math.hypot(p.x - enc.x, p.z - enc.z);
     if (!enc.active && !enc.cleared && d < 150 && (!enc.opts.night || SKY_NOW.night > 0.5) && (!enc.opts.flag || G.flags[enc.opts.flag])) spawnEncounter(enc);
     else if (enc.active && d > 210 && !enc.live.some(e => e.aggro && !e.dead)) despawnEncounter(enc);

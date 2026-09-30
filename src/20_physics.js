@@ -60,8 +60,10 @@ function insideFootprint(c, x, z, pad) {
 
 // Ground under a point: terrain, or the top of anything walkable that the
 // feet are already at (or just above). `feetY` decides what counts.
+// The walkable base surface: the outdoor terrain, or the cave floor when inside.
+function floorAt(x, z) { return GAME.inCave ? caveFloorAt(x, z) : heightAt(x, z); }
 function groundAt(x, z, feetY, pad = 0.2) {
-  let g = heightAt(x, z);
+  let g = floorAt(x, z);
   for (const c of nearColliders(x, z, 1)) {
     if (c.noGround) continue;
     if (c.y1 <= feetY + PHYS.STEP && c.y1 > g && insideFootprint(c, x, z, pad)) g = c.y1;
@@ -119,7 +121,7 @@ function moveBody(b, dt) {
   }
 
   // deep water: no swimming animations exist, so wading depth is the limit
-  if (!b.flying && !b.canSwim) {
+  if (!b.flying && !b.canSwim && !GAME.inCave) {
     const w = waterAt(_p.x, _p.z);
     if (w > NO_WATER && w - heightAt(_p.x, _p.z) > PHYS.WADE && !b.onPlatform) {
       const w0 = waterAt(ox, oz);
@@ -138,7 +140,7 @@ function moveBody(b, dt) {
 
   // vertical
   const ground = groundAt(b.pos.x, b.pos.z, b.pos.y);
-  b.onPlatform = ground > heightAt(b.pos.x, b.pos.z) + 0.05;
+  b.onPlatform = ground > floorAt(b.pos.x, b.pos.z) + 0.05;
   if (b.flying) { b.pos.y += b.vel.y * dt; b.grounded = false; b.groundY = ground; return; }
   if (b.grounded && b.vel.y <= 0 && b.pos.y - ground < PHYS.STEP + 0.25) {
     // stick to the ground when walking downhill instead of bouncing off it
@@ -155,25 +157,27 @@ function moveBody(b, dt) {
     } else b.grounded = false;
   }
   b.groundY = ground;
-  const w = waterAt(b.pos.x, b.pos.z);
+  const w = GAME.inCave ? NO_WATER : waterAt(b.pos.x, b.pos.z);
   b.inWater = w > NO_WATER && w > b.pos.y + 0.1 ? w - b.pos.y : 0;
 }
 
 /* ───────────── raycasts (spell aim, camera, line of sight) ───────────── */
 // Returns distance along the ray to the terrain, or Infinity.
 function rayTerrain(o, d, maxDist) {
-  let t = 0, step = 1.0, prevAbove = o.y - heightAt(o.x, o.z);
+  // "above" = distance to the nearest surface along y: floor below, ceiling above (cave)
+  const clearance = (x, y, z) => { const f = y - floorAt(x, z); return GAME.inCave ? Math.min(f, caveCeilAt(x, z) - y) : f; };
+  let t = 0, step = 1.0, prevAbove = clearance(o.x, o.y, o.z);
   if (prevAbove < 0) return 0;
   while (t < maxDist) {
     const nt = Math.min(t + step, maxDist);
     const x = o.x + d.x * nt, y = o.y + d.y * nt, z = o.z + d.z * nt;
-    const above = y - heightAt(x, z);
+    const above = clearance(x, y, z);
     if (above < 0) {
       // bisect for the crossing
       let a = t, b = nt;
       for (let i = 0; i < 12; i++) {
         const m = (a + b) / 2;
-        if (o.y + d.y * m - heightAt(o.x + d.x * m, o.z + d.z * m) < 0) b = m; else a = m;
+        if (clearance(o.x + d.x * m, o.y + d.y * m, o.z + d.z * m) < 0) b = m; else a = m;
       }
       return (a + b) / 2;
     }

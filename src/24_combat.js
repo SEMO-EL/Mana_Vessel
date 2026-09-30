@@ -43,6 +43,10 @@ function playerSwingHits(move) {
 function damageEnemy(e, dmg, o = {}) {
   if (e.dead || e.inactive) return;
   dmg *= DIFFICULTY[SETTINGS.difficulty].dealt;
+  if (e.def.fireWeak && (o.burn || o.school === 'fire')) dmg *= e.def.fireWeak;   // the Treant fears fire
+  if (e.def.magicOnly && o.kind === 'sword') {                                    // Roxy's rune-stones
+    BUS.emit('sfx', { id: 'block', pos: e.pos }); BUS.emit('hint', 'Magic, not a stick.'); return;
+  }
   // shields and guarding enemies eat frontal damage
   if (e.shield && o.dir && e.state !== 'attack' && !o.crit && o.kind !== 'magicAoE') {
     const front = -(Math.sin(e.face) * o.dir.x + Math.cos(e.face) * o.dir.z);   // >0: hit from the front
@@ -63,6 +67,7 @@ function damageEnemy(e, dmg, o = {}) {
   e.hurtT = 0.16;
   e.lastHitT = GAME.time;
   if (!e.aggro) alertEnemy(e, true);
+  if (e.def.spar && e.hp < 1) e.hp = 1;   // a sparring partner yields; he never dies
   numbers(e, dmg, o.crit);
   if (o.burn) { e.burn = Math.max(e.burn || 0, o.burn); e.burnT = 2.8; }
   if (o.slow) { e.slow = Math.max(e.slow || 0, o.slow); e.slowT = 2.2; }
