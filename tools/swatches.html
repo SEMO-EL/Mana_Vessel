@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8"><title>swatch probe</title>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.min.js", "three/addons/": "../vendor/three/addons/" } }</script>
+<script type="module">
+// For every mesh of every character: which of the 8x4 palette swatches do its UVs land in?
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const g = await new Promise((ok, bad) => new GLTFLoader().load('../assets/models/characters.glb', ok, undefined, bad));
+const out = {};
+for (const ch of g.scene.children) {
+  out[ch.name] = {};
+  ch.traverse(o => {
+    if (!o.isMesh) return;
+    const uv = o.geometry.attributes.uv, count = {};
+    for (let i = 0; i < uv.count; i++) {
+      const sx = Math.min(7, Math.floor(uv.getX(i) * 8)), sy = Math.min(3, Math.floor(uv.getY(i) * 4));
+      const k = sy * 8 + sx; count[k] = (count[k] || 0) + 1;
+    }
+    out[ch.name][o.name] = Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, n]) => k + ':' + n).join(' ');
+  });
+}
+window.__report = out;
+document.body.textContent = 'done';
+</script>
