@@ -1,0 +1,67 @@
+<script>
+/* ─────────────────────────────────────────────────────────────────────
+   Boot loader (classic script, runs last).
+   three.js only ships as ES modules and a file:// page can't import
+   module files from disk, so every module is embedded as base64, turned
+   into a blob: URL, and wired together with an import map. The game
+   itself is one more blob module that imports 'three' by name.
+   ───────────────────────────────────────────────────────────────────── */
+(function () {
+  'use strict';
+  var bootEl = document.getElementById('boot');
+  var bootMsg = document.getElementById('bootMsg');
+  function fail(msg) {
+    if (bootEl) bootEl.classList.add('err');
+    if (bootMsg) bootMsg.textContent = msg;
+    console.error('[boot] ' + msg);
+  }
+  window.addEventListener('error', function (e) {
+    fail((e.message || 'error') + (e.filename ? '  @ ' + e.filename.slice(-40) + ':' + e.lineno : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    fail('unhandled: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason));
+  });
+
+  function b64ToBytes(s) {
+    var bin = atob(s), n = bin.length, u = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  // Assets are decoded lazily and cached; the text stays in the DOM until asked for.
+  var assetCache = {};
+  window.MV_ASSET = function (name) {
+    if (assetCache[name]) return assetCache[name];
+    var el = document.querySelector('script[type="application/x-mv-asset"][data-name="' + name + '"]');
+    if (!el) throw new Error('missing asset ' + name);
+    var bytes = b64ToBytes(el.textContent);
+    el.textContent = '';               // free the base64 copy
+    return (assetCache[name] = bytes);
+  };
+
+  try {
+    var imports = {};
+    var mods = document.querySelectorAll('script[type="application/x-mv-module"]');
+    var dec = new TextDecoder();
+    for (var i = 0; i < mods.length; i++) {
+      var code = dec.decode(b64ToBytes(mods[i].textContent));
+      imports[mods[i].getAttribute('data-spec')] =
+        URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      mods[i].textContent = '';
+    }
+    var map = document.createElement('script');
+    map.type = 'importmap';
+    map.textContent = JSON.stringify({ imports: imports });
+    document.head.appendChild(map);
+
+    var gameSrc = document.querySelector('script[type="application/x-mv-game"]').textContent;
+    var gameUrl = URL.createObjectURL(new Blob([gameSrc], { type: 'text/javascript' }));
+    if (bootMsg) bootMsg.textContent = 'Waking the engine';
+    import(gameUrl).catch(function (e) {
+      fail('game failed to load: ' + (e && (e.stack || e.message) || e));
+    });
+  } catch (e) {
+    fail('loader: ' + (e && (e.stack || e.message) || e));
+  }
+})();
+</script>

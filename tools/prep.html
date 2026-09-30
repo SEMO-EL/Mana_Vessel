@@ -1,0 +1,168 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mana Vessel 3D — asset prep</title>
+<style>body{font:12px monospace;background:#111;color:#ccc;padding:12px} pre{white-space:pre-wrap}</style>
+<h3>asset prep — results land in window.__report</h3>
+<pre id="log"></pre>
+<script type="importmap">
+{ "imports": {
+  "three": "../vendor/three/three.module.min.js",
+  "three/addons/": "../vendor/three/addons/"
+} }
+</script>
+<script type="module">
+/* Converts the raw CC0 packs into four compact game assets:
+     characters.glb  9 rigs, meshes only, NO textures (re-attached at runtime)
+     anims.glb       one bone rig + the clips we use, deform bones only
+     props.glb       61 KayKit medieval set pieces, NO texture (one atlas)
+   Textures stay as the original tiny PNGs, copied separately.            */
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from './vendor/GLTFExporter.js';
+
+const logEl = document.getElementById('log');
+const log = (...a) => { logEl.textContent += a.join(' ') + '\n'; };
+window.__report = { status: 'running' };
+const loader = new GLTFLoader();
+const load = url => new Promise((ok, bad) => loader.load(url, ok, undefined, bad));
+
+async function save(path, data) {
+  const body = data instanceof ArrayBuffer ? data : new TextEncoder().encode(data);
+  const r = await fetch('/__save/' + path, { method: 'PUT', body });
+  if (!r.ok) throw new Error('save failed ' + path + ' ' + r.status);
+  log('saved', path, body.byteLength, 'bytes');
+  return body.byteLength;
+}
+const exportGLB = (input, opts = {}) =>
+  new Promise((ok, bad) => new GLTFExporter().parse(input, ok, bad, { binary: true, ...opts }));
+
+const CHARS = {
+  Mage: 'kaykit/Mage.glb', Knight: 'kaykit/Knight.glb', Rogue_Hooded: 'kaykit/Rogue_Hooded.glb',
+  Barbarian: 'kaykit/Barbarian.glb', Rogue: 'kaykit/Rogue.glb',
+  Skeleton_Minion: 'skeletons/Skeleton_Minion.glb', Skeleton_Warrior: 'skeletons/Skeleton_Warrior.glb',
+  Skeleton_Mage: 'skeletons/Skeleton_Mage.glb', Skeleton_Rogue: 'skeletons/Skeleton_Rogue.glb',
+};
+const KEEP = new Set(`Idle Idle_Combat 2H_Melee_Idle Unarmed_Idle Walking_A Walking_B Walking_C Walking_Backwards
+Running_A Running_B Running_C Running_Strafe_Left Running_Strafe_Right Jump_Start Jump_Idle Jump_Land
+Jump_Full_Short Jump_Full_Long 1H_Melee_Attack_Chop 1H_Melee_Attack_Slice_Diagonal 1H_Melee_Attack_Slice_Horizontal
+1H_Melee_Attack_Stab 1H_Melee_Attack_Jump_Chop 2H_Melee_Attack_Chop 2H_Melee_Attack_Slice 2H_Melee_Attack_Spin
+2H_Melee_Attack_Stab Block Block_Attack Block_Hit Blocking Dodge_Forward Dodge_Backward Dodge_Left Dodge_Right
+Hit_A Hit_B Death_A Death_A_Pose Death_B Death_B_Pose Unarmed_Melee_Attack_Punch_A Unarmed_Melee_Attack_Kick
+Spellcast_Raise Spellcast_Long Spellcast_Shoot Spellcasting Spellcast_Summon 1H_Ranged_Aiming 1H_Ranged_Shoot
+2H_Ranged_Aiming 2H_Ranged_Shoot Interact PickUp Use_Item Cheer Lie_Down Lie_Idle Lie_StandUp Sit_Floor_Down
+Sit_Floor_Idle Sit_Floor_StandUp Taunt Skeletons_Awaken_Floor Skeletons_Awaken_Standing
+Skeletons_Inactive_Floor_Pose Spawn_Ground_Skeletons Death_C_Skeletons Walking_D_Skeletons`.split(/\s+/));
+// Bones that actually carry geometry. The IK / control bones are Blender
+// helpers; their motion is already baked into these.
+const DEFORM = new Set(['root','hips','spine','chest','upperarml','lowerarml','wristl','handl','handslotl',
+  'upperarmr','lowerarmr','wristr','handr','handslotr','head','upperlegl','lowerlegl','footl','toesl',
+  'upperlegr','lowerlegr','footr','toesr']);
+
+const HEX = `building_home_A_red building_home_B_red building_windmill_red building_well_red building_tavern_red
+building_church_red building_blacksmith_red building_market_red building_watermill_red building_tower_A_red
+building_tower_B_red building_tower_base_red building_castle_red building_bridge_A building_bridge_B
+building_destroyed building_grain building_scaffolding fence_stone_straight fence_stone_straight_gate
+fence_wood_straight fence_wood_straight_gate wall_straight wall_straight_gate wall_corner_A_outside
+wall_corner_A_inside wall_corner_A_gate barrel crate_A_big crate_A_small crate_B_big crate_long_A crate_open
+sack tent weaponrack wheelbarrow bucket_water ladder pallet target resource_lumber resource_stone flag_red
+rock_single_A rock_single_B rock_single_C rock_single_D rock_single_E tree_single_A tree_single_B
+trees_A_large trees_B_large mountain_A mountain_B mountain_C waterlily_A waterplant_A waterplant_B
+cloud_big cloud_small`.split(/\s+/);
+
+function isConstant(track) {
+  const v = track.values, n = track.getValueSize();
+  for (let i = n; i < v.length; i++) if (Math.abs(v[i] - v[i % n]) > 1e-5) return false;
+  return true;
+}
+function trimClip(clip) {
+  const c = clip.clone();
+  c.tracks = c.tracks.filter(t => {
+    const dot = t.name.lastIndexOf('.');
+    const node = t.name.slice(0, dot), prop = t.name.slice(dot + 1);
+    if (!DEFORM.has(node)) return false;
+    // rigid-part rigs never scale; only the hips/root truly translate
+    if (prop === 'scale' && isConstant(t)) return false;
+    return true;
+  });
+  c.optimize();
+  return c;
+}
+// Sample world positions of every deform bone across a clip for two
+// clip versions; returns the worst deviation in metres.
+function poseError(sceneA, clipA, sceneB, clipB) {
+  const mA = new THREE.AnimationMixer(sceneA), mB = new THREE.AnimationMixer(sceneB);
+  const aA = mA.clipAction(clipA).play(), aB = mB.clipAction(clipB).play();
+  let worst = 0; const pa = new THREE.Vector3(), pb = new THREE.Vector3();
+  for (let i = 0; i <= 10; i++) {
+    const t = clipA.duration * i / 10;
+    mA.setTime(t); mB.setTime(t);
+    sceneA.updateMatrixWorld(true); sceneB.updateMatrixWorld(true);
+    for (const name of DEFORM) {
+      const a = sceneA.getObjectByName(name), b = sceneB.getObjectByName(name);
+      if (!a || !b) continue;
+      a.getWorldPosition(pa); b.getWorldPosition(pb);
+      worst = Math.max(worst, pa.distanceTo(pb));
+    }
+  }
+  aA.stop(); aB.stop();
+  return worst;
+}
+function stripMaps(root) {
+  const mats = {};
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (m.map) { mats[m.name] = m.map.name || m.map.image?.src || '?'; m.map = null; }
+    }
+  });
+  return mats;
+}
+
+async function run() {
+  const rep = { bytes: {}, poseErr: {}, charMaterials: {} };
+
+  /* ---- animation library ---- */
+  const donor = await load('../assets/raw/skeletons/Skeleton_Warrior.glb');
+  const check = await load('../assets/raw/skeletons/Skeleton_Warrior.glb');
+  const clips = donor.animations.filter(c => KEEP.has(c.name));
+  const trimmed = clips.map(trimClip);
+  let totalBefore = 0, totalAfter = 0;
+  for (let i = 0; i < clips.length; i++) {
+    totalBefore += clips[i].tracks.length; totalAfter += trimmed[i].tracks.length;
+    rep.poseErr[clips[i].name] = +poseError(check.scene, clips[i], donor.scene, trimmed[i]).toFixed(5);
+  }
+  rep.tracks = { before: totalBefore, after: totalAfter };
+  rep.worstPoseErr = Math.max(...Object.values(rep.poseErr));
+  const bonesOnly = donor.scene;
+  const drop = []; bonesOnly.traverse(o => { if (o.isMesh) drop.push(o); });
+  drop.forEach(o => o.parent.remove(o));
+  rep.bytes.anims = await save('assets/models/anims.glb', await exportGLB(bonesOnly, { animations: trimmed }));
+
+  /* ---- characters ---- */
+  const all = new THREE.Scene();
+  for (const [k, p] of Object.entries(CHARS)) {
+    const g = await load('../assets/raw/' + p);
+    rep.charMaterials[k] = stripMaps(g.scene);
+    g.scene.name = k;
+    all.add(g.scene);
+  }
+  rep.bytes.characters = await save('assets/models/characters.glb', await exportGLB(all, { animations: [] }));
+
+  /* ---- props ---- */
+  const props = new THREE.Scene();
+  const propMats = {};
+  for (const name of HEX) {
+    const g = await load('../assets/raw/hex/' + name + '.gltf');
+    Object.assign(propMats, stripMaps(g.scene));
+    g.scene.name = name;
+    props.add(g.scene);
+  }
+  rep.propMaterials = propMats;
+  rep.bytes.props = await save('assets/models/props.glb', await exportGLB(props));
+
+  rep.status = 'done';
+  window.__report = rep;
+  log(JSON.stringify({ bytes: rep.bytes, tracks: rep.tracks, worstPoseErr: rep.worstPoseErr }, null, 1));
+}
+run().catch(e => { window.__report = { status: 'error', error: String(e && e.stack || e) }; log('ERROR', e && e.stack || e); });
+</script>
