@@ -9,7 +9,7 @@
 ENEMY_DEFS.warden = {
   name: 'The Barrow Warden', base: 'Skeleton_Warrior', borrow: [['Knight', '2H_Sword', 'handslotr']],
   hp: 1350, poise: 170, r: 1.1, h: 1.8, walk: 1.5, run: 4.2, sight: 40, hear: 40,
-  xp: 520, weight: 4, flinchAt: 999, undead: true, knockRes: 1, boss: true,
+  xp: 520, weight: 4, flinchAt: 999, undead: true, knockRes: 1, boss: true, wakeR: 0,   // lies in state until the mist is crossed
   idle: 'Idle_Combat', walkClip: 'Walking_D_Skeletons', runClip: 'Running_C', deathClip: 'Death_C_Skeletons',
   attacks: [
     { clip: '2H_Melee_Attack_Chop',  speed: 0.8,  hitAt: 0.46, range: [0, 5],   reach: 4.4, arc: 0.55, dmg: 34, poise: 60, lunge: 2, shock: 5 },

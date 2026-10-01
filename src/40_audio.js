@@ -421,6 +421,18 @@ const AUDIO_SFX = {
     auNz(d, 0.5, 0.12, 200, 120, 'lowpass', 1);
     for (let i = 0; i < 6; i++) auNz(d, 0.025, 0.16, rnd(2000, 5000), 0, 'bandpass', 2.5, { at: rnd(0, 0.55), atk: 0.002 });
   },
+  ignite: d => {                                                       // a brazier catching: breathy whoosh, a few sparks
+    auNz(d, 0.45, 0.2, 260, 1400, 'bandpass', 0.9, { atk: 0.04 });
+    auNz(d, 0.3, 0.1, 150, 90, 'lowpass', 1);
+    for (let i = 0; i < 4; i++) auNz(d, 0.02, 0.12, rnd(2500, 5500), 0, 'bandpass', 2.5, { at: rnd(0.05, 0.4), atk: 0.002 });
+  },
+  bossIntro: d => {                                                    // a struck low drum, then a dark swell under the name
+    auTone(d, 'sine', 70, 38, 1.6, 0.5, { hold: 0.05 });
+    auNz(d, 0.5, 0.3, 180, 60, 'lowpass', 1, { atk: 0.004 });
+    auTone(d, 'sawtooth', 73.4, 0, 3.2, 0.08, { lp: 700, atk: 0.9, at: 0.1 });
+    auTone(d, 'sawtooth', 110, 0, 3.2, 0.055, { lp: 900, atk: 1.1, at: 0.15 });
+    auTone(d, 'sawtooth', 116.5, 0, 3.0, 0.04, { lp: 800, atk: 1.3, at: 0.25 });   // the minor-second rub
+  },
   /* the vessel */
   'break': d => {                                                      // v2 'break', bigger: shatter + sub drop
     auTone(d, 'sawtooth', 900, 60, 0.9, 0.28, { lp: 5000 });
@@ -544,7 +556,7 @@ const AUDIO_SFX = {
     auNz(d, 0.06, 0.06, 2000, 1500, 'bandpass', 1, { at: 0.12 });
   },
 };
-const AUDIO_PRIO = new Set(['tell', 'tellHeavy', 'break', 'reform', 'parry', 'hurt', 'learn', 'levelUp', 'discover', 'waystone', 'meteorImpact']);
+const AUDIO_PRIO = new Set(['bossIntro', 'tell', 'tellHeavy', 'break', 'reform', 'parry', 'hurt', 'learn', 'levelUp', 'discover', 'waystone', 'meteorImpact']);
 // minimum seconds between two of the same id (same-frame duplicates always merge)
 const AUDIO_GAP = { 'break': 0.5, reform: 0.5, levelUp: 0.4, discover: 1, waystone: 1, learn: 0.3, howl: 0.35, tell: 0.06, tellHeavy: 0.08 };
 

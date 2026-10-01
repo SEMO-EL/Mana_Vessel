@@ -86,12 +86,11 @@ const QUEST = [
   { id: 'done',      title: 'The Road to Roa',   text: 'Explore Buena, or rest and continue in Milestone 2.', at: null },
 ];
 function questStep() { return QUEST.find(q => q.id === G.quest) || QUEST[0]; }
-function setQuest(id) {
+function setQuest(id, { quiet = false } = {}) {
   if (G.quest === id) return;
   G.quest = id;
   const q = questStep();
-  toast(q.title, 'big');
-  setTimeout(() => toast(q.text), 700);
+  if (!quiet) { toast(q.title, 'big'); later(0.7, () => toast(q.text)); }
   BUS.emit('sfx', { id: 'page' });
   autosave();
 }
@@ -118,19 +117,26 @@ class NPC {
     this.col = addCircle(x, z, 0.4, this.pos.y, this.pos.y + 1.8, 'npc');
     this.talk = o.talk || null;
     this.visible = true;
-    if (this.talk) INTERACTABLES.push({ pos: this.pos, r: 2.8, label: () => 'Talk to ' + this.name, enabled: () => this.visible && !!this.talk, action: () => this.talk(this) });
+    // one conversation at a time: the key that closes a talk must not reopen it
+    // before its follow-up (quest step, spawned stones) has run
+    if (this.talk) INTERACTABLES.push({ pos: this.pos, r: 2.8, label: () => 'Talk to ' + this.name,
+      enabled: () => this.visible && !!this.talk && !this.busy,
+      action: async () => { if (this.busy) return; this.busy = true; try { await this.talk(this); } finally { this.busy = false; } } });
     NPCS[id] = this;
   }
   setVisible(on) { this.visible = on; this.actor.root.visible = on; this.col.y1 = on ? this.pos.y + 1.8 : this.pos.y - 5; }
   update(dt) {
     if (!this.visible) return;
     const d = PL.body.pos.distanceTo(this.pos);
-    if (d > 120) return;                           // too far to matter: skip animation
+    // animation LOD: every frame up close, ~5 Hz in the distance (never frozen)
+    this._acc = (this._acc || 0) + dt;
+    if (d > 60 && this._acc < 0.2) return;
+    const step = this._acc; this._acc = 0;
     // turn to face you when you come close
     const want = d < 6 ? Math.atan2(PL.body.pos.x - this.pos.x, PL.body.pos.z - this.pos.z) : this.baseFace;
-    this.face = dampAngle(this.face, want, 3, dt);
+    this.face = dampAngle(this.face, want, 3, step);
     this.actor.root.rotation.y = this.face;
-    this.actor.update(dt);
+    this.actor.update(step);
   }
 }
 async function npcSay(npc, lines) {
@@ -188,6 +194,7 @@ async function talkPaul(n) {
 /* rune-stones: breakable only by magic */
 ENEMY_DEFS.runestone = { name: 'Rune-stone', rig: 'stone', hp: 20, poise: 999, r: 0.7, h: 1.6, walk: 0, run: 0, sight: 0, hear: 0, xp: 4, weight: 9, static: true, magicOnly: true, attacks: [] };
 function spawnRuneStones() {
+  for (const e of [...ENT.enemies]) if (e.quest === 'stone') e.remove();   // idempotent (continue, re-talk)
   const r = NPCS.roxy.pos;
   G.flags.stonesBroken = 0;
   for (let i = 0; i < 3; i++) {
@@ -264,9 +271,43 @@ function defineEncounters() {
   E('caveGrotto', -42, -30, [['archer', -8, -6], ['thrall', 4, 3], ['thrall', 6, -4], ['sorcerer', -10, 8]]);
   E('caveHall', 38, -40, [['thrall', -3, 3, { dormant: true }], ['thrall', 3, 4, { dormant: true }], ['knight', 0, -6]]);
   E('caveOssuary', 0, -74, [['knight', -4, 0], ['archer', 6, -6], ['thrall', 3, 4, { dormant: true }], ['sorcerer', -6, -7]]);
-  E('warden', 0, -120, [['warden', 0, 0, { scale: 2.2, face: 0 }]], { boss: true,
-    onClear: () => { G.flags.warden = true; banner('Great Enemy Felled', 'The Barrow Warden'); setTimeout(() => say(SCRIPT.wardenDead).then(() => { if (G.quest === 'warden' || G.quest === 'cave') setQuest('farewell'); }), 2500); } });
+  E('warden', 0, -120, [['warden', 0, 0, { scale: 2.2, face: 0, dormant: true }]], { boss: true,
+    onClear: () => { G.flags.warden = true; banner('Great Enemy Felled', 'The Barrow Warden'); later(2.5, () => say(SCRIPT.wardenDead).then(() => { if (G.quest === 'warden' || G.quest === 'cave') setQuest('farewell'); })); } });
 }
+
+/* ───────────── the Warden's reveal ─────────────
+   Crossing the mist: the braziers catch around the Barrow, the Warden climbs
+   out of its grave in the shaft of daylight, and its name lands. The first
+   time is a short cutscene; after that it simply rises as you walk in. */
+const SHOT = { fn: null };
+BUS.on('fogWall', () => {
+  const W = ENT.enemies.find(e => e.key === 'warden' && !e.dead && e.state === 'dormant');
+  if (!W) return;
+  if (G.flags.wardenSeen) { later(0.8, () => W.wake(1.0)); return; }
+  G.flags.wardenSeen = true;
+  setPlayerState('talk'); PL.actor.setUpper(null); PL.actor.loop('Idle', { fade: 0.3 });
+  CAM.lockTarget = null;
+  letterbox(true); $('hud').classList.add('off');
+  const P0 = PL.body.pos.clone(), wp = W.pos.clone();
+  const dir = new THREE.Vector3(wp.x - P0.x, 0, wp.z - P0.z).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
+  // from over your shoulder at the mist, down the hall to a low three-quarter on the grave
+  const from = P0.clone().addScaledVector(dir, -3).addScaledVector(side, 1.2).setY(P0.y + 2.6);
+  const to = wp.clone().addScaledVector(dir, -9).addScaledVector(side, 4).setY(wp.y + 0.9);   // low: it looms
+  const ov = CAM.override = { pos: from.clone(), look: wp.clone().setY(wp.y + 1), fov: 42 };
+  CAM.ovBlend = 1;
+  let t = 0, woke = false, carded = false;
+  SHOT.fn = dt => {
+    t += dt;
+    ov.pos.lerpVectors(from, to, smooth(0, 1, t / 4.6));
+    ov.look.set(wp.x, wp.y + lerp(0.6, W.h * 0.62, smooth(1.4, 3.8, t)), wp.z);
+    if (!woke && t > 1.3) { woke = true; W.wake(0.9); W.awakeT += 1.6; shake(0.25); }
+    if (!carded && t > 2.5) { carded = true; bossCard('The Barrow Warden', 'Keeper of the Weeping Cave'); BUS.emit('sfx', { id: 'bossIntro' }); }
+    if (t < 5.2) return false;
+    CAM.override = null; letterbox(false); $('hud').classList.remove('off');
+    if (PL.state === 'talk') setPlayerState('move');
+    return true;
+  };
+});
 
 /* ───────────── waystones ───────────── */
 async function activateWaystone(W) {
@@ -307,7 +348,7 @@ async function fastTravel(id) {
   if (!W || !G.waystones[id]) return;
   closeAllScreens();
   await fadeOut(0.6);
-  if (GAME.inCave) { GAME.inCave = false; setOutdoorVisible(true); if (VFX.rain) VFX.rain.visible = true; }
+  leaveCaveNow();
   for (const e of [...ENT.enemies]) e.remove();
   for (const enc of ENCOUNTERS) { enc.active = false; enc.live = []; }
   placeAtWaystone(W);
@@ -341,11 +382,11 @@ BUS.on('playerDied', () => {
 });
 async function riseAgain() {
   closeAllScreens();
+  if (SHOT.fn) { SHOT.fn = null; CAM.override = null; letterbox(false); }
   await fadeOut(0.5);
-  if (GAME.inCave) { GAME.inCave = false; setOutdoorVisible(true); if (VFX.rain) VFX.rain.visible = true; }
+  leaveCaveNow();
   for (const e of [...ENT.enemies]) e.remove();
   resetEncounters();
-  if (CAVE.fogPassed && !G.flags.warden) { CAVE.fogPassed = false; CAVE.fogCol = addBox(CAVE.fogCol.x, CAVE.fogCol.z, 4.5, 0.4, 0, CAVE.fogCol.y0, CAVE.fogCol.y1, 'fogwall'); CAVE.fogCol.noGround = true; }
   const W = WSTONE.list.find(w => w.id === G.lastWaystone) || WSTONE.list[0];
   G.hp = G.maxHp; G.mana = G.maxMana * 0.6; G.stamina = G.maxStamina;
   placeAtWaystone(W);
@@ -442,7 +483,7 @@ async function onReachGate() {
   if (G.flags.gateEnd) return;
   G.flags.gateEnd = true;
   await say(SCRIPT.gate);
-  setQuest('done');
+  setQuest('done', { quiet: true });       // the endcard says it
   showEndcard();
 }
 
@@ -456,10 +497,15 @@ BUS.on('enemyKilled', e => {
 });
 BUS.on('vesselBreak', o => {
   if (o.first) setTimeout(() => splash('m_break', 'The Vessel Breaks', 'and reforms larger', 3800), 400);
-  if (G.quest === 'breakIt') setTimeout(() => setQuest('tellRoxy'), 4300);
+  if (G.quest === 'breakIt') later(4.3, () => { if (G.quest === 'breakIt') setQuest('tellRoxy'); });
 });
 BUS.on('enterCave', () => { if (G.quest === 'cave') setQuest('warden'); });
+// story timers run on game time: a pause (or the map) holds them
+const LATER = [];
+function later(sec, fn) { LATER.push({ t: sec, fn }); }
 function updateStory(dt) {
+  for (let i = LATER.length - 1; i >= 0; i--) if ((LATER[i].t -= dt) <= 0) { const f = LATER[i].fn; LATER.splice(i, 1); f(); }
+  if (SHOT.fn && SHOT.fn(dt)) SHOT.fn = null;
   for (const n of Object.values(NPCS)) n.update(dt);
   checkSpar();
   updateDiscovery();

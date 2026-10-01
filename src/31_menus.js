@@ -32,6 +32,7 @@ function titleCamera(dt) {
 }
 function showTitle() {
   GAME.state = 'title';
+  leaveCaveNow();
   TOD.hour = 17.6; TOD.frozen = true;
   Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 1e9;
   $('hud').classList.add('off');
@@ -77,9 +78,12 @@ function refreshCreator() {
 let _ccOrbit = 0;
 function creatorCamera(dt) {
   _ccOrbit += dt * 0.25;
-  const p = PL.body.pos, a = 2.4 + Math.sin(_ccOrbit) * 0.5;
-  camera.position.set(p.x + Math.sin(a) * 3.6 - 1.2, p.y + 1.55, p.z + Math.cos(a) * 3.6);
-  camera.lookAt(p.x - 0.9, p.y + 1.05, p.z);
+  // orbit in front of the character and aim at a point to the camera's LEFT
+  // of them, so they stand in the open right half (the panel covers the left)
+  const p = PL.body.pos, a = PL.face + Math.sin(_ccOrbit) * 0.45;
+  camera.position.set(p.x + Math.sin(a) * 3.4, p.y + 1.45, p.z + Math.cos(a) * 3.4);
+  const rx = Math.cos(a), rz = -Math.sin(a);          // camera's right axis (it looks along -(sin a, cos a))
+  camera.lookAt(p.x - rx * 0.95, p.y + 0.95, p.z - rz * 0.95);
   GAME.focus.copy(p);
   PL.actor.update(dt);
 }
@@ -146,8 +150,10 @@ function continueJourney() {
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
   for (const e of [...ENT.enemies]) e.remove();
+  UI.spar = null; CAM.lockTarget = null; LATER.length = 0;
+  if (SHOT.fn) { SHOT.fn = null; CAM.override = null; letterbox(false); }
   for (const enc of ENCOUNTERS) { enc.active = false; enc.live = []; enc.cleared = !!(enc.opts.boss && G.flags[enc.id]); }
-  CAVE.fogPassed = false;
+  leaveCaveNow();
   if (NPCS.paul) NPCS.paul.setVisible(true);
   if (G.quest === 'stones') spawnRuneStones();
   for (const P of PAGES) P.mesh.visible = !G.pages.includes(P.i);
@@ -295,6 +301,7 @@ function openTravel() {
 function showEndcard() {
   GAME.state = 'end';
   $('endText').textContent = `${G.name}, level ${G.lvl}, Adventurer Rank ${guildRank(G.lvl)}. You broke the vessel ${G.breaks} times; it is ${Math.round(G.maxMana)} deep now. ${G.kills} kills, ${G.pages.length} of Roxy's pages, ${G.deaths} deaths. The Boreas estate is waiting in Roa — and a girl who punches.`;
+  $('hud').classList.add('off'); $('toasts').innerHTML = ''; letterbox(false);
   openScreen('endcard');
   autosave();
 }

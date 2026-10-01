@@ -186,7 +186,7 @@ class Enemy {
     this.shield = d.shield || 0;
     this.state = opts.dormant ? 'dormant' : 'idle';
     this.stateT = rnd(0, 2);
-    this.aggro = false; this.lockable = true;
+    this.aggro = false; this.lockable = !opts.dormant;   // the sleeping dead are scenery until they rise
     this.encounter = opts.encounter || null;
     this.wanderT = rnd(2, 6); this.wanderTo = null;
     this.circleDir = Math.random() < 0.5 ? -1 : 1;
@@ -235,6 +235,15 @@ class Enemy {
     if (this.actor) this.actor.once('Hit_B', { speed: 0.7, fade: 0.05 });
   }
   interrupt() { this.releaseToken(); this.set('recover'); this.attack = null; if (this.actor) this.actor.once('Hit_A', { speed: 1.4 }); }
+  // The sleeping dead rise: when you walk past (wakeR, 0 = only by script) or strike them.
+  wake(speed = 1.2) {
+    if (this.state !== 'dormant' || this.dead) return;
+    this.aggro = true; this.lockable = false; this.set('awaken');
+    const clip = CHARS.clips.get('Skeletons_Awaken_Floor');
+    this.awakeT = clip ? clip.duration / speed : 2;
+    if (this.actor) this.actor.once('Skeletons_Awaken_Floor', { speed, fade: 0.05 });
+    BUS.emit('sfx', { id: 'boneRise', pos: this.pos });
+  }
   releaseToken() { if (this.token) { this.token = false; ENT.tokens = Math.max(0, (ENT.tokens || 0) - 1); } }
   onDeath() {
     this.releaseToken();
@@ -264,6 +273,10 @@ class Enemy {
       if (this.stateT > 4) { this.fade -= dt; this.root.position.y = this.pos.y - (1 - this.fade) * 0.8; if (this.fade <= 0) this.remove(); }
       this.sync(dt);
       return;
+    }
+    if (this.state === 'dormant') {
+      const wr = d.wakeR ?? 6.5;
+      if (this.hp < this.maxHp || (wr > 0 && this.dist() < wr && Math.abs(PL.body.pos.y - this.pos.y) < 4)) this.wake();
     }
     if (this.state !== 'dormant' && !d.static) this.think(dt);
     // steering is done; physics does the rest
@@ -298,7 +311,7 @@ class Enemy {
     shake(0.5);
     for (let i = 0; i < 3; i++) {
       const a = i / 3 * TAU, x = this.pos.x + Math.cos(a) * 7, z = this.pos.z + Math.sin(a) * 7;
-      const t = new Enemy('thrall', x, z, { dormant: true });
+      const t = new Enemy('thrall', x, z, { dormant: true, encounter: this.encounter });   // cleared with the cave
       t.aggro = true; t.lockable = false; t.set('awaken');
       t.actor.once('Spawn_Ground_Skeletons', { speed: 1.4, fade: 0 });
     }
@@ -400,7 +413,7 @@ class Enemy {
         break;
       case 'awaken':
         steer(0, 0, 0, 5);
-        if (this.stateT > 2.0) { this.lockable = true; this.set('chase'); }
+        if (this.stateT > (this.awakeT || 2.0)) { this.lockable = true; this.set('chase'); }
         break;
     }
   }
@@ -464,7 +477,8 @@ class Enemy {
         const dir = target.clone().sub(from).normalize();
         if (n > 1) dir.applyAxisAngle(_up, (i - (n - 1) / 2) * R.spread);
         dir.y += (R.gravity || 0) * from.distanceTo(target) / (R.spd * R.spd) * 0.5;
-        spawnProjectile({ pos: from.clone(), dir: dir.normalize(), spd: R.spd, r: R.r, dmg: R.dmg, hostile: true, col: R.col, life: 3, gravity: R.gravity || 0, poise: 18 });
+        spawnProjectile({ pos: from.clone(), dir: dir.normalize(), spd: R.spd, r: R.r, dmg: R.dmg, hostile: true, col: R.col, life: 3, gravity: R.gravity || 0, poise: 18,
+          target: R.homing ? 'player' : null, homing: R.homing || 0 });
       }
       BUS.emit('sfx', { id: a.chant ? 'enemyCast' : 'crossbow', pos: this.pos });
     }
@@ -541,14 +555,7 @@ function resetEncounters() {
   }
 }
 function wakeDormant(radius) {
-  for (const e of ENT.enemies) {
-    if (e.state !== 'dormant' || e.dead) continue;
-    if (e.dist() < radius) {
-      e.aggro = true; e.lockable = false; e.set('awaken');
-      e.actor.once('Skeletons_Awaken_Floor', { speed: 1.2, fade: 0.05 });
-      BUS.emit('sfx', { id: 'boneRise', pos: e.pos });
-    }
-  }
+  for (const e of ENT.enemies) if (e.state === 'dormant' && e.dist() < radius) e.wake();
 }
 
 function updateEnemies(dt) {

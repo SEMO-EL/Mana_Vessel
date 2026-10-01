@@ -107,13 +107,20 @@ kbd{font-family:var(--display);font-size:11px;font-weight:700;min-width:22px;dis
 #bannerTitle{font-family:var(--display);font-weight:500;font-size:clamp(28px,3.6vw,48px);letter-spacing:.16em;color:var(--parch);text-shadow:0 4px 30px rgba(0,0,0,.8)}
 #bannerSub{font-family:var(--display);font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold)}
 @keyframes banner{0%{opacity:0;letter-spacing:.3em}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
+/* boss title card: the name lands in the lower third while the boss rises */
+#bossCard{position:fixed;left:0;right:0;bottom:12.5%;text-align:center;z-index:16;pointer-events:none;opacity:0}
+#bossCard.on{animation:bosscard 3.8s ease forwards}
+#bcSub{font-family:var(--display);font-size:12px;letter-spacing:.55em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+#bcTitle{font-family:var(--display);font-weight:900;font-size:clamp(30px,4.6vw,66px);letter-spacing:.2em;text-transform:uppercase;color:#f3e6c8;text-shadow:0 0 24px rgba(255,150,60,.35),0 6px 40px #000}
+#bossCard .line{width:min(620px,70%);height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,#c9583a,var(--gold),#c9583a,transparent)}
+@keyframes bosscard{0%{opacity:0;transform:scale(1.06)}18%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0}}
 
 #letterbox i{position:fixed;left:0;right:0;height:0;background:#000;z-index:14;transition:height .6s ease}
 #letterbox i:first-child{top:0}#letterbox i:last-child{bottom:0}
 #letterbox.on i{height:10vh}
 
 /* ───────────── dialogue ───────────── */
-#dialogue{position:fixed;left:50%;bottom:6%;transform:translateX(-50%);width:min(900px,86vw);display:none;z-index:22}
+#dialogue{position:fixed;left:50%;bottom:6%;transform:translateX(-50%);width:min(900px,86vw);display:none;z-index:65} /* above #fade: the prologue is text over black */
 #dialogue.on{display:flex}
 #dlgPortrait{width:150px;flex:0 0 150px;border:1px solid rgba(201,162,39,.45);border-right:none;overflow:hidden;background:#06070e;position:relative;display:none}
 #dlgPortrait.on{display:block}

@@ -61,7 +61,7 @@ function waterMaterial() {
         col += uSunCol * spec;
         // foam: at the shoreline, and wherever the river drops steeply
         float fn = wn(p2 * 2.3) * 0.6 + wn(p1 * 4.0) * 0.4;
-        float foam = smoothstep(0.55, 0.0, depth) * smoothstep(0.45, 0.8, fn);
+        float foam = (1.0 - smoothstep(0.0, 0.55, depth)) * smoothstep(0.45, 0.8, fn);
         foam = max(foam, smoothstep(0.08, 0.35, vSteep) * smoothstep(0.35, 0.7, fn));
         col = mix(col, vec3(0.92, 0.95, 0.94) * (0.35 + 0.65 * uSunVis + 0.2), foam * 0.85);
         float alpha = mix(0.45, 0.93, smoothstep(0.0, 2.2, depth));

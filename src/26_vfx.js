@@ -165,7 +165,9 @@ function initLightPool() {
 function requestLight(pos, col, intensity, dist) { VFX.lightReq.push({ pos, col, intensity, dist }); }
 function assignLights() {
   const cp = camera.position, max = Q().lights;
-  VFX.lightReq.sort((a, b) => (b.intensity / (1 + a.pos.distanceToSquared(cp) * 0.001)) - (a.intensity / (1 + b.pos.distanceToSquared(cp) * 0.001)));
+  // brightest first, discounted by how far the camera is outside each light's reach
+  for (const r of VFX.lightReq) r.score = r.intensity / (1 + r.pos.distanceToSquared(cp) / (r.dist * r.dist));
+  VFX.lightReq.sort((a, b) => b.score - a.score);
   for (let i = 0; i < VFX.lights.length; i++) {
     const l = VFX.lights[i], r = i < max ? VFX.lightReq[i] : null;
     if (r) { l.position.copy(r.pos); l.color.set(r.col); l.intensity = r.intensity; l.distance = r.dist; }

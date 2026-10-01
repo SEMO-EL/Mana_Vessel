@@ -79,7 +79,7 @@ function buildGrass() {
         float wv = sin(uTime * 1.8 + wxz.x * 0.33 + wxz.y * 0.21) * 0.55 + sin(uTime * 3.3 + wxz.x * 1.4 + wxz.y * 0.9) * 0.2;
         vec2 bend = vec2(0.94, 0.34) * wv * uWind * 0.55 + dir * 0.18;
         vec2 away = wxz - uPlayer.xz; float pd = length(away);
-        bend += away / max(pd, 0.001) * smoothstep(1.3, 0.15, pd) * 1.3 * step(abs(uPlayer.y - gy), 2.5);
+        bend += away / max(pd, 0.001) * (1.0 - smoothstep(0.15, 1.3, pd)) * 1.3 * step(abs(uPlayer.y - gy), 2.5);
         p.xz += bend * t * t * hgt;
         p.y -= length(bend) * t * t * hgt * 0.35;
         vec3 transformed = p;

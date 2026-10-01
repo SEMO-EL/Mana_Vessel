@@ -81,6 +81,10 @@ function spawnPlayer(x, z, face = 0) {
   PL.body.vel.set(0, 0, 0);
   PL.body.grounded = true;
   PL.face = face;
+  // place the model now, not on the next play-state update: the creator and
+  // the intro cinematic show the character without ever running updatePlayer
+  PL.actor.root.position.copy(PL.body.pos);
+  PL.actor.root.rotation.y = face;
   setPlayerState('move');
   PL.actor.loop('Idle');
   CAM.yaw = face + Math.PI; CAM.pitch = -0.2;

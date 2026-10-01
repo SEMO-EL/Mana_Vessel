@@ -101,7 +101,7 @@ const skyMat = new THREE.ShaderMaterial({
       float y = d.y;
       // gradient: ground haze below the horizon, horizon band, zenith
       vec3 col = mix(uHor, uZen, smoothstep(0.0, 0.55, y));
-      col = mix(col, mix(uHor, uGnd, 0.35), smoothstep(0.0, -0.25, y));
+      col = mix(col, mix(uHor, uGnd, 0.35), (1.0 - smoothstep(-0.25, 0.0, y)));
       // sun: disk (HDR, blooms), glow, and warm horizon wash toward it
       float sd = max(dot(d, uSunDir), 0.0);
       col += uSunCol * (pow(sd, 900.0) * 30.0 + pow(sd, 18.0) * 0.55 + pow(sd, 3.0) * 0.18 * (1.0 - smoothstep(0.0, 0.6, y)));

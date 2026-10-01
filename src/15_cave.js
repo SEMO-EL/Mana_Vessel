@@ -113,6 +113,44 @@ function buildCave() {
     post.position.set(w.x, y + 1, w.z); C.group.add(post);
     CAVE_FIRES.push({ pos: new THREE.Vector3(w.x, y + 2.1, w.z) });
   }
+  // THE BARROW: a ring of cold braziers that wake, two by two from the door
+  // to the back wall, when you walk through the mist; and one thin shaft of
+  // daylight through a crack in the dome, falling where the Warden lies.
+  const B = CAVE.shapes.find(s => s.id === 'barrow');
+  const stoneM = toonMat({ color: '#5d544a' }), ironM = toonMat({ color: '#2b2724' }), coalM = toonMat({ color: '#2a1a12', emissive: '#3a1606' });
+  const plinthG = new THREE.CylinderGeometry(0.34, 0.46, 1.1, 7).translate(0, 0.55, 0);
+  const bowlG = new THREE.CylinderGeometry(0.66, 0.34, 0.42, 9).translate(0, 1.31, 0);
+  const coalG = new THREE.CylinderGeometry(0.56, 0.56, 0.06, 9).translate(0, 1.53, 0);
+  CAVE.braziers = [];
+  for (let i = 0; i < 8; i++) {
+    const a = Math.PI / 2 + (i + 0.5) / 8 * TAU;          // the door is at +z (a = π/2)
+    const w = caveWorld(B.c[0] + Math.cos(a) * (B.r - 4.5), B.c[1] + Math.sin(a) * (B.r - 4.5)), y = caveFloorAt(w.x, w.z);
+    const g = new THREE.Group();
+    const parts = [new THREE.Mesh(plinthG, stoneM), new THREE.Mesh(bowlG, ironM), new THREE.Mesh(coalG, coalM)];
+    for (const m of parts) { m.castShadow = true; g.add(m); }
+    g.position.set(w.x, y, w.z);
+    C.group.add(g);
+    CAVE.braziers.push({ pos: new THREE.Vector3(w.x, y + 1.75, w.z), delay: 0.35 + Math.min(i, 7 - i) * 0.32, lit: false });
+  }
+  const sw = caveWorld(B.c[0], B.c[1] - 3), sFloor = caveFloorAt(sw.x, sw.z), sTop = caveCeilAt(sw.x, sw.z) + 1, sH = sTop - sFloor;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 3.6, sH, 24, 1, true), new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uK: { value: 1 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    vertexShader: `varying vec2 vUv; varying float vEdge;
+      void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vec3 n = normalize(normalMatrix * normal); vEdge = abs(dot(n, normalize(-mv.xyz)));
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform float uTime, uK; varying vec2 vUv; varying float vEdge;
+      void main(){ float soft = pow(clamp(vEdge, 1e-4, 1.0), 2.2);   // edge-on faces fade: reads as volume (clamped: MSAA can extrapolate vEdge below 0, and pow(<0) is NaN)
+        float h = smoothstep(0.0, 0.25, vUv.y) * (1.0 - smoothstep(0.82, 1.0, vUv.y));
+        float drift = 0.75 + 0.25 * sin(vUv.x * 18.0 + uTime * 0.6) * sin(vUv.y * 7.0 - uTime * 0.4);
+        gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * soft * h * drift * 0.16 * uK, 1.0); }`,
+  }));
+  shaft.position.set(sw.x, sFloor + sH / 2, sw.z);
+  shaft.renderOrder = 7;
+  C.group.add(shaft);
+  CAVE.shaft = { mesh: shaft, x: sw.x, z: sw.z, y0: sFloor, h: sH };
+  CAVE.barrow = caveWorld(B.c[0], B.c[1]);
+  CAVE.barrow.r = B.r;
   // bones scattered through the ossuary and barrow
   const boneMat = toonMat({ color: '#d8ceb4' });
   for (let i = 0; i < 60; i++) {
@@ -131,7 +169,7 @@ function buildCave() {
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9,78.2))) * 43758.5); }
       float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
       void main(){ float v = n(vUv*vec2(6.0,4.0) + vec2(0.0, uTime*0.4)) * 0.6 + n(vUv*vec2(13.0,9.0) - vec2(uTime*0.3, 0.0)) * 0.4;
-        float e = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x) * smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
+        float e = smoothstep(0.0, 0.2, vUv.x) * (1.0 - smoothstep(0.8, 1.0, vUv.x)) * smoothstep(0.0, 0.15, vUv.y) * (1.0 - smoothstep(0.7, 1.0, vUv.y));
         gl_FragColor = vec4(vec3(1.0, 0.82, 0.45) * v * e * 0.9, 1.0); }`,
   }));
   fog.position.set(fw.x, fy + 3, fw.z);
@@ -219,6 +257,7 @@ async function exitCave() {
   CAM.lockTarget = null;
   for (const e of [...ENT.enemies]) if (e.encounter && e.encounter.opts.cave) e.remove();
   for (const enc of ENCOUNTERS) if (enc.opts.cave) { enc.active = false; enc.live = []; }
+  syncFogWall();
   const m = STRUCT.caveMouth;
   PL.body.pos.set(m.x, heightAt(m.x, m.z + 7), m.z + 7);
   PL.body.vel.set(0, 0, 0);
@@ -236,6 +275,20 @@ function passFogWall() {
   BUS.emit('fogWall');
 }
 
+// The boss fog stands while the Warden does. Called whenever a run's state is
+// (re)established: rising, travelling, continuing, starting over, walking out.
+function syncFogWall() {
+  const up = !(G && G.flags.warden);
+  if (up && CAVE.fogPassed) { const c = CAVE.fogCol; CAVE.fogCol = addBox(c.x, c.z, 4.5, 0.4, 0, c.y0, c.y1, 'fogwall'); CAVE.fogCol.noGround = true; }
+  if (!up && !CAVE.fogPassed) removeCollider(CAVE.fogCol);
+  CAVE.fogPassed = !up;
+}
+// Out of the cave at once, no fade (death, fast travel, quitting to the title).
+function leaveCaveNow() {
+  if (GAME.inCave) { GAME.inCave = false; setOutdoorVisible(true); if (VFX.rain) VFX.rain.visible = true; }
+  syncFogWall();
+}
+
 function updateCave(dt) {
   if (!GAME.inCave) return;
   for (const l of CAVE.lights) if (l.pos.distanceToSquared(camera.position) < 55 * 55) requestLight(l.pos, l.col, l.i, l.d);
@@ -243,6 +296,31 @@ function updateCave(dt) {
     if (f.pos.distanceToSquared(camera.position) > 70 * 70) continue;
     if (Math.random() < 0.7) emit(1, { pos: f.pos, spread: 0.1, vel: { x: 0, y: 1.4, z: 0 }, velSpread: 0.25, col: '#ff7a20', col2: '#ffd070', life: 0.6, size: 0.3, bright: 2.2 });
     requestLight(f.pos, '#ff8a3a', 5 + Math.sin(GAME.time * 11 + f.pos.x) * 0.8, 11);
+  }
+  // the Barrow wakes once you're through the mist (and stays lit once it's won)
+  CAVE.arenaT = CAVE.fogPassed ? (CAVE.arenaT || 0) + dt : 0;
+  let lit = 0;
+  for (const b of CAVE.braziers) {
+    const on = CAVE.arenaT > b.delay;
+    if (on && !b.lit) {
+      emit(26, { pos: b.pos, col: '#ffb050', col2: '#fff0b0', spread: 0.3, velSpread: 3.5, upBias: 3, life: 0.7, size: 0.4, bright: 2.4 });
+      BUS.emit('sfx', { id: 'ignite', pos: b.pos });
+    }
+    b.lit = on;
+    if (!on) continue;
+    lit++;
+    if (b.pos.distanceToSquared(camera.position) > 70 * 70) continue;
+    if (Math.random() < 0.85) emit(1, { pos: b.pos, spread: 0.25, vel: { x: 0, y: 1.8, z: 0 }, velSpread: 0.35, col: '#ff7a20', col2: '#ffd070', life: 0.7, size: 0.45, size2: 0.1, bright: 2.2 });
+    requestLight(b.pos, '#ff9440', 7 + Math.sin(GAME.time * 9 + b.pos.x) * 0.8, 16);
+  }
+  const P = PL.body.pos, inBarrow = Math.hypot(P.x - CAVE.barrow.x, P.z - CAVE.barrow.z) < CAVE.barrow.r + 6;
+  CAVE.glow = damp(CAVE.glow || 0, inBarrow ? lit / CAVE.braziers.length : 0, 1.6, dt);
+  // the daylight shaft, and dust turning in it
+  const S = CAVE.shaft;
+  S.mesh.material.uniforms.uTime.value = GAME.time;
+  if (Math.hypot(P.x - S.x, P.z - S.z) < 45 && Math.random() < dt * 14) {
+    const a = rnd(0, TAU), r = Math.sqrt(Math.random()) * 2.2;
+    emit(1, { pos: _cvL2.set(S.x + Math.cos(a) * r, S.y0 + rnd(0.5, 9), S.z + Math.sin(a) * r), vel: { x: rnd(-0.1, 0.1), y: -0.12, z: rnd(-0.1, 0.1) }, velSpread: 0.05, col: '#dfe8ff', life: 5, size: 0.05, size2: 0.05, bright: 1.3, drag: 0.2 });
   }
   // your staff is the lantern down here
   if (PL.actor) requestLight(PL.actor.bonePos('handslotr', _cvL).setY(_cvL.y + 0.6), '#ffd9a8', 7, 13);
@@ -253,16 +331,19 @@ function updateCave(dt) {
     emit(1, { pos: new THREE.Vector3(x, caveCeilAt(x, z) - 0.3, z), vel: { x: 0, y: -1, z: 0 }, velSpread: 0, gravity: 18, drag: 0.1, col: '#9fd8ff', life: 1.2, size: 0.05, size2: 0.05, bright: 1.5 });
   }
 }
-const _cvL = new THREE.Vector3();
+const _cvL = new THREE.Vector3(), _cvL2 = new THREE.Vector3();
+const _cvWarm = new THREE.Color('#d39a66'), _cvWarmG = new THREE.Color('#5c3a24'), _cvFogWarm = new THREE.Color('#1e130c');
 
 // Cave atmosphere overrides the sky state while inside (called after updateSky).
 function caveAtmosphere() {
   if (!GAME.inCave) return;
-  WFOG.wfColor.value.set('#07090f');
+  // the lit Barrow lifts the dark toward firelight
+  const g = CAVE.glow || 0;
+  WFOG.wfColor.value.set('#07090f').lerp(_cvFogWarm, g * 0.7);
   WFOG.wfSunColor.value.set('#1a2a3a');
   WFOG.wfParams.value.set(0.035, 0.0, CAVE.base - 50, 0.0);
   SUN.intensity = 0;
-  HEMI.color.set('#34405a'); HEMI.groundColor.set('#161218'); HEMI.intensity = 0.55;
+  HEMI.color.set('#34405a').lerp(_cvWarm, g); HEMI.groundColor.set('#161218').lerp(_cvWarmG, g); HEMI.intensity = 0.55 + 1.5 * g;
   if (gradePass) { gradePass.uniforms.uLift.value.set(0.0, 0.004, 0.01); gradePass.uniforms.uGain.value.set(0.92, 1.0, 1.1); gradePass.uniforms.uSat.value = 0.9; }
   renderer.toneMappingExposure = 1.25;
 }

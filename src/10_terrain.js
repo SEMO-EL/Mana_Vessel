@@ -289,13 +289,13 @@ function terrainMaterial() {
         { float b = tNoise(vWFPos.xz * 0.9) * 0.45 + tNoise(vWFPos.xz * 0.23) * 0.35 + tNoise(vWFPos.xz * 3.1) * 0.2;
           diffuseColor.rgb *= 0.84 + 0.32 * b;
           // cliffs: sedimentary strata + vertical cracks, only where it's steep
-          float steep = smoothstep(0.82, 0.55, normalize(vTerN).y);
+          float steep = (1.0 - smoothstep(0.55, 0.82, normalize(vTerN).y));
           if (steep > 0.0) {
             vec2 sp = vec2(vWFPos.x + vWFPos.z, vWFPos.y);
             float warp = tNoise(sp * vec2(0.04, 0.08)) * 6.0;
             float band = sin((vWFPos.y + warp) * 0.9) * 0.5 + 0.5;
             float fine = tNoise(vec2((vWFPos.x - vWFPos.z) * 0.6, vWFPos.y * 3.0));
-            float crack = smoothstep(0.08, 0.0, abs(tNoise(vec2((vWFPos.x + vWFPos.z) * 0.35, vWFPos.y * 0.05)) - 0.5));
+            float crack = 1.0 - smoothstep(0.0, 0.08, abs(tNoise(vec2((vWFPos.x + vWFPos.z) * 0.35, vWFPos.y * 0.05)) - 0.5));
             vec3 rc = diffuseColor.rgb * (0.78 + 0.34 * band) * (0.9 + 0.2 * fine);
             rc *= 1.0 - crack * 0.45;
             rc = mix(rc, rc * vec3(1.05, 0.98, 0.92), band);

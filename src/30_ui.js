@@ -49,6 +49,10 @@ function splash(artKey, title, sub = '', ms = 4200) {
   });
 }
 function letterbox(on) { $('letterbox').classList.toggle('on', on); }
+function bossCard(title, sub = '') {
+  $('bcTitle').textContent = title; $('bcSub').textContent = sub;
+  const b = $('bossCard'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');
+}
 
 /* ───────────── world-anchored floaters ───────────── */
 const _proj = new THREE.Vector3();
@@ -204,15 +208,21 @@ function updateCompass() {
 }
 
 /* ───────────── dialogue ───────────── */
+// A second say() while one is open waits its turn (a burn tick can finish a
+// quest enemy mid-conversation) instead of replacing it and stranding its promise.
+const _dlgQueue = [];
 function say(lines, opts = {}) {
   return new Promise(resolve => {
-    UI.dlg = { lines, i: 0, shown: 0, resolve, opts, t: 0 };
-    $('dialogue').classList.add('on');
-    letterbox(true);
-    $('hud').classList.add('off');
-    if (G && PL.state !== 'dead') { UI.dlg.prevState = PL.state; setPlayerState('talk'); PL.actor.setUpper(null); PL.actor.loop('Idle', { fade: 0.3 }); }
-    showLine();
+    if (UI.dlg) _dlgQueue.push({ lines, opts, resolve }); else openDialogue(lines, opts, resolve);
   });
+}
+function openDialogue(lines, opts, resolve) {
+  UI.dlg = { lines, i: 0, shown: 0, resolve, opts, t: 0, openFrame: GAME.frame };
+  $('dialogue').classList.add('on');
+  letterbox(true);
+  $('hud').classList.add('off');
+  if (G && PL.state !== 'dead') { UI.dlg.prevState = PL.state; setPlayerState('talk'); PL.actor.setUpper(null); PL.actor.loop('Idle', { fade: 0.3 }); }
+  showLine();
 }
 function showLine() {
   const d = UI.dlg, L = d.lines[d.i];
@@ -239,10 +249,13 @@ function advanceDialogue() {
     UI.dlg = null;
     if (G && PL.state === 'talk') setPlayerState('move');
     d.resolve();
+    const next = _dlgQueue.shift();
+    if (next) openDialogue(next.lines, next.opts, next.resolve);
   } else showLine();
 }
 function updateDialogue(dt) {
   const d = UI.dlg; if (!d) return;
+  if (GAME.frame === d.openFrame) return;   // the key that opened the talk must not also skip its first line
   const L = d.lines[d.i];
   if (d.shown < L.t.length) {
     d.t += dt;
@@ -252,15 +265,26 @@ function updateDialogue(dt) {
   if (IN.pressed('interact') || IN.pressed('jump') || IN.edgesDown.has('Enter') || IN.edgesDown.has('Mouse0')) advanceDialogue();
 }
 $('dlgBox').addEventListener('click', () => advanceDialogue());
-// A two-shot: camera over the player's shoulder looking at the speaker.
+// A two-shot from the side: both faces visible, the speaker nearer frame
+// centre, and both sitting in the upper half (the dialogue box owns the bottom).
+// Picks whichever side of the pair has more open ground, so a wall or tree
+// isn't between the lens and the conversation.
 function talkCam(target) {
   const p = PL.body.pos, t = target;
   const dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz) || 1;
-  const nx = dx / d, nz = dz / d, sx = -nz, sz = nx;
-  return {
-    pos: new THREE.Vector3(p.x - nx * 2.4 + sx * 1.1, p.y + 1.9, p.z - nz * 2.4 + sz * 1.1),
-    look: new THREE.Vector3(t.x, t.y + 1.45, t.z), fov: 42,
-  };
+  const nx = dx / d, nz = dz / d;
+  const mx = p.x + dx * 0.6, mz = p.z + dz * 0.6;
+  let best = null, bestClear = -1;
+  for (const s of [1, -1]) {
+    const sx = -nz * s, sz = nx * s;
+    const pos = new THREE.Vector3(mx + sx * 3.6 - nx * 1.2, Math.max(p.y, t.y) + 1.75, mz + sz * 3.6 - nz * 1.2);
+    pos.y = Math.max(pos.y, floorAt(pos.x, pos.z) + 1.2);
+    const look = new THREE.Vector3(mx, (p.y + t.y) / 2 + 0.55, mz);
+    const dir = look.clone().sub(pos); const len = dir.length(); dir.divideScalar(len);
+    const clear = Math.min(raycastWorld(pos, dir, len), len);
+    if (clear > bestClear) { bestClear = clear; best = { pos, look, fov: 40 }; }
+  }
+  return best;
 }
 
 /* ───────────── per-frame HUD ───────────── */

@@ -60,9 +60,14 @@ function aimPoint(out = new THREE.Vector3(), maxD = 60) {
   if (!isFinite(best)) best = maxD;
   return out.copy(_ao).addScaledVector(_ad, best);
 }
+// Where spells leave from: out in front of the casting hand, never below chest
+// height. (Early in the cast animation the hand is low; a bolt born 0.5 m off
+// the ground, aimed down a slope, buries itself in the hillside.)
 function staffTip(out = new THREE.Vector3()) {
   PL.actor.bonePos('handslotr', out);
-  return out.addScaledVector(_ad.set(Math.sin(PL.face), 0, Math.cos(PL.face)), 0.5).setY(out.y + 0.35);
+  out.x += Math.sin(PL.face) * 0.55; out.z += Math.cos(PL.face) * 0.55;
+  out.y = Math.max(out.y + 0.35, PL.body.pos.y + 1.35);
+  return out;
 }
 
 /* ───────────── casting ───────────── */
@@ -92,7 +97,8 @@ function castPlayerSpell(sp, incanted) {
         if (shots > 1) d.applyAxisAngle(_up, (i - (shots - 1) / 2) * sp.spread).y += rnd(-0.03, 0.03);
         spawnProjectile({ pos: origin.clone(), dir: d.normalize(), spd: sp.spd, r: sp.radius, dmg: sp.dmg * power,
           school: sp.school, pierce: sp.pierce || 0, life: sp.life, gravity: sp.gravity || 0, knock: sp.knock || 0,
-          slow: sp.slow, burn: sp.burn, freezes: sp.freezes, poise: sp.poise ?? 12 });
+          slow: sp.slow, burn: sp.burn, freezes: sp.freezes, poise: sp.poise ?? 12,
+          target: CAM.lockTarget, homing: CAM.lockTarget ? 2.5 : 0 });
       }
       if (sp.id === 'vacuum') { shake(0.35); hitstop(0.05); }
       break;
@@ -132,11 +138,21 @@ function spawnProjectile(o) {
   MAGIC.projectiles.push(p);
   return p;
 }
-const _pp = new THREE.Vector3();
+const _pp = new THREE.Vector3(), _hm = new THREE.Vector3(), _hm2 = new THREE.Vector3(), _hm3 = new THREE.Vector3();
 function updateProjectiles(dt) {
   for (let i = MAGIC.projectiles.length - 1; i >= 0; i--) {
     const p = MAGIC.projectiles[i];
     p.age += dt; p.life -= dt;
+    // homing: turn toward the target by at most `homing` radians per second
+    if (p.homing && p.target) {
+      const tp = p.target === 'player' ? _hm.set(PL.body.pos.x, PL.body.pos.y + 1.1, PL.body.pos.z) : (p.target.dead ? null : p.target.lockPoint());
+      if (tp) {
+        const want = _hm2.copy(tp).sub(p.pos).normalize(), cur = _hm3.copy(p.vel).normalize();
+        const ang = cur.angleTo(want);
+        if (ang > 1.3) p.homing = 0;               // dodged past it: no boomerangs
+        else if (ang > 1e-4) { cur.lerp(want, Math.min(1, p.homing * dt / ang)).normalize(); p.vel.copy(cur).multiplyScalar(p.spd); }
+      }
+    }
     p.vel.y -= (p.gravity || 0) * dt;
     const prevY = p.pos.y;
     p.pos.addScaledVector(p.vel, dt);

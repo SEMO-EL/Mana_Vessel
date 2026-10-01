@@ -23,7 +23,14 @@ const TEX_OF = { mage_texture: 'mage', knight_texture: 'knight', rogue_texture: 
 
 async function loadCharacters() {
   const [chars, anims] = await Promise.all([parseGLB('models/characters.glb'), parseGLB('models/anims.glb')]);
-  for (const c of [...chars.scene.children]) { c.position.set(0, 0, 0); CHARS.lib.set(c.name, c); }
+  for (const c of [...chars.scene.children]) {
+    c.position.set(0, 0, 0);
+    // All nine rigs share bone names, so GLTFLoader made them unique across the
+    // file ("upperarml_1", "upperarml_2"…). The shared clips target the plain
+    // names — undo the suffix inside each character or only the first one moves.
+    c.traverse(o => { if (o !== c) o.name = o.name.replace(/_\d+$/, ''); });
+    CHARS.lib.set(c.name, c);
+  }
   for (const clip of anims.animations) {
     if (clip.name.startsWith('Dodge_')) {
       // dodges carry ~0.4 m of root travel; the controller moves you instead
