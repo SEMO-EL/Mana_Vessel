@@ -32,6 +32,7 @@ const SCRIPT = {
   paul1: [
     { s: 'Paul Greyrat', p: null, t: 'There he is! Magic, magic, magic. Your mother\'s side, that. Well — magic won\'t save you when something gets inside your chant.' },
     { s: 'Paul Greyrat', p: null, t: 'Sword. Left click. Swing it until it stops feeling like a decision. Tap the run key to roll out of the way — hold it to run. Watch the shoulders, not the blade: everything telegraphs.' },
+    { s: 'Paul Greyrat', p: null, t: 'And I keep my guard up, so hacking at my front gets you nowhere. Wait for me to swing, then make me pay for it. Or get round my side.' },
     { s: 'Paul Greyrat', p: null, t: 'Come on, then. Show your old man what you\'ve got. I\'ll go easy. Probably.' },
   ],
   paul2: [
@@ -215,7 +216,8 @@ function buildStoneRig() {
 /* sparring with Paul: an enemy that yields */
 ENEMY_DEFS.paulSpar = {
   name: 'Paul Greyrat', base: 'Knight', show: ['1H_Sword'], hide: ['Knight_Helmet'], recolor: { knight: { 1: '#a37a3c' } },
-  hp: 220, poise: 60, r: 0.42, h: 1.75, walk: 1.8, run: 4.8, sight: 40, hear: 40, xp: 60, weight: 1, flinchAt: 14, spar: true,
+  hp: 300, poise: 60, r: 0.42, h: 1.75, walk: 1.8, run: 4.8, sight: 40, hear: 40, xp: 60, weight: 1, flinchAt: 14, spar: true,
+  shield: 0.85, guardPoise: 0.3, flinchCd: 1.8, armorWindup: true,   // his blade guards his front, and once he swings he commits: dodge, then punish
   idle: '2H_Melee_Idle', walkClip: 'Walking_B', runClip: 'Running_A',
   attacks: [
     { clip: '1H_Melee_Attack_Slice_Diagonal', speed: 0.95, hitAt: 0.42, range: [0, 2.6], reach: 2.4, arc: 1.0, dmg: 9, poise: 18, lunge: 3 },
@@ -230,6 +232,22 @@ function startSpar() {
   e.sparring = true;
   UI.spar = e;
 }
+// Losing to Paul: he stops the blade an inch short, and you go again when ready.
+BUS.on('sparLost', () => {
+  const e = UI.spar;
+  if (!e) return;
+  e.dead = true; e.releaseToken();
+  if (CAM.lockTarget === e) CAM.lockTarget = null;
+  e.remove();
+  UI.spar = null;
+  NPCS.paul.setVisible(true);
+  G.hp = Math.max(G.hp, G.maxHp * 0.5);
+  setQuest('findPaul', { quiet: true });
+  npcSay(NPCS.paul, [
+    { s: 'Paul Greyrat', t: 'Hah! And that is why you watch the shoulders. Breathe, kid. You were closer than you think.' },
+    { s: 'Paul Greyrat', t: 'Wait for my swing, get out of its way, then hit me while I\'m still recovering. Come talk to me when you want another go.' },
+  ]);
+});
 function checkSpar() {
   const e = UI.spar;
   if (!e) return;

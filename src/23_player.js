@@ -457,7 +457,7 @@ function playerHit(dmg, { dir = null, poise = 20, unblockable = false, pure = fa
       PL.actor.once('Block_Hit', { speed: 1.6, fade: 0.05, onEnd: () => PL.state === 'move' && PL.actor.loop('Idle_Combat') });
       BUS.emit('sfx', { id: 'block' });
       G.hp -= taken;
-      if (G.hp <= 0) { playerDie(); return 'dead'; }
+      if (G.hp <= 0) return lethal();
       return 'blocked';
     }
     PL.guarding = false;              // guard broken
@@ -467,7 +467,7 @@ function playerHit(dmg, { dir = null, poise = 20, unblockable = false, pure = fa
   PL.lastHitT = GAME.time;
   breakChant();
   BUS.emit('playerHurt', { dmg: taken, dir });
-  if (G.hp <= 0) { playerDie(); return 'dead'; }
+  if (G.hp <= 0) return lethal();
   if (!PL.hyper && !noStagger && PL.state !== 'collapse') {
     setPlayerState('hit');
     PL.iframe = 0.2;
@@ -475,6 +475,12 @@ function playerHit(dmg, { dir = null, poise = 20, unblockable = false, pure = fa
     PL.actor.once(poise > 35 ? 'Hit_B' : 'Hit_A', { speed: 1.5, fade: 0.05 });
   }
   return 'hit';
+}
+// A blow that would kill you. Sparring, Paul pulls it: you stay on your feet
+// at 1 HP and the bout is his.
+function lethal() {
+  if (UI.spar) { G.hp = 1; BUS.emit('sparLost'); return 'hit'; }
+  playerDie(); return 'dead';
 }
 // dot of your facing with a hit direction: < 0 means the blow comes from the front
 function facingAway(dir) { return Math.sin(PL.face) * dir.x + Math.cos(PL.face) * dir.z; }

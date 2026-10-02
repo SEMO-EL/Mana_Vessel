@@ -224,7 +224,9 @@ class Enemy {
   set(s) { this.state = s; this.stateT = 0; }
 
   onFlinch() {
-    if (this.state === 'active' || this.def.weight >= 2 || this.staggerT > 0) return;
+    if (this.state === 'active' || this.def.weight >= 2 || this.staggerT > 0 || this.flinchCd > 0) return;
+    if (this.def.armorWindup && this.state === 'windup') return;      // committed swings don't break
+    this.flinchCd = this.def.flinchCd ?? 0.85;   // no stun-locks: after a flinch it fights through the next blows
     if (this.state === 'windup') this.releaseToken();
     this.set('flinch');
     if (this.actor) this.actor.once(Math.random() < 0.5 ? 'Hit_A' : 'Hit_B', { speed: 1.6, fade: 0.05 });
@@ -261,6 +263,9 @@ class Enemy {
     if (this.staggerT > 0) this.staggerT -= dt;
     if (this.slowT > 0 && (this.slowT -= dt) <= 0) this.slow = 0;
     if (this.rootT > 0) this.rootT -= dt;
+    if (this.flinchCd > 0) this.flinchCd -= dt;
+    // poise recovers once the blows stop coming (the Souls rule)
+    if (this.poise < d.poise && GAME.time - (this.lastHitT || 0) > 2.5) this.poise = Math.min(d.poise, this.poise + d.poise * 0.6 * dt);
     if (this.burnT > 0) {
       this.burnT -= dt;
       this.hp -= this.burn * dt;

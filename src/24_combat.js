@@ -48,11 +48,13 @@ function damageEnemy(e, dmg, o = {}) {
     BUS.emit('sfx', { id: 'block', pos: e.pos }); BUS.emit('hint', 'Magic, not a stick.'); return;
   }
   // shields and guarding enemies eat frontal damage
-  if (e.shield && o.dir && e.state !== 'attack' && !o.crit && o.kind !== 'magicAoE') {
+  // (only while it isn't swinging or reeling: the swing and its recovery are the opening)
+  const opening = e.state === 'windup' || e.state === 'active' || e.state === 'recover' || e.state === 'stagger' || e.staggerT > 0;
+  if (e.shield && o.dir && !opening && !o.crit && o.kind !== 'magicAoE') {
     const front = -(Math.sin(e.face) * o.dir.x + Math.cos(e.face) * o.dir.z);   // >0: hit from the front
     if (front > 0.35) {
       dmg *= 1 - e.shield;
-      e.poise -= (o.poise || 10) * 0.5;
+      e.poise -= (o.poise || 10) * (e.def.guardPoise ?? 0.5); e.lastHitT = GAME.time;
       BUS.emit('sfx', { id: 'block', pos: e.pos });
       BUS.emit('spark', { pos: e.pos.clone().setY(e.pos.y + 1.1), col: '#e8e0d0', n: 10 });
       if (e.poise <= 0) staggerEnemy(e);
