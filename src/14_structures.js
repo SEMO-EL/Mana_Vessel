@@ -370,3 +370,41 @@ function buildCaveMouth() {
   for (const s of [-1, 1]) FIRES.push({ pos: new THREE.Vector3(x + s * 3.6, y + 2.4, z + 2.5), small: true });
   INTERACTABLES.push({ pos: new THREE.Vector3(x, y + 0.5, z + 3), r: 5, label: () => 'Enter the Weeping Cave', action: () => enterCave() });
 }
+
+/* ───────────── static batching ─────────────
+   Every placed prop shares one material (the KayKit atlas), so ~170 little
+   meshes — each drawn twice, once for the shadow map — bake into one merged
+   mesh per 256 m cell: a handful of draw calls instead of ~350, with frustum
+   and shadow culling still working cell by cell. The placed objects leave
+   the scene but stay in STRUCT.placed (the map reads their transforms). */
+function batchStaticProps() {
+  const CELL = 256, cells = new Map();
+  for (const p of STRUCT.placed) {
+    const obj = p.obj;
+    if (obj.parent !== STRUCT.group) continue;
+    const meshes = [];
+    obj.traverse(o => { if (o.isMesh) meshes.push(o); });
+    if (!meshes.length || meshes.some(m => m.isSkinnedMesh || m.material !== meshes[0].material
+      || m.castShadow !== meshes[0].castShadow || m.receiveShadow !== meshes[0].receiveShadow)) continue;
+    obj.updateMatrixWorld(true);
+    const m0 = meshes[0];
+    const key = Math.floor(obj.position.x / CELL) + ',' + Math.floor(obj.position.z / CELL) + '|' + m0.material.uuid + '|' + (+m0.castShadow) + (+m0.receiveShadow);
+    let c = cells.get(key);
+    if (!c) cells.set(key, c = { mat: m0.material, cast: m0.castShadow, recv: m0.receiveShadow, geos: [], objs: [] });
+    for (const m of meshes) c.geos.push(m.geometry.clone().applyMatrix4(m.matrixWorld));
+    c.objs.push(obj);
+  }
+  let calls = 0, props = 0;
+  for (const c of cells.values()) {
+    const g = c.geos.length > 1 ? mergeGeometries(c.geos, false) : c.geos[0];
+    if (!g) { for (const x of c.geos) x.dispose(); continue; }       // layouts differ: leave these props as they are
+    g.computeBoundingSphere(); g.computeBoundingBox();
+    const m = new THREE.Mesh(g, c.mat);
+    m.castShadow = c.cast; m.receiveShadow = c.recv; m.matrixAutoUpdate = false;
+    STRUCT.group.add(m);
+    for (const o of c.objs) STRUCT.group.remove(o);
+    if (g !== c.geos[0]) for (const x of c.geos) x.dispose();
+    calls++; props += c.objs.length;
+  }
+  STRUCT.batched = { cells: calls, props };
+}

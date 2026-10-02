@@ -294,6 +294,9 @@ class Enemy {
   sync(dt) {
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.face;
+    // shadow LOD: past ~45 m a wolf's fifteen little meshes needn't draw into the shadow map
+    const near = this.pos.distanceToSquared(camera.position) < (this.def.boss ? 120 * 120 : 45 * 45);
+    if (near !== this._shadowNear) { this._shadowNear = near; this.root.traverse(o => { if (!o.isMesh) return; if (o.userData.cs === undefined) o.userData.cs = o.castShadow; o.castShadow = near && o.userData.cs; }); }
     if (this.rig) this.rig.update(dt, this);
     else this.actor.update(dt * (this.slow ? 1 - this.slow * 0.6 : 1));
   }

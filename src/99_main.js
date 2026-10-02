@@ -71,6 +71,7 @@ async function boot() {
   buildPeople();
   defineEncounters();
   buildPages();
+  batchStaticProps();
   initVFX();
   initMenus();
   if (typeof mapBuild === 'function') { bootStatus('Drawing the map'); await nextFrame(); try { mapBuild(); } catch (e) { console.error('map', e); } }

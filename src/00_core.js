@@ -142,10 +142,10 @@ function assetTexture(name, opts = {}) {
    Persisted separately from saves. Quality presets are starting points;
    every field can still be changed on its own in Settings.            */
 const QUALITY = {
-  low:    { scale: 0.75, shadow: 1024, shadowDist: 70,  grass: 0.35, trees: 0.6, bloom: false, msaa: 0, far: 700,  lights: 2 },
-  medium: { scale: 1.0,  shadow: 2048, shadowDist: 100, grass: 0.6,  trees: 0.8, bloom: true,  msaa: 0, far: 950,  lights: 4 },
-  high:   { scale: 1.0,  shadow: 4096, shadowDist: 130, grass: 1.0,  trees: 1.0, bloom: true,  msaa: 4, far: 1300, lights: 6 },
-  ultra:  { scale: 1.25, shadow: 4096, shadowDist: 170, grass: 1.4,  trees: 1.0, bloom: true,  msaa: 4, far: 1600, lights: 8 },
+  low:    { scale: 0.75, shadow: 1024, shadowDist: 70,  grass: 0.35, trees: 0.6, bloom: false, msaa: 0, far: 700,  lights: 2, treeNear: 110 },
+  medium: { scale: 1.0,  shadow: 2048, shadowDist: 100, grass: 0.6,  trees: 0.8, bloom: true,  msaa: 0, far: 950,  lights: 4, treeNear: 180 },
+  high:   { scale: 1.0,  shadow: 4096, shadowDist: 130, grass: 1.0,  trees: 1.0, bloom: true,  msaa: 4, far: 1300, lights: 6, treeNear: 260 },
+  ultra:  { scale: 1.25, shadow: 4096, shadowDist: 170, grass: 1.4,  trees: 1.0, bloom: true,  msaa: 4, far: 1600, lights: 8, treeNear: 320 },
 };
 const SETTINGS = {
   quality: 'high',

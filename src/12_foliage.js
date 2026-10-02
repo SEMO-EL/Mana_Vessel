@@ -326,7 +326,7 @@ function updateTrees(time) {
   const cp = camera.position;
   for (const c of FOL.cells) {
     const d = Math.hypot(c.center.x - cp.x, c.center.z - cp.z);
-    const near = d < 260;
+    const near = d < (Q().treeNear || 260);   // detailed canopies only this close (by quality)
     for (const p of c.parts) { p.hi.visible = near; p.lo.visible = !near; }
   }
 }
