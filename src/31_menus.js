@@ -190,14 +190,23 @@ function openGrimoire() {
     const pct = next ? clamp((p - prev) / (next - prev), 0, 1) : 1;
     html += `<div class="school"><h3 style="color:${s.col}">${s.name}<span class="rank">${RANKS[r]}</span></h3>`;
     html += `<div class="prog"><i style="width:${pct * 100}%;background:${s.col}"></i></div>`;
+    const slotted = unlockedSpells().find(x => x.school === k);
     for (const sp of SPELLS.filter(x => x.school === k)) {
-      const has = p >= RANK_NEED[sp.rank];
-      html += `<div class="sp ${has ? '' : 'lock'}"><b>${sp.name}</b> — ${RANKS[sp.rank]} · ${sp.cost} mana${has ? '' : ' · locked'}</div>`;
+      const has = p >= RANK_NEED[sp.rank], on = slotted && slotted.id === sp.id;
+      html += `<div class="sp ${has ? 'can' : 'lock'} ${on ? 'attuned' : ''}" ${has ? `data-attune="${sp.id}"` : ''}><b>${sp.name}</b> — ${RANKS[sp.rank]} · ${sp.cost} mana${has ? (on ? ' · <i>attuned</i>' : '') : ' · locked'}</div>`;
     }
     html += `</div>`;
   }
-  html += `<p class="flavor" style="margin:14px auto 0;text-align:center">Tap cast for chantless (instant, ×1.6 cost). Hold until the circle turns gold to incant (×0.55 cost, ×1.45 power). Casting a school ranks it up.</p>`;
+  html += `<p class="flavor" style="margin:14px auto 0;text-align:center">Click a learned spell to attune it to its school's slot. Tap cast for chantless (instant, ×1.6 cost). Hold until the circle turns gold to incant (×0.55 cost, ×1.45 power). Casting a school ranks it up.</p>`;
   b.innerHTML = html;
+  for (const el of b.querySelectorAll('[data-attune]')) el.onclick = () => {
+    const sp = SPELL[el.dataset.attune];
+    G.attune = G.attune || {};
+    G.attune[sp.school] = sp.id;
+    BUS.emit('sfx', { id: 'uiSelect' });
+    BUS.emit('slot');
+    openGrimoire();                       // redraw with the new mark
+  };
   GAME.state = 'grimoire';
   openScreen('grimoire');
 }

@@ -240,9 +240,10 @@ class Enemy {
     if (this.state !== 'dormant' || this.dead) return;
     this.aggro = true; this.lockable = false; this.set('awaken');
     const clip = CHARS.clips.get('Skeletons_Awaken_Floor');
-    this.awakeT = clip ? clip.duration / speed : 2;
+    this.awakeT = this.def.wakeT ?? (clip ? clip.duration / speed : 2);
+    BUS.emit('enemyWake', this);
     if (this.actor) this.actor.once('Skeletons_Awaken_Floor', { speed, fade: 0.05 });
-    BUS.emit('sfx', { id: 'boneRise', pos: this.pos });
+    if (this.actor) BUS.emit('sfx', { id: 'boneRise', pos: this.pos });
   }
   releaseToken() { if (this.token) { this.token = false; ENT.tokens = Math.max(0, (ENT.tokens || 0) - 1); } }
   onDeath() {
@@ -276,7 +277,7 @@ class Enemy {
     }
     if (this.state === 'dormant') {
       const wr = d.wakeR ?? 6.5;
-      if (this.hp < this.maxHp || (wr > 0 && this.dist() < wr && Math.abs(PL.body.pos.y - this.pos.y) < 4)) this.wake();
+      if (this.hp < this.maxHp || (wr > 0 && this.dist() < wr && Math.abs(PL.body.pos.y - this.pos.y) < 12)) this.wake();
     }
     if (this.state !== 'dormant' && !d.static) this.think(dt);
     // steering is done; physics does the rest

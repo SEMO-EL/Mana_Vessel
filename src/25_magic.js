@@ -16,19 +16,25 @@ function schoolRank(sc) {
   for (let i = RANK_NEED.length - 1; i >= 0; i--) if (p >= RANK_NEED[i]) return i;
   return 0;
 }
+function isLearned(s) { return (G.prof[s.school] || 0) >= (RANK_NEED[s.rank] ?? 999); }
+function learnedIds() { return SPELLS.filter(isLearned).map(s => s.id); }
+// One slot per school. It holds the spell you attuned in the Grimoire, or, if
+// you never chose, the strongest you know. (Lower spells keep their uses: the
+// pillar you climb, the bolt that freezes water.)
 function unlockedSpells() {
   const best = {};
-  for (const s of SPELLS) {
-    if ((G.prof[s.school] || 0) >= (RANK_NEED[s.rank] ?? 999)) {
-      if (!best[s.school] || s.rank > best[s.school].rank) best[s.school] = s;
-    }
-  }
-  return ['fire', 'water', 'wind', 'earth', 'heal'].map(k => best[k]).filter(Boolean);
+  for (const s of SPELLS) if (isLearned(s) && (!best[s.school] || s.rank > best[s.school].rank)) best[s.school] = s;
+  const at = (G && G.attune) || {};
+  return ['fire', 'water', 'wind', 'earth', 'heal'].map(k => {
+    const chosen = at[k] && SPELL[at[k]];
+    return chosen && chosen.school === k && isLearned(chosen) ? chosen : best[k];
+  }).filter(Boolean);
 }
 function checkUnlocks(before) {
-  const after = unlockedSpells().map(s => s.id);
-  for (const id of after) if (!before.includes(id)) {
-    BUS.emit('toast', { text: 'Learned — ' + SPELL[id].name, cls: 'big' });
+  const bar = unlockedSpells().map(s => s.id);
+  for (const id of learnedIds()) if (!before.includes(id)) {
+    const onBar = bar.includes(id);
+    BUS.emit('toast', { text: 'Learned — ' + SPELL[id].name + (onBar ? '' : ' · attune it in the Grimoire'), cls: 'big' });
     BUS.emit('sfx', { id: 'unlock' });
     BUS.emit('slot');
   }
@@ -46,6 +52,8 @@ function aimPoint(out = new THREE.Vector3(), maxD = 60) {
   if (CAM.lockTarget) return out.copy(CAM.lockTarget.lockPoint());
   camera.getWorldPosition(_ao); camera.getWorldDirection(_ad);
   let best = raycastWorld(_ao, _ad, maxD);
+  // the eye stops at the water's skin too: aim there and that's where the ice forms
+  best = Math.min(best, rayWater(_ao, _ad, Math.min(best, maxD)));
   // enemies as spheres around their chest
   for (const e of ENT.enemies) {
     if (e.dead || e.inactive) continue;
@@ -59,6 +67,18 @@ function aimPoint(out = new THREE.Vector3(), maxD = 60) {
   }
   if (!isFinite(best)) best = maxD;
   return out.copy(_ao).addScaledVector(_ad, best);
+}
+// Distance along a ray to the water surface (lake or river), or Infinity.
+function rayWater(o, d, maxD) {
+  if (d.y >= -1e-4 || GAME.inCave) return Infinity;            // looking up never meets it
+  const under = t => { const w = waterAt(o.x + d.x * t, o.z + d.z * t); return w > NO_WATER && o.y + d.y * t < w; };
+  for (let t = 0.5; t < maxD; t += 0.75) {
+    if (!under(t)) continue;
+    let a = Math.max(0, t - 0.75), b = t;
+    for (let k = 0; k < 6; k++) { const m = (a + b) / 2; if (under(m)) b = m; else a = m; }
+    return b;
+  }
+  return Infinity;
 }
 // Where spells leave from: out in front of the casting hand, never below chest
 // height. (Early in the cast animation the hand is low; a bolt born 0.5 m off
@@ -77,7 +97,7 @@ function castPlayerSpell(sp, incanted) {
   const eff = cost > 0 ? spent / cost : 1;         // an empty vessel still gives what it has
   const power = (incanted ? CHANT.incantPower : 1) * RACES[G.race].magic * (1 + G.lvl * 0.05) * (1 + schoolRank(sp.school) * 0.12) * eff;
   G.cds[sp.id] = sp.cd * (incanted ? 1.15 : 1);
-  const before = unlockedSpells().map(s => s.id);
+  const before = learnedIds();
   G.prof[sp.school] = (G.prof[sp.school] || 0) + (incanted ? 1.4 : 1.0);
   checkUnlocks(before);
   const col = SCHOOLS[sp.school].col;
@@ -166,6 +186,12 @@ function updateProjectiles(dt) {
     if (!done && p.freezes && !p.hostile && w > NO_WATER && prevY >= w && p.pos.y < w + 0.05) {
       makeIceFloe(p.pos.x, p.pos.z, w); done = true;
     }
+    // anything else that meets the water ends there in a splash
+    if (!done && w > NO_WATER && prevY >= w && p.pos.y < w) {
+      emit(16, { pos: _pp.set(p.pos.x, w + 0.1, p.pos.z), col: '#cfe8f5', spread: 0.3, velSpread: 2.2, upBias: 3.5, life: 0.6, size: 0.12, size2: 0.04, gravity: 9 });
+      ring(_pp, { col: '#bfe0f0', r1: 1.4, life: 0.5 });
+      done = true;
+    }
     // ground / walls
     if (!done && p.pos.y < heightAt(p.pos.x, p.pos.z)) done = true;
     if (!done) for (const c of nearColliders(p.pos.x, p.pos.z, 1)) {
@@ -195,6 +221,7 @@ function updateProjectiles(dt) {
     }
     if (done) {
       emit(18, { pos: p.pos, col: p.col, spread: 0.2, velSpread: 4, life: 0.45, size: 0.35, bright: 2, gravity: p.school === 'earth' ? 9 : 0 });
+      if (p.school === 'fire' && !p.hostile) burnNear(p.pos, 2);         // fire splashes: a near miss still catches
       if (p.school === 'earth') emit(10, { pool: 'soft', pos: p.pos, col: '#8a7458', spread: 0.3, velSpread: 3, life: 0.8, size: 0.4, size2: 1.2, gravity: 6 });
       scene.remove(p.mesh); p.mesh.material.dispose();
       MAGIC.projectiles.splice(i, 1);
@@ -476,8 +503,9 @@ function burnBramble(c) {
     BUS.emit('toast', { text: 'The brambles burn away', cls: 'good' });
   }
 }
+// anything that burns within r of a thicket's EDGE sets it alight
 function burnNear(pos, r) {
-  for (const b of BRAMBLES) if (!b.col.burnt && Math.hypot(b.col.x - pos.x, b.col.z - pos.z) < r + 2) burnBramble(b.col);
+  for (const b of BRAMBLES) if (!b.col.burnt && Math.hypot(b.col.x - pos.x, b.col.z - pos.z) < r + (b.col.r || 2)) burnBramble(b.col);
 }
 function updateBrambles(dt) {
   for (let i = BRAMBLES.length - 1; i >= 0; i--) {

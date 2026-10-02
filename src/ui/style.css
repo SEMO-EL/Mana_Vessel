@@ -108,8 +108,9 @@ kbd{font-family:var(--display);font-size:11px;font-weight:700;min-width:22px;dis
 #bannerSub{font-family:var(--display);font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold)}
 @keyframes banner{0%{opacity:0;letter-spacing:.3em}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
 /* boss title card: the name lands in the lower third while the boss rises */
-#bossCard{position:fixed;left:0;right:0;bottom:12.5%;text-align:center;z-index:16;pointer-events:none;opacity:0}
+#bossCard{position:fixed;left:0;right:0;bottom:21%;text-align:center;z-index:16;pointer-events:none;opacity:0}
 #bossCard.on{animation:bosscard 3.8s ease forwards}
+body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: sit low */
 #bcSub{font-family:var(--display);font-size:12px;letter-spacing:.55em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
 #bcTitle{font-family:var(--display);font-weight:900;font-size:clamp(30px,4.6vw,66px);letter-spacing:.2em;text-transform:uppercase;color:#f3e6c8;text-shadow:0 0 24px rgba(255,150,60,.35),0 6px 40px #000}
 #bossCard .line{width:min(620px,70%);height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,#c9583a,var(--gold),#c9583a,transparent)}
@@ -191,5 +192,7 @@ kbd{font-family:var(--display);font-size:11px;font-weight:700;min-width:22px;dis
 .school h3{margin:0 0 6px;font-family:var(--display);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
 .school .rank{float:right;font-family:var(--display);font-size:11px;letter-spacing:.14em;color:var(--hot)}
 .school .prog{height:3px;background:rgba(0,0,0,.5);margin:6px 0 10px}.school .prog i{display:block;height:100%}
-.school .sp{font-size:13px;color:var(--dim);margin:3px 0}.school .sp.lock{opacity:.35}
+.school .sp{font-size:13px;color:var(--dim);margin:3px 0;padding:3px 8px;border:1px solid transparent}.school .sp.lock{opacity:.35}
+.school .sp.can{cursor:pointer;pointer-events:auto}.school .sp.can:hover{border-color:rgba(201,162,39,.35);background:rgba(201,162,39,.06)}
+.school .sp.attuned{border-color:rgba(240,207,98,.6);background:rgba(240,207,98,.08)}.school .sp i{color:var(--hot);font-style:italic}
 .school .sp b{color:var(--parch);font-weight:600}

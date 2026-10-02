@@ -48,7 +48,7 @@ function splash(artKey, title, sub = '', ms = 4200) {
     setTimeout(() => { el.classList.remove('on'); res(); }, ms);
   });
 }
-function letterbox(on) { $('letterbox').classList.toggle('on', on); }
+function letterbox(on) { $('letterbox').classList.toggle('on', on); document.body.classList.toggle('lb', on); }
 function bossCard(title, sub = '') {
   $('bcTitle').textContent = title; $('bcSub').textContent = sub;
   const b = $('bossCard'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');

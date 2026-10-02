@@ -26,6 +26,7 @@ ENEMY_DEFS.warden = {
 ENEMY_DEFS.treant = {
   name: 'The Elder Treant', rig: 'treant', hp: 1100, poise: 150, r: 1.6, h: 6.5, walk: 1.5, run: 2.6, sight: 40, hear: 40,
   xp: 460, weight: 4, flinchAt: 999, knockRes: 1, boss: true, fireWeak: 1.6,
+  wakeR: 16, wakeT: 2.2,      // stands as a tree until you come close (or strike it)
   attacks: [
     { name: 'slam',  range: [0, 6],  windup: 1.0, active: 0.2, recover: 1.1, reach: 6, arc: 0.6, dmg: 32, poise: 60, aoe: { r: 3.6, at: 'front', dist: 4.4 } },
     { name: 'sweep', range: [0, 6],  windup: 0.9, active: 0.3, recover: 1.0, reach: 6.2, arc: 2.2, dmg: 26, poise: 40 },
@@ -93,6 +94,9 @@ function buildTreantRig() {
       const sp = Math.hypot(e.body.vel.x, e.body.vel.z);
       this.phase += dt * sp * 1.8;
       const t = GAME.time;
+      // asleep it is only a tree: arms raised as boughs, eyes dark. It wakes over ~2 s.
+      this.wakeK = damp(this.wakeK ?? (e.state === 'dormant' ? 0 : 1), e.state === 'dormant' ? 0 : 1, 1.6, dt);
+      const sleep = 1 - this.wakeK;
       this.legs.forEach((L, i) => { L.hip.position.y = 1.5 + Math.max(0, Math.sin(this.phase + i * Math.PI / 2)) * 0.35 * Math.min(1, sp); });
       this.body.rotation.z = Math.sin(this.phase) * 0.04 * Math.min(1, sp) + Math.sin(t * 0.7) * 0.015;
       this.crown.rotation.y = Math.sin(t * 0.5) * 0.08;
@@ -106,11 +110,14 @@ function buildTreantRig() {
         if (a.name === 'roots') { lUp = rUp = -1.2 * w; }
         if (a.name === 'stomp') { this.body.position.y = 1.6 + (st === 'windup' ? w * 0.9 : -0.3); }
       } else this.body.position.y = damp(this.body.position.y, 1.6, 8, dt);
+      lUp = lerp(lUp, -2.75, sleep); rUp = lerp(rUp, -2.6, sleep);
       this.arms[0].sh.rotation.x = damp(this.arms[0].sh.rotation.x, lUp, 8, dt);
       this.arms[1].sh.rotation.x = damp(this.arms[1].sh.rotation.x, rUp, 8, dt);
+      if (e.state === 'awaken') this.crown.rotation.z = Math.sin(t * 23) * 0.05 * sleep;   // the shudder as it wakes
+      else this.crown.rotation.z = damp(this.crown.rotation.z, 0, 6, dt);
       this.body.rotation.y = damp(this.body.rotation.y, swing, 6, dt);
       this.arms.forEach(A => { A.el.rotation.x = -0.4 + Math.sin(t * 1.3 + A.s) * 0.05; A.sh.rotation.z = A.s * 0.25; });
-      this.eyeM.color.setRGB(2.2 + w * 1.5, 2.5 - w * 1.2, 0.8 - w * 0.6);
+      this.eyeM.color.setRGB(2.2 + w * 1.5, 2.5 - w * 1.2, 0.8 - w * 0.6).multiplyScalar(this.wakeK * this.wakeK);
       if (e.dead) { this.deadT = this.deadT < 0 ? 0 : this.deadT + dt; this.root.rotation.x = smooth(0, 1.6, this.deadT) * 1.45; }
     },
     weaponPos(out) { return this.arms[1].el.getWorldPosition(out); },

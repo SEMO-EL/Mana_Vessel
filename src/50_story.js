@@ -263,7 +263,7 @@ function defineEncounters() {
   });
   defineEncounter('ridgeWatch', -40, 40, [['marksman', 0, 0], ['bandit', 4, 3]]);
   defineEncounter('chapelNight', PLACES.ruinsE.x, PLACES.ruinsE.z, [['thrall', -4, 4], ['thrall', 5, 2], ['archer', 0, -8]], { night: true });
-  defineEncounter('treant', GROVE.x, GROVE.z, [['treant', 0, 0]], { boss: true, onClear: () => { G.flags.treant = true; banner('Great Enemy Felled', 'The Elder Treant'); } });
+  defineEncounter('treant', GROVE.x, GROVE.z, [['treant', 0, 0, { dormant: true }]], { boss: true, onClear: () => { G.flags.treant = true; banner('Great Enemy Felled', 'The Elder Treant'); } });
   // the cave, chamber by chamber (local coords → world)
   const cw = (lx, lz) => caveWorld(lx, lz);
   const E = (id, lx, lz, list, o) => { const w = cw(lx, lz); defineEncounter(id, w.x, w.z, list, { cave: true, ...(o || {}) }); };
@@ -274,6 +274,15 @@ function defineEncounters() {
   E('warden', 0, -120, [['warden', 0, 0, { scale: 2.2, face: 0, dormant: true }]], { boss: true,
     onClear: () => { G.flags.warden = true; banner('Great Enemy Felled', 'The Barrow Warden'); later(2.5, () => say(SCRIPT.wardenDead).then(() => { if (G.quest === 'warden' || G.quest === 'cave') setQuest('farewell'); })); } });
 }
+
+// The Elder Treant is only a tree until you come too close. Then it isn't.
+BUS.on('enemyWake', e => {
+  if (e.key !== 'treant') return;
+  BUS.emit('sfx', { id: 'howl', pos: e.pos });
+  shake(0.45);
+  emit(40, { pool: 'soft', pos: e.pos.clone().setY(e.pos.y + 6), col: '#5a7a38', spread: 2.2, velSpread: 2.5, life: 2.2, size: 0.35, size2: 0.2, gravity: 2.5 });   // leaves shaken loose
+  if (!G.flags.treantSeen) { G.flags.treantSeen = true; bossCard('The Elder Treant', 'Heart of Buena Forest'); BUS.emit('sfx', { id: 'bossIntro' }); }
+});
 
 /* ───────────── the Warden's reveal ─────────────
    Crossing the mist: the braziers catch around the Barrow, the Warden climbs
@@ -503,12 +512,22 @@ function takePage(P) {
   BUS.emit('sfx', { id: 'page' });
   say([{ s: 'Roxy\'s Textbook', t: SCRIPT.pages[P.i] + '   (' + G.pages.length + ' / 5)' }]);
   const schools = ['fire', 'fire', 'water', 'earth', 'wind'];
+  const before = learnedIds();
   G.prof[schools[P.i]] = (G.prof[schools[P.i]] || 0) + 8;
+  checkUnlocks(before);
   if (G.pages.length === 5) { G.maxMana += 30; G.mana = G.maxMana; setTimeout(() => toast('Roxy\'s Textbook complete — Max mana +30', 'big'), 1500); }
   autosave();
 }
+// The first time you come near a page that a spell will win you, a nudge.
+const PAGE_HINTS = {
+  1: [16, 'A thicket of thorns, and something pale caught inside. Fire would make short work of it.'],
+  2: [55, 'Something glints on the island. Too deep to wade, unless the water were ice.'],
+  3: [20, 'A page on a ledge under the falls, out of reach. Earth will lift whatever stands on it.'],
+};
 function updatePages(dt) {
   for (const P of PAGES) if (P.mesh.visible) {
+    const H = PAGE_HINTS[P.i];
+    if (H && G && !G.flags['ph' + P.i] && !GAME.inCave && P.pos.distanceTo(PL.body.pos) < H[0]) { G.flags['ph' + P.i] = true; hint(H[1], 6); }
     P.mesh.rotation.y += dt * 0.9;
     P.mesh.rotation.z = Math.sin(GAME.time * 1.3 + P.i) * 0.12;      // it turns and flutters on the air
     P.mesh.position.y = P.pos.y + 1.1 + Math.sin(GAME.time * 2 + P.i) * 0.1;

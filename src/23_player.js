@@ -37,6 +37,7 @@ function newGameState({ name, race, style, aff }) {
     prof: { fire: 0, water: 0, wind: 0, earth: 0, heal: 0, [aff]: 3 },
     flags: {}, discovered: {}, waystones: { village: true }, lastWaystone: 'village',
     pos: null, hour: 17.2, quest: 'findRoxy', pages: [], cds: {},
+    attune: {},                 // school → the learned spell you chose for its slot (unset: the strongest)
     deaths: 0, playTime: 0,
   };
 }
@@ -80,6 +81,7 @@ function spawnPlayer(x, z, face = 0) {
   PL.body.pos.set(x, floorAt(x, z), z);
   PL.body.vel.set(0, 0, 0);
   PL.body.grounded = true;
+  PL.safePos = null;
   PL.face = face;
   // place the model now, not on the next play-state update: the creator and
   // the intro cinematic show the character without ever running updatePlayer
@@ -173,7 +175,26 @@ function updatePlayer(dt) {
   PL.interactTarget = canAct() && PL.state === 'move' ? nearestInteractable() : null;
   if (PL.interactTarget && IN.pressed('interact')) PL.interactTarget.action();
 
+  // No swimming in this world: land in water too deep to wade and it carries
+  // you back to the last place you stood safely. (Short of a floe? Try again.)
+  if (b.grounded && !b.onPlatform && !GAME.inCave) {
+    if (b.inWater > PHYS.WADE + 0.3) {
+      if (PL.safePos) {
+        emit(30, { pos: b.pos.clone().setY(b.pos.y + b.inWater), col: '#d8f0fa', spread: 0.6, velSpread: 3, upBias: 4, life: 0.8, size: 0.14, size2: 0.05, gravity: 9 });
+        BUS.emit('sfx', { id: 'freeze', pos: b.pos });
+        BUS.emit('flash', { col: '#bfe0f0', a: 0.3 });
+        b.pos.copy(PL.safePos); b.vel.set(0, 0, 0);
+        CAM.pivot.set(b.pos.x, b.pos.y + 1.55, b.pos.z);
+        A.root.position.copy(b.pos);
+        if (!PL.toldDeep) { PL.toldDeep = true; hint('Too deep to wade. The current carries you back to shore.', 4); }
+      }
+    } else if (b.inWater < PHYS.WADE * 0.8) (PL.safePos || (PL.safePos = new THREE.Vector3())).copy(b.pos);
+  }
+
+  // the model eases up steps and haul-outs instead of popping (down is never eased: no floating)
+  const vy = A.root.position.y;
   A.root.position.copy(b.pos);
+  if (b.grounded && b.pos.y > vy && b.pos.y - vy < 1.6) A.root.position.y = damp(vy, b.pos.y, 16, dt);
   A.root.rotation.y = PL.face;
   A.update(dt);
 

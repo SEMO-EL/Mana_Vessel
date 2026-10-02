@@ -104,33 +104,37 @@ function pushOut(p, r, feetY, height) {
 const _p = { x: 0, z: 0 };
 function moveBody(b, dt) {
   const ox = b.pos.x, oz = b.pos.z;
+  // wading, you can haul yourself out onto anything at the waterline (an ice
+  // floe, a jetty): step tests measure from the surface, not the riverbed
+  const feet = b.pos.y + (b.inWater || 0);
   _p.x = ox + b.vel.x * dt; _p.z = oz + b.vel.z * dt;
 
   // steepness: refuse to walk UP a too-steep slope (sliding along it is fine)
   if (!b.flying) {
-    const g0 = groundAt(ox, oz, b.pos.y), g1 = groundAt(_p.x, _p.z, b.pos.y);
+    const g0 = groundAt(ox, oz, feet), g1 = groundAt(_p.x, _p.z, feet);
     const run = Math.hypot(_p.x - ox, _p.z - oz);
-    if (run > 1e-4 && g1 - g0 > PHYS.STEP * 0.5 && (g1 - g0) / run > PHYS.MAX_SLOPE_TAN && g1 > b.pos.y + PHYS.STEP) {
+    if (run > 1e-4 && g1 - g0 > PHYS.STEP * 0.5 && (g1 - g0) / run > PHYS.MAX_SLOPE_TAN && g1 > feet + PHYS.STEP) {
       // try each axis alone so you slide along the contour instead of sticking
-      const gx = groundAt(_p.x, oz, b.pos.y), gz = groundAt(ox, _p.z, b.pos.y);
-      const okX = (gx - g0) / Math.max(Math.abs(_p.x - ox), 1e-4) <= PHYS.MAX_SLOPE_TAN || gx <= b.pos.y + PHYS.STEP;
-      const okZ = (gz - g0) / Math.max(Math.abs(_p.z - oz), 1e-4) <= PHYS.MAX_SLOPE_TAN || gz <= b.pos.y + PHYS.STEP;
+      const gx = groundAt(_p.x, oz, feet), gz = groundAt(ox, _p.z, feet);
+      const okX = (gx - g0) / Math.max(Math.abs(_p.x - ox), 1e-4) <= PHYS.MAX_SLOPE_TAN || gx <= feet + PHYS.STEP;
+      const okZ = (gz - g0) / Math.max(Math.abs(_p.z - oz), 1e-4) <= PHYS.MAX_SLOPE_TAN || gz <= feet + PHYS.STEP;
       if (okX && !okZ) _p.z = oz; else if (okZ && !okX) _p.x = ox; else { _p.x = ox; _p.z = oz; }
       b.blocked = true;
     } else b.blocked = false;
   }
 
-  // deep water: no swimming animations exist, so wading depth is the limit
-  if (!b.flying && !b.canSwim && !GAME.inCave) {
+  // deep water: no swimming animations exist, so wading depth is the limit for
+  // WALKING (a jump may carry you over it, onto a floe)
+  if (!b.flying && !b.canSwim && !GAME.inCave && b.grounded) {
     const w = waterAt(_p.x, _p.z);
-    if (w > NO_WATER && w - heightAt(_p.x, _p.z) > PHYS.WADE && !b.onPlatform) {
+    if (w > NO_WATER && w - heightAt(_p.x, _p.z) > PHYS.WADE && !b.onPlatform && !(groundAt(_p.x, _p.z, feet) > w - 0.3)) {
       const w0 = waterAt(ox, oz);
       const deeperThanBefore = !(w0 > NO_WATER) || (w - heightAt(_p.x, _p.z)) > (w0 - heightAt(ox, oz));
       if (deeperThanBefore) { _p.x = ox; _p.z = oz; b.hitDeepWater = true; }
     }
   }
 
-  pushOut(_p, b.r, b.pos.y, b.h);
+  pushOut(_p, b.r, feet, b.h);
 
   // playable boundary — soft wall well inside the mountain ring
   const lim = WORLD.half - 20;
@@ -139,7 +143,7 @@ function moveBody(b, dt) {
   b.pos.x = _p.x; b.pos.z = _p.z;
 
   // vertical
-  const ground = groundAt(b.pos.x, b.pos.z, b.pos.y);
+  const ground = groundAt(b.pos.x, b.pos.z, feet);
   b.onPlatform = ground > floorAt(b.pos.x, b.pos.z) + 0.05;
   if (b.flying) { b.pos.y += b.vel.y * dt; b.grounded = false; b.groundY = ground; return; }
   if (b.grounded && b.vel.y <= 0 && b.pos.y - ground < PHYS.STEP + 0.25) {
