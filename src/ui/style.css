@@ -196,3 +196,16 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
 .school .sp.can{cursor:pointer;pointer-events:auto}.school .sp.can:hover{border-color:rgba(201,162,39,.35);background:rgba(201,162,39,.06)}
 .school .sp.attuned{border-color:rgba(240,207,98,.6);background:rgba(240,207,98,.08)}.school .sp i{color:var(--hot);font-style:italic}
 .school .sp b{color:var(--parch);font-weight:600}
+/* creator: Back and Begin always share one row, the primary one wider */
+#creator .row{flex-wrap:nowrap}
+#creator .row button{min-width:0;padding-left:14px;padding-right:14px}
+#creator #ccStart{flex:1}
+/* short screens: tighter steps so the whole panel fits without scrolling */
+@media (max-height:620px){
+  #creator .panel.left{margin-top:2vh;max-height:96vh;padding-top:14px;padding-bottom:14px}
+  #creator .step{margin:10px 0 6px}
+  #creator p.flavor{margin:4px 0}
+  #ccDesc{min-height:3em;margin-top:10px;font-size:13px;line-height:1.45}
+  #creator .row{margin-top:12px}
+  #creator input{padding:7px 12px;font-size:15px}
+}
