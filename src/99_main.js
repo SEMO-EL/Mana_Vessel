@@ -180,6 +180,36 @@ window.__mv = {
   },
 };
 
+/* ?test — a smoke run the headless harness reads back. Synchronous: it boots
+   a dev game, plays a few seconds of each system, and reports what broke.
+   (Kept short: headless Chrome renders on the CPU.) */
+function selfTests() {
+  const R = {}, fail = [], step = (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) frame(dt); };
+  const check = (name, fn) => { try { const v = fn(); R[name] = v === undefined ? true : v; if (v === false) fail.push(name); } catch (e) { fail.push(name + ': ' + (e.message || e)); } };
+  check('title', () => GAME.state);
+  check('devPlay', () => { startDevPlay(); step(20); return GAME.state; });
+  check('calls', () => { step(10); return renderer.info.render.calls; });
+  // a frame that isn't black: a NaN anywhere spreads through bloom to the whole screen
+  check('brightness', () => {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 18;
+    const x = c.getContext('2d'); frame(1 / 30); x.drawImage(renderer.domElement, 0, 0, 32, 18);
+    const d = x.getImageData(0, 0, 32, 18).data; let s = 0;
+    for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2];
+    const v = Math.round(s / (32 * 18 * 3)); return v > 20 ? v : false;
+  });
+  check('spells', () => { const out = []; for (const sp of unlockedSpells()) { G.cds = {}; G.mana = G.maxMana; castPlayerSpell(sp, false); step(8); out.push(sp.id); } return out.join(','); });
+  check('kill', () => {
+    const p = PL.body.pos, e = new Enemy('wolf', p.x + 4, p.z), k0 = G.kills;
+    for (let i = 0; i < 20 && !e.dead; i++) damageEnemy(e, 40, { dir: new THREE.Vector3(1, 0, 0), kind: 'sword' });
+    step(6); return G.kills - k0 === 1;
+  });
+  check('vessel', () => { const m0 = G.maxMana; G.mana = 1; spendMana(5); const down = PL.state === 'collapse'; step(70, 1 / 12); return down && G.maxMana > m0 && PL.state === 'move'; });
+  check('save', () => { G.quest = 'wolves'; saveGame(true); const s = loadGame(); localStorage.removeItem(SAVE_KEY); return !!s && s.quest === 'wolves' && Array.isArray(s.pos); });
+  check('map', () => typeof MAP !== 'undefined' && !!MAP.canvas ? MAP.buildMs : false);
+  check('batched', () => STRUCT.batched || false);
+  R.failures = fail; R.ok = fail.length === 0;
+  return R;
+}
 function runTests() {
   const report = { bootMs: GAME.bootMs, ok: true };
   try { if (typeof selfTests === 'function') Object.assign(report, selfTests()); } catch (e) { report.ok = false; report.error = String(e.stack || e); }

@@ -506,18 +506,18 @@ function startCollapse() {
   PL.chanting = null; CAM.aiming = false; CAM.lockTarget = null;
   PL.actor.setUpper(null);
   PL.body.vel.set(0, PL.body.vel.y, 0);
-  PL.collapseT = 0;
+  PL.collapseT = 0; PL._rising = false;    // (a stand-up cut short by death must not carry over)
   PL.actor.once('Lie_Down', { speed: 2.6, fade: 0.1, onEnd: () => { if (PL.state === 'collapse') PL.actor.loop('Lie_Idle', { fade: 0.15 }); } });
 }
 function stCollapse(dt) {
   PL.body.vel.x = PL.body.vel.z = 0;
   PL.collapseT += dt;
+  const rise = () => { PL._rising = false; setPlayerState('move'); PL.actor.loop('Idle', { fade: 0.2 }); endCollapse(); };
   if (PL.collapseT > 1.9 && !PL._rising) {
     PL._rising = true;
-    PL.actor.once('Lie_StandUp', { speed: 2.4, fade: 0.12, onEnd: () => {
-      PL._rising = false; setPlayerState('move'); PL.actor.loop('Idle', { fade: 0.2 }); endCollapse();
-    } });
+    PL.actor.once('Lie_StandUp', { speed: 2.4, fade: 0.12, onEnd: () => { if (PL.state === 'collapse') rise(); } });
   }
+  if (PL.collapseT > 4) rise();        // never stay down: the animation event is not a contract
 }
 
 /* ───────────── interaction ───────────── */
