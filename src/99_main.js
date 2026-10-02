@@ -168,7 +168,7 @@ function reportFatal(e) {
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, PROPS_LIB, propSize,
   PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES,
-  get G() { return G; }, set G(v) { G = v; },
+  get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
   hold(keys, n = 30, dt = 1 / 60) {

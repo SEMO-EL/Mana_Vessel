@@ -343,6 +343,12 @@ function leaveRest() {
   if (PL.state !== 'rest') return;
   PL.actor.once('Sit_Floor_StandUp', { speed: 1.4, onEnd: () => { setPlayerState('move'); PL.actor.loop('Idle'); } });
 }
+// Elden Ring's rule: no travelling out of a fight, or up out of the ground.
+function travelBlock() {
+  if (GAME.inCave) return 'The cave holds you. Find the way out first.';
+  if (ENT.enemies.some(e => !e.dead && e.aggro && e.dist() < 50)) return 'Not with enemies this close.';
+  return null;
+}
 async function fastTravel(id) {
   const W = WSTONE.list.find(w => w.id === id);
   if (!W || !G.waystones[id]) return;
@@ -351,6 +357,7 @@ async function fastTravel(id) {
   leaveCaveNow();
   for (const e of [...ENT.enemies]) e.remove();
   for (const enc of ENCOUNTERS) { enc.active = false; enc.live = []; }
+  G.lastWaystone = id;                    // where you arrive is where you'll rise
   placeAtWaystone(W);
   GAME.state = 'play';
   $('hud').classList.remove('off');
@@ -376,6 +383,7 @@ BUS.on('playerDied', () => {
       'Not this time. Get up.',
     ]) + '  ·  ' + G.breaks + ' breaks, ' + G.kills + ' kills, level ' + G.lvl + '.';
     GAME.state = 'dead';
+    $('hud').classList.add('off');
     openScreen('death');
     BUS.emit('sfx', { id: 'death' });
   }, 2600);
@@ -414,6 +422,48 @@ async function climbTower() {
 
 /* ───────────── collectibles: Roxy's lost pages ───────────── */
 const PAGES = [];
+// A leaf of Roxy's textbook: parchment, lines of her small hand, one spell
+// diagram, scorched edges — painted once and shared by all five pages.
+let _pageTex = null, _haloTex = null;
+function pageTexture() {
+  if (_pageTex) return _pageTex;
+  const W = 128, H = 166, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), R = mulberry32(4242);
+  const bg = x.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#efe2bf'); bg.addColorStop(1, '#dcc897');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(150,110,60,${0.04 + R() * 0.05})`; x.beginPath(); x.arc(R() * W, R() * H, 6 + R() * 18, 0, TAU); x.fill(); }
+  // the diagram: a circle of runes with a star inside
+  x.strokeStyle = 'rgba(70,46,26,.85)'; x.lineWidth = 1.4;
+  x.beginPath(); x.arc(64, 54, 26, 0, TAU); x.stroke();
+  x.beginPath(); x.arc(64, 54, 19, 0, TAU); x.stroke();
+  x.beginPath(); for (let k = 0; k <= 5; k++) { const a = -Math.PI / 2 + k * TAU * 2 / 5; x[k ? 'lineTo' : 'moveTo'](64 + Math.cos(a) * 19, 54 + Math.sin(a) * 19); } x.stroke();
+  for (let k = 0; k < 10; k++) { const a = k / 10 * TAU; x.fillStyle = 'rgba(70,46,26,.8)'; x.fillRect(64 + Math.cos(a) * 22.5 - 1, 54 + Math.sin(a) * 22.5 - 1, 2, 2); }
+  // lines of handwriting
+  x.strokeStyle = 'rgba(60,40,24,.7)'; x.lineWidth = 1;
+  for (let row = 0; row < 7; row++) {
+    let px = 14 + (row === 0 ? 8 : 0); const py = 96 + row * 9.5;
+    while (px < W - 16) {
+      const w = 4 + R() * 12; x.beginPath(); x.moveTo(px, py);
+      for (let s = 1; s <= 4; s++) x.lineTo(px + w * s / 4, py + (R() - 0.5) * 2.2);
+      x.stroke(); px += w + 3 + R() * 2;
+    }
+  }
+  // scorched edges
+  const v = x.createRadialGradient(W / 2, H / 2, H * 0.32, W / 2, H / 2, H * 0.62);
+  v.addColorStop(0, 'rgba(90,50,20,0)'); v.addColorStop(1, 'rgba(90,50,20,.55)');
+  x.fillStyle = v; x.fillRect(0, 0, W, H);
+  _pageTex = new THREE.CanvasTexture(c); _pageTex.colorSpace = THREE.SRGBColorSpace; _pageTex.anisotropy = 4;
+  return _pageTex;
+}
+function haloTexture() {
+  if (_haloTex) return _haloTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,230,160,1)'); g.addColorStop(0.35, 'rgba(255,210,120,.35)'); g.addColorStop(1, 'rgba(255,200,100,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  _haloTex = new THREE.CanvasTexture(c); _haloTex.colorSpace = THREE.SRGBColorSpace;
+  return _haloTex;
+}
 function buildPages() {
   const T = STRUCT.tower;
   const spots = [
@@ -431,8 +481,14 @@ function buildPages() {
   addBox(lx, lz, FALLS_LEDGE.w, FALLS_LEDGE.d, 0, ly - 30, ly, 'ledge');
   spots.forEach(([x, z, y], i) => {
     const py = y === 'ledge' ? ly : y ?? heightAt(x, z);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.65), new THREE.MeshBasicMaterial({ color: new THREE.Color('#f0e6c8').multiplyScalar(1.6), side: THREE.DoubleSide }));
+    // the page itself (a gently lit painting, not a lamp) and a soft halo that finds it from afar
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.55, 4, 1), toonMat({ map: pageTexture(), emissive: '#4a3c22', side: THREE.DoubleSide }));
+    const pg = m.geometry.attributes.position;
+    for (let k = 0; k < pg.count; k++) pg.setZ(k, Math.sin((pg.getX(k) / 0.42 + 0.5) * Math.PI) * 0.04);   // a soft curl
+    m.geometry.computeVertexNormals();
     m.position.set(x, py + 1.1, z);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: new THREE.Color('#ffd98a').multiplyScalar(1.3), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.setScalar(1.5); m.add(halo);
     STRUCT.group.add(m);
     const P = { i, mesh: m, pos: new THREE.Vector3(x, py, z) };
     PAGES.push(P);
@@ -453,7 +509,8 @@ function takePage(P) {
 }
 function updatePages(dt) {
   for (const P of PAGES) if (P.mesh.visible) {
-    P.mesh.rotation.y += dt * 1.2;
+    P.mesh.rotation.y += dt * 0.9;
+    P.mesh.rotation.z = Math.sin(GAME.time * 1.3 + P.i) * 0.12;      // it turns and flutters on the air
     P.mesh.position.y = P.pos.y + 1.1 + Math.sin(GAME.time * 2 + P.i) * 0.1;
     P.mesh.visible = !(G && G.pages.includes(P.i));
     if (P.pos.distanceToSquared(PL.body.pos) < 60 * 60) {
