@@ -211,6 +211,30 @@ function buildStructures() {
     const o = placeProp(n, x, z, { rot: yawTo(x, z, -430, 360) });
     if (id) o.userData.id = id;
   }
+  // The rest of Buena: cottages shoulder to shoulder along both sides of the
+  // road, each facing the street with a yard fenced behind — a village, not a
+  // scatter. Skips the story buildings, the plaza, the waystone, the people,
+  // the river bank and Paul's yard.
+  const roadZ = x => {
+    for (let i = 0; i < ROAD.length - 1; i++) { const [ax, az] = ROAD[i], [bx, bz] = ROAD[i + 1]; if (x >= ax && x <= bx) return az + (bz - az) * (x - ax) / (bx - ax); }
+    return ROAD[0][1];
+  };
+  const keepClear = [...houses.map(([, x, z]) => [x, z, 15]), [-430, 352, 16], [-392, 332, 12], [-498, 444, 24],
+    [-462, 312, 7], [-478, 318, 7], [-418, 344, 7], [-405, 352, 7]];
+  const RV = mulberry32(919);
+  for (let x = -580; x <= -380; x += 15 + RV() * 4) for (const side of [-1, 1]) {
+    const hx = x + (RV() - 0.5) * 4, rz = roadZ(hx), hz = rz + side * (15 + RV() * 4);
+    if (roadDistAt(hx, hz) < 11 || riverDistAt(hx, hz) < 22) continue;
+    if (keepClear.some(([cx, cz, r]) => Math.hypot(hx - cx, hz - cz) < r)) continue;
+    const h0 = heightAt(hx, hz);
+    if (Math.abs(heightAt(hx + 5, hz) - h0) > 1.6 || Math.abs(heightAt(hx, hz + 5) - h0) > 1.6) continue;   // no cottages on a slope
+    placeProp(RV() < 0.55 ? 'building_home_A_red' : 'building_home_B_red', hx, hz, { rot: yawTo(hx, hz, hx, rz) + (RV() - 0.5) * 0.25 });
+    keepClear.push([hx, hz, 13]);
+    // a yard fence behind, and something by the door
+    if (RV() < 0.7) for (const dx of [-4.4, 0, 4.4]) placeProp('fence_wood_straight', hx + dx, hz + side * 9.5, { s: 3.8, rot: Math.PI / 2, pad: 0.6 });
+    const dx = (RV() < 0.5 ? -1 : 1) * (3.5 + RV() * 1.5);
+    placeProp(['barrel', 'crate_A_big', 'sack', 'bucket_water', 'resource_lumber', 'wheelbarrow'][Math.floor(RV() * 6)], hx + dx, hz - side * 5.5, { s: 5, rot: RV() * TAU, pad: 0.6 });
+  }
   placeProp('building_well_red', -430, 352, { s: 7, rot: 0.4 });
   // watermill on the river bank, wheel toward the water
   const wmX = -357, wmZ = 300;

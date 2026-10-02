@@ -16,7 +16,10 @@ function openScreen(id) {
 function closeAllScreens() { for (const s of SCREENS) $(s).classList.remove('on'); }
 
 /* ───────────── title: a slow cinematic flight over Buena ───────────── */
-const TITLE_PATH = [[-700, 150, 700], [-560, 90, 520], [-420, 70, 470], [-300, 80, 380], [-180, 110, 250], [-110, 105, 150], [-60, 90, 20], [-120, 80, -200], [-250, 95, -380], [-300, 110, -470]];
+// A slow crane along the south shore, the sun low on the left: raking light,
+// the river leading in, mountains framing the title. (Never into the sun —
+// backlit haze flattens the whole valley to one colour.)
+const TITLE_PATH = [[-690, 100, 715], [-640, 90, 680], [-590, 84, 655], [-530, 78, 642], [-460, 82, 650], [-390, 90, 668], [-330, 100, 690]];
 let _titleT = 0;
 function titleCamera(dt) {
   _titleT += dt * 0.012;
@@ -27,13 +30,14 @@ function titleCamera(dt) {
   const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
   const x = cr(P(i - 1)[0], P(i)[0], P(i + 1)[0], P(i + 2)[0], t), y = cr(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1], t), z = cr(P(i - 1)[2], P(i)[2], P(i + 1)[2], P(i + 2)[2], t);
   camera.position.set(x, Math.max(y, heightAt(x, z) + 25), z);
-  camera.lookAt(-420, 30, 330);
-  GAME.focus.set(-420, 26, 350);
+  const k = u / n, lx = lerp(-475, -385, k);
+  camera.lookAt(lx, 74, 330);
+  GAME.focus.set(lx, 26, 380);
 }
 function showTitle() {
   GAME.state = 'title';
   leaveCaveNow();
-  TOD.hour = 17.6; TOD.frozen = true;
+  TOD.hour = 17.2; TOD.frozen = true;
   Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 1e9;
   $('hud').classList.add('off');
   if (PL.actor) PL.actor.root.visible = false;
