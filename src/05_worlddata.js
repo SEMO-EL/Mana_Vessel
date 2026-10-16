@@ -12,9 +12,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const WORLD = {
   half: 800,                       // Buena's half-extent (its ring, its map frame)
-  x0: -1100, x1: 1100,             // heightfield bounds (metres)
+  x0: -1100, x1: 2700,             // heightfield bounds (metres): Buena's square + the Roa basin
   z0: -1100, z1: 1100,
-  px0: -780, px1: 780,             // playable rectangle (soft wall)
+  px0: -780, px1: 2380,            // playable rectangle (soft wall)
   pz0: -780, pz1: 780,
   cell: 2,                         // heightfield spacing
   seed: 20260930,
@@ -30,10 +30,24 @@ const RIVER = [
 ];
 const RIVER_WIDTH = 14;        // channel width at the surface
 
-// The road: village west → bridge → east to the Roa pass.
+// The road: village west → bridge → east through the pass → Roa's west gate,
+// down the main street, out of the east gate and north-east along the trade
+// road into the outskirts.
 const ROAD = [
   [-600, 330], [-520, 345], [-420, 362], [-345, 388], [-250, 408], [-120, 420],
-  [0, 402], [160, 430], [320, 420], [460, 398], [620, 382], [760, 380], [880, 380], [1060, 380],
+  [0, 402], [160, 430], [320, 420], [460, 398], [620, 382], [760, 380], [900, 382],
+  [1060, 386], [1220, 384], [1360, 383], [1448, 385], [1560, 386], [1672, 385],
+  [1770, 346], [1880, 272], [1990, 190], [2090, 104], [2170, 24],
+];
+// city streets (rasterised with the road): the estate avenue north from the
+// plaza, the street out of the south gate to the market gardens, the quarter
+// street across the south of the city, and a lane down each side of it
+const STREETS = [
+  [[1560, 386], [1560, 326]],
+  [[1560, 386], [1552, 440], [1552, 489], [1548, 560]],
+  [[1452, 440], [1668, 440]],
+  [[1500, 296], [1500, 485]],
+  [[1620, 296], [1620, 485]],
 ];
 const ROAD_WIDTH = 7;
 
@@ -49,7 +63,14 @@ const PLACES = {
   cave:      { x: -60,  z: -540, r: 60,  name: 'The Weeping Cave' },
   camp:      { x: 190,  z: 565, r: 60,  name: 'Brigands\' Rest' },
   ruinsE:    { x: 560,  z: -390, r: 50,  name: 'Sunken Chapel' },
-  gate:      { x: 780,  z: 380, r: 60,  name: 'The Roa Road',         sub: 'Sealed — Milestone 2' },
+  gate:      { x: 780,  z: 380, r: 60,  name: 'The Roa Road',         sub: 'Out of Buena' },
+  pass:      { x: 1010, z: 384, r: 90,  name: 'The Eastern Pass',     sub: 'Between Buena and Roa' },
+  roa:       { x: 1560, z: 385, r: 150, name: 'City of Roa',          sub: 'Seat of House Boreas' },
+  estate:    { x: 1560, z: 312, r: 40,  name: 'The Boreas Estate' },
+  farms:     { x: 1540, z: 600, r: 90,  name: 'Roa Market Gardens' },
+  outskirts: { x: 1980, z: 120, r: 190, name: 'Roa Outskirts',        sub: 'The trade road north-east' },
+  wagons:    { x: 1985, z: 158, r: 45,  name: 'Wagonbreak Camp' },
+  firstWall: { x: 2096, z: -112, r: 60, name: 'The First Wall',       sub: 'Older than Roa' },
 };
 
 // Terrain sculpt features.
@@ -65,10 +86,25 @@ const CLIFF = { z0: -522, z1: -578, h: 74 };          // northern escarpment
 const GROVE = { x: 430, z: -200, r: 60 };             // shallow bowl
 const EAST_PASS = { z: 380, w: 70 };                  // gap in the mountain ring for the road
 const FOREST_ZONE = { x0: 90, x1: 780, z0: -640, z1: 310 };
+// how much a point belongs to Buena Forest (the east edge fades out past the ring, before Roa)
+const forestEast = x => 1 - smooth(FOREST_ZONE.x1 + 40, FOREST_ZONE.x1 + 160, x);
+
+// The Roa basin: its own ring of mountains (same rounded-square shape as
+// Buena's), the walled city on a low rise, market gardens to the south, and
+// in the north-east the dry, broken outskirts where the trade road runs.
+const ROA_BASIN = { x: 1720, z: 260, r: 540 };
+const ROA_CITY = { x: 1560, z: 385, hw: 112, hd: 104, h: 44 };      // walls ±hw × ±hd around (x, z): 14 × 13 wall lengths of 16 m
+const ROA_ESTATE = { x: 1560, z: 312, hw: 58, hd: 28, up: 3.2 };     // the Boreas terrace
+const OUTSKIRTS = { x0: 1790, z1: 250 };                             // north-east of here: badlands
+const FIRST_WALL = { x: 2096, z: -112, r: 34 };                       // the golem's sunken arena
+const WAGON_CAMP = { x: 1985, z: 158 };
 
 // Waystones — rest, respawn, fast travel. Order matters for the map.
 const WAYSTONES = [
   { id: 'village', x: -392, z: 332, name: 'Buena Village' },
   { id: 'forest',  x: 300,  z: -46, name: 'Forest Clearing' },
   { id: 'cave',    x: -66,  z: -498, name: 'Below the Cliffs' },
+  { id: 'pass',    x: 1060, z: 404, name: 'The Eastern Pass' },
+  { id: 'roa',     x: 1532, z: 408, name: 'Roa — Market Square' },
+  { id: 'trade',   x: 1880, z: 300, name: 'The Trade Road' },
 ];

@@ -257,12 +257,26 @@ function treeDensity(x, z, n) {
   if (Math.hypot(x - PLACES.camp.x, z - PLACES.camp.z) < 40) return 0;
   if (Math.hypot(x - PLACES.cave.x, z - PLACES.cave.z) < 45) return 0;
   if (Math.hypot(x - PLACES.ruinsE.x, z - PLACES.ruinsE.z) < 22) return 0;
-  const forest = smooth(FOREST_ZONE.x0 - 30, FOREST_ZONE.x0 + 90, x) * (1 - smooth(FOREST_ZONE.z1 - 50, FOREST_ZONE.z1 + 60, z));
+  if (x > 880) return roaTreeDensity(x, z, h, n);
+  const forest = smooth(FOREST_ZONE.x0 - 30, FOREST_ZONE.x0 + 90, x) * (1 - smooth(FOREST_ZONE.z1 - 50, FOREST_ZONE.z1 + 60, z)) * forestEast(x);
   const patchy = smooth(-0.1, 0.5, n(x / 90, z / 90));
   const bank = (1 - smooth(10, 40, TER.RIVD[idx])) * 0.25;
   const north = smooth(-380, -520, z) * 0.35;          // woods below the cliffs
   const ridge = smooth(38, 70, h) * (1 - forest) * 0.18;
   return clamp(forest * (0.55 + patchy * 0.45) + patchy * 0.05 + bank + north * patchy + ridge, 0, 0.95);
+}
+// Roa: no trees in the streets, the camp or the arena; orchard rows west of
+// the walls; scattered groves on the plain; scrub and dead wood in the outskirts.
+const ROA_ORCHARD = { x: 1360, z: 455, hw: 62, hd: 56 };
+function roaTreeDensity(x, z, h, n) {
+  if (rectDist(x, z, ROA_CITY) < 16) return 0;
+  if (rectDist(x, z, { x: 1545, z: 600, hw: 100, hd: 75 }) < 4) return 0;           // the market gardens
+  if (Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 46) return 0;
+  if (Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r + 24) return 0;
+  const orchard = rectDist(x, z, ROA_ORCHARD) < 1 && Math.abs(((x - ROA_ORCHARD.x) % 11 + 11) % 11 - 5.5) > 3.6 ? 0.9 : 0;
+  const patchy = smooth(0, 0.55, n(x / 80, z / 80)), dry = outskirtsW(x, z);
+  const slopes = smooth(48, 90, h) * 0.22;                                           // pines up toward the ring
+  return clamp(orchard + patchy * 0.14 * (1 - dry) + dry * (0.03 + patchy * 0.05) + slopes, 0, 0.95);
 }
 const _tmpN = new THREE.Vector3();
 
@@ -278,16 +292,22 @@ async function buildTrees() {
   const CELL = 200, X0 = WORLD.px0 - 10, Z0 = WORLD.pz0 - 10;   // instancing buckets: one per 200 m cell
   const buckets = new Map();
   const step = 7.5 / Math.sqrt(q.trees);
-  for (let z = WORLD.pz0 - 10; z < WORLD.pz1 + 10; z += step) {
-    for (let x = WORLD.px0 - 10; x < WORLD.px1 + 10; x += step) {
+  // Two sweeps with their own random streams: Buena's square exactly as it
+  // always was, then the Roa basin — so growing the world east never
+  // replants a single tree in Buena.
+  const BX = WORLD.half - 10;
+  const sweep = (xa, xb, R) => { for (let z = WORLD.pz0 - 10; z < WORLD.pz1 + 10; z += step) for (let x = xa; x < xb; x += step) plant(x, z, R); };
+  const plant = (x, z, R) => {
       const px = x + (R() - 0.5) * step * 0.9, pz = z + (R() - 0.5) * step * 0.9;
       const d = treeDensity(px, pz, n);
-      if (R() > d) continue;
+      if (R() > d) return;
       const h = heightAt(px, pz);
       const coldness = smooth(-300, -560, pz) + smooth(60, 140, h);
       let vi;
-      const r = R();
-      if (r < 0.14) vi = 5;                                            // bush
+      const r = R(), dry = px > 900 ? outskirtsW(px, pz) : 0;
+      if (dry > 0.4 && r < 0.75) vi = r < 0.38 ? 6 : 5;                // the outskirts: dead wood and scrub
+      else if (px > 900 && rectDist(px, pz, ROA_ORCHARD) < 2) vi = R() < 0.5 ? 0 : 1;   // the orchard: one kind, in rows
+      else if (r < 0.14) vi = 5;                                       // bush
       else if (r < 0.14 + 0.5 * clamp(coldness, 0, 1) + 0.12) vi = R() < 0.5 ? 3 : 4;  // pine
       else if (r < 0.95) vi = R() < 0.18 ? 2 : (R() < 0.5 ? 0 : 1);   // broadleaf / oak
       else vi = 6;                                                     // dead
@@ -296,8 +316,9 @@ async function buildTrees() {
       if (!buckets.has(key)) buckets.set(key, variants.map(() => []));
       buckets.get(key)[vi].push([px, h - 0.15, pz, R() * TAU, s]);
       FOL.trees.push({ x: px, z: pz, r: vi === 5 ? 0 : variants[vi].trunkR * s, kind: variants[vi].kind, h: variants[vi].height * s });
-    }
-  }
+  };
+  sweep(WORLD.px0 - 10, BX, R);
+  sweep(BX, WORLD.px1 + 10, mulberry32(WORLD.seed + 178));
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   for (const [key, lists] of buckets) {
     const [cx, cz] = key.split(',').map(Number);
@@ -337,19 +358,23 @@ function scatterRocks() {
   const R = mulberry32(WORLD.seed + 91), n = Noise.make(WORLD.seed + 92);
   const names = ['rock_single_A', 'rock_single_B', 'rock_single_C', 'rock_single_D', 'rock_single_E'];
   const lists = names.map(() => []);
-  const tries = Math.round(2600 * (WORLD.px1 - WORLD.px0) * (WORLD.pz1 - WORLD.pz0) / (1560 * 1560));   // same density, any size
-  for (let i = 0; i < tries; i++) {
-    const x = lerp(WORLD.px0, WORLD.px1, R()), z = lerp(WORLD.pz0, WORLD.pz1, R());
+  // Buena's square with its original stream, then the rest at the same density with its own
+  const B = WORLD.half - 20, R2 = mulberry32(WORLD.seed + 191);
+  const extra = Math.round(2600 * (WORLD.px1 - B) * (WORLD.pz1 - WORLD.pz0) / (2 * B * 2 * B));
+  for (let i = 0; i < 2600 + extra; i++) {
+    const roa = i >= 2600, r = roa ? R2 : R;
+    const x = roa ? lerp(B, WORLD.px1, r()) : lerp(-B, B, r()), z = roa ? lerp(WORLD.pz0, WORLD.pz1, r()) : lerp(-B, B, r());
     const ii = terIndex(x, z), idx = Math.round(ii[1]) * TER.NX + Math.round(ii[0]);
     if (TER.WATER[idx] > NO_WATER || TER.ROADD[idx] < 6) continue;
     const nn = normalAt(x, z, _tmpN);
     const steep = 1 - nn.y;
     const bank = 1 - smooth(8, 18, TER.RIVD[idx]);
-    const p = steep * 2.2 + bank * 0.5 + smooth(0.4, 0.9, n(x / 60, z / 60)) * 0.12;
-    if (R() > p) continue;
+    const p = steep * 2.2 + bank * 0.5 + smooth(0.4, 0.9, n(x / 60, z / 60)) * 0.12 + (roa ? outskirtsW(x, z) * 0.1 : 0);
+    if (r() > p) continue;
     if (Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z) < 90) continue;
-    const s = (0.8 + R() * 1.6) * (1 + steep * 2);
-    lists[(R() * names.length) | 0].push([x, heightAt(x, z) - 0.3 * s, z, R() * TAU, s]);
+    if (roa && (rectDist(x, z, ROA_CITY) < 12 || Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r || Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 30)) continue;
+    const s = (0.8 + r() * 1.6) * (1 + steep * 2);
+    lists[(r() * names.length) | 0].push([x, heightAt(x, z) - 0.3 * s, z, r() * TAU, s]);
     FOL.rocks.push({ x, z, r: 0.9 * s });
   }
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);

@@ -65,6 +65,52 @@ function rasterPolyline(pts, levels, F, L, reach) {
   }
 }
 
+/* ───────────── the Roa basin ───────────── */
+// distance from a point to an axis-aligned rectangle {x, z, hw, hd} (0 inside)
+function rectDist(x, z, R) { return Math.hypot(Math.max(Math.abs(x - R.x) - R.hw, 0), Math.max(Math.abs(z - R.z) - R.hd, 0)); }
+// how much a point belongs to the outskirts' badlands (north-east of the city)
+const outskirtsW = (x, z) => smooth(OUTSKIRTS.x0 - 90, OUTSKIRTS.x0 + 90, x) * (1 - smooth(OUTSKIRTS.z1 - 90, OUTSKIRTS.z1 + 90, z));
+// First pass, inside the height loop: the outskirts break into mesas and
+// gullies — but stay walkable along the trade road.
+function sculptRoa(h, x, z, i, nA, nB) {
+  const ok = outskirtsW(x, z);
+  if (ok > 0) h += ok * smooth(8, 36, TER.ROADD[i]) * (ridged(nB, x / 85, z / 85, 3) * 18 - 6 + fbm(nA, x / 36, z / 36, 2) * 2.5);
+  return h;
+}
+// Second pass: the built places want level ground. Each one's level is the
+// median of the land already under it, so nothing stands on a plinth or sits
+// in a pit, and the edges ease back into the hills.
+function sculptRoaSites() {
+  const c = WORLD.cell, N = TER.NX, H = TER.H, n = Noise.make(WORLD.seed + 61);
+  const median = (x0, z0, x1, z1) => {
+    const v = [];
+    for (let z = z0; z <= z1; z += 6) for (let x = x0; x <= x1; x += 6) v.push(heightAt(x, z));
+    v.sort((a, b) => a - b); return v[v.length >> 1];
+  };
+  const C = ROA_CITY, E = ROA_ESTATE, F = FIRST_WALL, W = WAGON_CAMP;
+  C.h = median(C.x - C.hw, C.z - C.hd, C.x + C.hw, C.z + C.hd);
+  F.h = median(F.x - F.r, F.z - F.r, F.x + F.r, F.z + F.r) - 2.5;     // sunk a little below its surroundings
+  W.h = median(W.x - 20, W.z - 20, W.x + 20, W.z + 20);
+  const each = (x0, z0, x1, z1, fn) => {
+    const i0 = Math.max(1, Math.floor((x0 - WORLD.x0) / c)), i1 = Math.min(N - 2, Math.ceil((x1 - WORLD.x0) / c));
+    const j0 = Math.max(1, Math.floor((z0 - WORLD.z0) / c)), j1 = Math.min(TER.NZ - 2, Math.ceil((z1 - WORLD.z0) / c));
+    for (let j = j0; j <= j1; j++) for (let k = i0; k <= i1; k++) { const i = j * N + k; H[i] = fn(H[i], WORLD.x0 + k * c, WORLD.z0 + j * c); }
+  };
+  // the city on one low plateau, eased out over 70 m; the Boreas terrace a step up within it
+  each(C.x - C.hw - 72, C.z - C.hd - 72, C.x + C.hw + 72, C.z + C.hd + 72, (h, x, z) => {
+    h = lerp(h, C.h + n(x / 50, z / 50) * 0.5, 1 - smooth(0, 70, rectDist(x, z, C)));
+    return h + E.up * (1 - smooth(0, 7, rectDist(x, z, E)));
+  });
+  // the First Wall: a sunken arena floor ringed by a raised lip (walkable: ~30°)
+  each(F.x - F.r - 32, F.z - F.r - 32, F.x + F.r + 32, F.z + F.r + 32, (h, x, z) => {
+    const d = Math.hypot(x - F.x, z - F.z);
+    h = lerp(h, F.h + n(x / 9, z / 9) * 0.25, 1 - smooth(F.r - 4, F.r + 10, d));
+    return h + 3.5 * Math.exp(-Math.pow((d - F.r - 9) / 6, 2));
+  });
+  // the wagon camp: a level yard beside the road
+  each(W.x - 40, W.z - 40, W.x + 40, W.z + 40, (h, x, z) => lerp(h, W.h, 1 - smooth(22, 38, Math.hypot(x - W.x, z - W.z))));
+}
+
 async function buildTerrain() {
   const c = WORLD.cell, X0 = WORLD.x0, Z0 = WORLD.z0;
   const N = TER.NX = Math.round((WORLD.x1 - WORLD.x0) / c) + 1;     // N: the row stride
@@ -89,6 +135,8 @@ async function buildTerrain() {
   const roadPts = catmull(ROAD, 8);
   TER.roadPath = roadPts;
   rasterPolyline(roadPts, null, TER.ROADD, null, ROAD_WIDTH / 2 + 20);
+  TER.streets = STREETS.map(s => s.length > 2 ? catmull(s, 6) : s);
+  for (const s of TER.streets) rasterPolyline(s, null, TER.ROADD, null, ROAD_WIDTH / 2 + 20);
 
   /* --- heights --- */
   const n1 = Noise.make(WORLD.seed + 1), n2 = Noise.make(WORLD.seed + 2), n3 = Noise.make(WORLD.seed + 3);
@@ -104,7 +152,7 @@ async function buildTerrain() {
       let h = 32 + fbm(n1, x / 480, z / 480, 4) * 20 + fbm(n2, x / 130, z / 130, 3) * 5.5 + n3(x / 38, z / 38) * 1.0;
 
       // forest hills — rougher inside the forest zone
-      const fw = smooth(FOREST_ZONE.x0 - 60, FOREST_ZONE.x0 + 60, x) * (1 - smooth(FOREST_ZONE.z1 - 60, FOREST_ZONE.z1 + 60, z));
+      const fw = smooth(FOREST_ZONE.x0 - 60, FOREST_ZONE.x0 + 60, x) * (1 - smooth(FOREST_ZONE.z1 - 60, FOREST_ZONE.z1 + 60, z)) * forestEast(x);
       h += fw * fbm(n4, x / 170, z / 170, 3) * 12;
 
       // watchtower ridge: capsule falloff along its spine, crest roughened
@@ -131,11 +179,17 @@ async function buildTerrain() {
       // two bands: rolling foothills first, the real peaks further out — so the
       // horizon layers into depth instead of standing up as one wall
       let m = smooth(760, 900, ringE), m2 = smooth(880, 1060, ringE);
+      // Roa's basin has a ring of its own: between the two, mountains — except the pass
+      const ringR = Math.pow(Math.pow(Math.abs(x - ROA_BASIN.x), 4) + Math.pow(Math.abs(z - ROA_BASIN.z), 4), 0.25);
+      m = Math.min(m, smooth(ROA_BASIN.r, ROA_BASIN.r + 140, ringR));
+      m2 = Math.min(m2, smooth(ROA_BASIN.r + 120, ROA_BASIN.r + 300, ringR));
       if (x > 560) {
         const pass = 1 - (1 - smooth(EAST_PASS.w, EAST_PASS.w + 100, Math.abs(z - EAST_PASS.z))) * smooth(560, 760, x);
         m *= pass; m2 *= pass;
       }
       h += m * (45 + fbm(n4, x / 140, z / 140, 3) * 30) + m2 * (80 + ridged(n5, x / 240, z / 240, 5) * 170);
+
+      if (x > 900) h = sculptRoa(h, x, z, i, n2, n5);
 
       // village basin
       const dv = Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z);
@@ -175,6 +229,8 @@ async function buildTerrain() {
     if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / NZ * 100) + '%'); await nextFrame(); }
   }
 
+  sculptRoaSites();
+
   /* --- grass density: none on water, road, rock, steep ground, or the basin core --- */
   for (let iz = 1; iz < NZ - 1; iz++) {
     for (let ix = 1; ix < N - 1; ix++) {
@@ -186,6 +242,10 @@ async function buildTerrain() {
       g *= smooth(ROAD_WIDTH * 0.5, ROAD_WIDTH * 0.5 + 4, TER.ROADD[i]);
       g *= smooth(hw + 1, hw + 7, TER.RIVD[i]);
       g *= 0.55 + 0.45 * smooth(-0.2, 0.4, n3(x / 25, z / 25));
+      if (x > 900) {
+        g *= 1 - 0.62 * outskirtsW(x, z);                                   // the outskirts: dry and patchy
+        g *= 0.2 + 0.8 * smooth(2, 18, rectDist(x, z, ROA_CITY));           // trodden flat inside the walls
+      }
       TER.GRASS[i] = Math.round(clamp(g, 0, 1) * 255);
     }
   }
@@ -239,6 +299,8 @@ const TCOL = (() => {
     dirt: C('#8a7150'), path: C('#7b6747'), bank: C('#a8976b'), bed: C('#5d5a4c'),
     rock: C('#7b7266'), rockDark: C('#554e46'), cliff: C('#8d8272'),
     snow: C('#e9e7e1'), field: C('#c0a24c'),
+    dust: C('#ad9a68'), dustPale: C('#c2b184'), badRock: C('#9b8467'),
+    cobble: C('#8a7e6c'), cobbleDark: C('#6e6456'), plaza: C('#a59882'), soil: C('#6c5639'),
   };
 })();
 const _tc = new THREE.Color(), _tc2 = new THREE.Color();
@@ -248,7 +310,7 @@ function terrainColor(x, z, h, slope, i, nA, nB, out) {
   out.copy(TCOL.lush).lerp(TCOL.dry, smooth(-0.1, 0.7, v1)).lerp(TCOL.dark, smooth(0.2, 0.8, -v1) * 0.6);
   out.lerp(TCOL.warm, smooth(0.3, 1, v2) * 0.35);
   // forest floor
-  const fw = smooth(FOREST_ZONE.x0 - 40, FOREST_ZONE.x0 + 80, x) * (1 - smooth(FOREST_ZONE.z1 - 40, FOREST_ZONE.z1 + 80, z));
+  const fw = smooth(FOREST_ZONE.x0 - 40, FOREST_ZONE.x0 + 80, x) * (1 - smooth(FOREST_ZONE.z1 - 40, FOREST_ZONE.z1 + 80, z)) * forestEast(x);
   out.lerp(_tc.copy(TCOL.forest).lerp(TCOL.moss, smooth(-0.3, 0.6, v2)), fw * 0.8);
   // wheat fields south of the village
   const fieldW = (1 - smooth(55, 80, Math.hypot(x + 340, z - 520))) + (1 - smooth(40, 60, Math.hypot(x + 560, z - 430)));
@@ -261,9 +323,11 @@ function terrainColor(x, z, h, slope, i, nA, nB, out) {
   // lake shore
   const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
   if (h < WORLD.lakeLevel + 1.2 && dl < LAKE.r + 20) out.lerp(TCOL.bank, 0.7);
+  if (x > 900) roaGroundColor(x, z, h, v1, v2, out);
   // road
   const ro = TER.ROADD[i];
-  out.lerp(_tc.copy(TCOL.dirt).lerp(TCOL.path, smooth(-0.5, 0.5, v2)), (1 - smooth(ROAD_WIDTH * 0.35, ROAD_WIDTH * 0.5 + 1.5, ro)) * 0.95);
+  const paved = x > 900 ? 1 - smooth(0, 6, rectDist(x, z, ROA_CITY)) : 0;      // Roa's streets are laid stone, not dirt
+  out.lerp(_tc.copy(TCOL.dirt).lerp(TCOL.path, smooth(-0.5, 0.5, v2)), (1 - smooth(ROAD_WIDTH * 0.35, ROAD_WIDTH * 0.5 + 1.5, ro)) * 0.95 * (1 - paved * 0.8));
   // village worn ground
   const dv = Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z);
   out.lerp(TCOL.path, (1 - smooth(20, 90, dv)) * 0.25 * (0.6 + 0.4 * v2));
@@ -388,4 +452,25 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
   g.computeBoundingSphere();
   g.computeBoundingBox();
   return g;
+}
+
+/* Roa's ground: dust and pale rock in the outskirts, worn cobbles inside the
+   walls (a paler square round the plaza), tilled soil in the market gardens. */
+const ROA_PLAZA = { x: 1560, z: 386, r: 26 };
+function roaGroundColor(x, z, h, v1, v2, out) {
+  const ok = outskirtsW(x, z);
+  if (ok > 0) {
+    out.lerp(_tc.copy(TCOL.dust).lerp(TCOL.dustPale, smooth(-0.2, 0.7, v2)), ok * (0.55 + 0.3 * smooth(-0.3, 0.6, v1)));
+    out.lerp(TCOL.badRock, ok * smooth(0.45, 0.9, v2) * 0.4);
+  }
+  const inside = 1 - smooth(0, 6, rectDist(x, z, ROA_CITY));
+  if (inside > 0) {
+    const tile = Math.abs(Math.sin(x * 0.9) * Math.sin(z * 0.9));          // a hint of laid stone at close range
+    out.lerp(_tc.copy(TCOL.cobble).lerp(TCOL.cobbleDark, smooth(0.2, 0.9, v2) * 0.6 + tile * 0.15), inside * 0.82);
+    out.lerp(TCOL.plaza, (1 - smooth(ROA_PLAZA.r - 4, ROA_PLAZA.r + 2, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z))) * 0.9);
+  }
+  // market gardens: strips of tilled soil south of the walls
+  const gardens = (1 - smooth(0, 14, rectDist(x, z, { x: 1545, z: 600, hw: 95, hd: 70 }))) * (Math.sin(z * 0.35 + Math.sin(x * 0.02) * 2) > 0.2 ? 1 : 0.35);
+  out.lerp(TCOL.soil, gardens * 0.55);
+  return out;
 }

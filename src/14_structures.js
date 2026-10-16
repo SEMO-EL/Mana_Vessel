@@ -294,15 +294,14 @@ function buildStructures() {
   addBox(tx, tz, 2.6, 2.6, 0, topY - 1, topY, 'towerTop');
   INTERACTABLES.push({ pos: new THREE.Vector3(tx + Math.sin(0.3) * 6, tower.position.y + 1, tz + Math.cos(0.3) * 6), r: 5, label: () => 'Climb the watchtower', action: () => climbTower() });
 
-  /* Roa's sealed gate in the eastern pass, walls climbing the slopes, the city beyond */
+  /* the gate out of Buena, in the eastern pass, walls climbing the slopes.
+     Shut until the story opens it (the doors swing east, toward Roa). */
   const gx = 786, gz = 380;
-  placeProp('wall_straight_gate', gx, gz, { s: 10, rot: Math.PI / 2 });
+  STRUCT.passGate = buildGate(gx, gz, Math.PI / 2, 10, { open: 0 });
   for (const off of [-20, -40, -60, 20, 40, 60]) placeProp('wall_straight', gx + Math.abs(off) * 0.08, gz + off, { s: 10, rot: Math.PI / 2, sink: 1.5 });
-  addBox(gx, gz, 1.2, 12, 0, heightAt(gx, gz) - 2, heightAt(gx, gz) + 12, 'roaGate');
   INTERACTABLES.push({ pos: new THREE.Vector3(gx - 4, heightAt(gx - 4, gz), gz), r: 6, label: () => 'The gate to Roa',
-    action: () => BUS.emit('toast', { text: 'The gate is barred from the other side. (Milestone 2)', cls: 'big' }) });
-  placeProp('building_castle_red', 1030, 380, { s: 22, rot: -Math.PI / 2, collide: false, y: heightAt(1030, 380) - 2 });
-  for (const [x, z] of [[1000, 330], [1000, 430], [1065, 340], [1065, 420]]) placeProp('building_tower_B_red', x, z, { s: 13, collide: false });
+    enabled: () => STRUCT.passGate.k < 0.5,
+    action: () => { if (typeof onGateKnock === 'function') onGateKnock(); } });
 
   /* Brigands' Rest */
   const C = PLACES.camp;
@@ -381,7 +380,7 @@ function batchStaticProps() {
   const CELL = 256, cells = new Map();
   for (const p of STRUCT.placed) {
     const obj = p.obj;
-    if (obj.parent !== STRUCT.group) continue;
+    if (obj.parent !== STRUCT.group || obj.userData.noBatch) continue;     // (gates move: they stay themselves)
     const meshes = [];
     obj.traverse(o => { if (o.isMesh) meshes.push(o); });
     if (!meshes.length || meshes.some(m => m.isSkinnedMesh || m.material !== meshes[0].material
@@ -407,4 +406,48 @@ function batchStaticProps() {
     calls++; props += c.objs.length;
   }
   STRUCT.batched = { cells: calls, props };
+}
+
+/* ───────────── gates ─────────────
+   A KayKit wall gate whose two doors swing on their hinges. The wall on
+   either side of the arch always collides; the doorway only while the
+   doors are shut. Doors swing toward the gate's local +Z. Returns
+   { obj, k, set(k) } — k: 0 shut … 1 open. Gates never join the static
+   batch (they move). */
+function buildGate(x, z, rot, s, { open = 0 } = {}) {
+  const obj = placeProp('wall_straight_gate', x, z, { s, rot, collide: false });
+  obj.userData.noBatch = true;
+  const c = Math.cos(rot), si = Math.sin(rot);
+  const at = (lx, lz) => [x + lx * c + lz * si, z - lx * si + lz * c];      // the prop's local frame → world
+  const y0 = obj.position.y - 1, y1 = obj.position.y + 1.36 * s, yDoor = obj.position.y + 0.81 * s;
+  for (const side of [-1, 1]) {
+    const [bx, bz] = at(side * 0.725 * s, 0.05 * s);
+    addBox(bx, bz, 0.275 * s, 0.43 * s, -rot, y0, y1, 'wall');
+  }
+  const hinges = [];
+  obj.traverse(o => {
+    if (!o.isMesh || !/door_(left|right)/.test(o.name)) return;
+    const left = /left/.test(o.name), hx = left ? 0.45 : -0.45;
+    const pivot = new THREE.Group();
+    pivot.position.set(hx, 0, 0);
+    o.parent.add(pivot);
+    pivot.add(o);
+    o.position.x -= hx;                                                     // same place, now hung on the hinge
+    hinges.push({ pivot, sign: left ? 1 : -1 });
+  });
+  const [dx, dz] = at(0, 0.05 * s);
+  let col = null;
+  const G = {
+    obj, k: -1,
+    set(k) {
+      k = clamp(k, 0, 1);
+      this.k = k;
+      for (const h of hinges) h.pivot.rotation.y = h.sign * k * 1.45;
+      if (k > 0.35 && col) { removeCollider(col); col = null; }
+      else if (k <= 0.35 && !col) col = addBox(dx, dz, 0.45 * s, 0.22 * s, -rot, y0, yDoor, 'gateDoors');
+      obj.updateMatrixWorld(true);
+    },
+  };
+  G.set(open);
+  return G;
 }

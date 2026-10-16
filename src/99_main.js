@@ -64,6 +64,7 @@ async function boot() {
   scatterRocks();
   await loadCharacters();
   buildStructures();
+  buildRoa();
   bootStatus('Hollowing the cave');
   await nextFrame();
   buildCave();
@@ -138,7 +139,7 @@ function frame(dtReal) {
   if (!GAME.inCave) {
     updateWater(GAME.time);
     updateGrass(GAME.time, camera.position, G ? PL.body.pos : null);
-    updateLamps(); updateFires(dtReal);
+    updateLamps(); updateFires(dtReal); updateFountains(dtReal);
   }
   updateTrees(GAME.time);
   updateCave(dtReal);
