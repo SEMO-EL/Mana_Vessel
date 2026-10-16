@@ -178,6 +178,7 @@ window.__mv = {
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
+  mapDraw(t = performance.now() / 1000) { if (typeof mapDraw === 'function' && MAP.open) mapDraw(t); },   // a map frame without rAF (hidden pane)
   hold(keys, n = 30, dt = 1 / 60) {
     for (const k of keys) { IN.keys.add(k); IN.edgesDown.add(k); }
     for (let i = 0; i < n; i++) frame(dt);

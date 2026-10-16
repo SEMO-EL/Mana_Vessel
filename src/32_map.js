@@ -54,6 +54,11 @@ const MAP_LABELS = {
   falls: { dx: -90, dz: -40, size: 'mid' },       cave: { dx: 30, dz: -46 },
   camp: { dz: 40 },                               ruinsE: { dz: 36 },
   gate: { dx: -150, dz: -44, size: 'mid' },
+  // the Roa basin (the estate sits inside the city's walls: its name would sit on the keep)
+  pass: { dz: -40, size: 'mid' },                 roa: { dz: -138, size: 'big' },
+  estate: { hide: true },                         farms: { dz: 72 },
+  outskirts: { dx: 170, dz: 190, size: 'mid', spread: 0.3 },
+  wagons: { dz: -36 },                            firstWall: { dz: -48 },
 };
 const MAP_LABEL_PX = { big: 15, mid: 12.5, small: 10.5 };   // screen px at 1× (grow with √zoom)
 
@@ -736,7 +741,7 @@ function mapDrawLabels(ctx, f) {
   const zs = f.k * Math.sqrt(MAP.view.zoom);
   for (const key in PLACES) {
     const p = PLACES[key], o = MAP_LABELS[key] || { dz: -30 }, a = smooth(0.3, 0.75, mapSeen(p.x, p.z));
-    if (a <= 0.01) continue;
+    if (a <= 0.01 || o.hide) continue;
     const px = MAP_LABEL_PX[o.size || 'small'] * zs, X = f.ox + (p.x + (o.dx || 0)) * f.s, Y = f.oy + (p.z + (o.dz || 0)) * f.s;
     if (X < -400 || X > f.vw + 400 || Y < -80 || Y > f.vh + 80) continue;
     ctx.globalAlpha = a;
