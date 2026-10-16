@@ -1,15 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════════════
    WORLD LAYOUT — Buena & the Fittoa Borderlands.  Units are metres.
-   +X is east, +Z is south (so -Z is north). Playable square is ±800;
-   the heightfield runs to ±1100 so the mountain ring has somewhere to be.
+   +X is east, +Z is south (so -Z is north).
+
+   Two basins, one heightfield: Buena (±800 around the origin, ringed by
+   mountains) and, through the eastern pass, the Roa basin. The field is a
+   rectangle so the mountains have somewhere to be on every side; the
+   playable rectangle is a soft wall inside it — the mountains do the rest.
 
    Design rule: every landmark can see at least two others. The river is
    the spine — follow it and you pass village, ridge, falls and cliffs.
    ═══════════════════════════════════════════════════════════════════════ */
 const WORLD = {
-  half: 800,          // playable half-extent
-  ext: 1100,          // heightfield half-extent
-  cell: 2,            // heightfield spacing
+  half: 800,                       // Buena's half-extent (its ring, its map frame)
+  x0: -1100, x1: 1100,             // heightfield bounds (metres)
+  z0: -1100, z1: 1100,
+  px0: -780, px1: 780,             // playable rectangle (soft wall)
+  pz0: -780, pz1: 780,
+  cell: 2,                         // heightfield spacing
   seed: 20260930,
   lakeLevel: 18,
 };

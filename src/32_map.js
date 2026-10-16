@@ -26,11 +26,14 @@
    runs while open. The menus own GAME.state — mapClose() just hides, and
    the main loop notices the map is gone and returns to play.
    ═══════════════════════════════════════════════════════════════════════ */
-const MAP_RES = 2048;                          // painted map, px square
-const MAP_HALF = WORLD.half;                   // it covers ±MAP_HALF metres
-const MAP_PPM = MAP_RES / (2 * MAP_HALF);      // map px per metre (1.28)
-const MAP_RV = 128;                            // fog-of-war mask, texels square
-const MAP_FOG_RES = 256;                       // the mask, softly upsampled for drawing
+// The frame: the playable rectangle plus a 20 m margin (Buena alone was ±800).
+const MAP_X0 = WORLD.px0 - 20, MAP_X1 = WORLD.px1 + 20, MAP_Z0 = WORLD.pz0 - 20, MAP_Z1 = WORLD.pz1 + 20;
+const MAP_W = MAP_X1 - MAP_X0, MAP_H = MAP_Z1 - MAP_Z0;
+const MAP_PPM = Math.min(1.28, 3600 / Math.max(MAP_W, MAP_H));   // map px per metre (1.28 at Buena's size)
+const MAP_RES_X = Math.round(MAP_W * MAP_PPM), MAP_RES_Z = Math.round(MAP_H * MAP_PPM);   // painted map, px
+const MAP_TEXEL = 12.5;                        // fog-of-war mask texel, metres
+const MAP_RVX = Math.round(MAP_W / MAP_TEXEL), MAP_RVZ = Math.round(MAP_H / MAP_TEXEL);
+const MAP_FOGX = MAP_RVX * 2, MAP_FOGZ = MAP_RVZ * 2;   // the mask, softly upsampled for drawing
 const MAP_REVEAL_R = 70;                       // reveal radius on foot, metres
 const MAP_ZOOM = { min: 1, max: 4, open: 2 };
 const MAP_COL = {
@@ -56,28 +59,32 @@ const MAP_LABEL_PX = { big: 15, mid: 12.5, small: 10.5 };   // screen px at 1× 
 
 const MAP = {
   canvas: null, buildMs: 0,                                  // the painted map
-  reveal: new Uint8Array(MAP_RV * MAP_RV), owner: null, revealT: 0,
+  reveal: new Uint8Array(MAP_RVX * MAP_RVZ), owner: null, revealT: 0,
   fog: null, fogCtx: null, fogImg: null, fogNoise: null, fogDirty: true,
   el: null, cv: null, open: false, raf: 0, lastT: 0, frame: null, err: false,
   view: { cx: 0, cz: 0, zoom: MAP_ZOOM.open, tz: MAP_ZOOM.open, ax: 0, az: 0, sx: 0, sy: 0 },
   drag: null, hover: null, sel: null, travelling: false,
 };
 const mapHex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+// world metres → painted-map pixels, and "is this inside the frame (± margin)"
+const mapX = x => (x - MAP_X0) * MAP_PPM, mapY = z => (z - MAP_Z0) * MAP_PPM;
+const inMapFrame = (x, z, m = 0) => x > MAP_X0 - m && x < MAP_X1 + m && z > MAP_Z0 - m && z < MAP_Z1 + m;
 const mapWaystones = () => (typeof WSTONE !== 'undefined' && WSTONE.list.length ? WSTONE.list : WAYSTONES);
 
 /* ───────────── painting ───────────── */
 function mapBuild() {
-  if (!TER.H || !TER.N) return false;
+  if (!TER.H || !TER.NX) return false;
   const t0 = performance.now();
   const cv = MAP.canvas || document.createElement('canvas');
-  cv.width = cv.height = MAP_RES;                            // (also wipes a rebuild)
+  cv.width = MAP_RES_X; cv.height = MAP_RES_Z;                // (also wipes a rebuild)
   const ctx = cv.getContext('2d');
   MAP.canvas = cv;
-  ctx.fillStyle = MAP_COL.parch; ctx.fillRect(0, 0, MAP_RES, MAP_RES);
-  // heightfield samples covering the square: B per side, starting at grid index i0
-  const B = Math.round(2 * MAP_HALF / WORLD.cell) + 1, i0 = Math.round((WORLD.ext - MAP_HALF) / WORLD.cell);
+  ctx.fillStyle = MAP_COL.parch; ctx.fillRect(0, 0, MAP_RES_X, MAP_RES_Z);
+  // heightfield samples covering the frame: BX × BZ, starting at grid index (ix0, iz0)
+  const g = { BX: Math.round(MAP_W / WORLD.cell) + 1, BZ: Math.round(MAP_H / WORLD.cell) + 1,
+    ix0: Math.round((MAP_X0 - WORLD.x0) / WORLD.cell), iz0: Math.round((MAP_Z0 - WORLD.z0) / WORLD.cell) };
   const steps = [
-    () => mapPaintRelief(ctx, B, i0), () => mapPaintContours(ctx, B, i0), () => mapPaintWater(ctx, B, i0),
+    () => mapPaintRelief(ctx, g), () => mapPaintContours(ctx, g), () => mapPaintWater(ctx, g),
     () => mapPaintProps(ctx, 'ground'), () => mapPaintForest(ctx), () => mapPaintRoad(ctx),
     () => mapPaintProps(ctx, 'build'), () => mapPaintPaper(ctx),
   ];
@@ -103,15 +110,15 @@ function mapRampLUT(n, hMax) {
 
 /* Relief: one pixel per heightfield sample, then a smooth upscale — the
    softness reads as watercolour, and it's ~6× fewer samples than 2048². */
-function mapPaintRelief(ctx, B, i0) {
-  const N = TER.N, H = TER.H, GR = TER.GRASS, inv2c = 1 / (2 * WORLD.cell);
+function mapPaintRelief(ctx, { BX, BZ, ix0, iz0 }) {
+  const N = TER.NX, H = TER.H, GR = TER.GRASS, inv2c = 1 / (2 * WORLD.cell);
   const LUTN = 1024, HMAX = 340, lut = mapRampLUT(LUTN, HMAX), lk = (LUTN - 1) / HMAX;
   // light from the north-west (−x, −z), ~42° up; heights exaggerated so gentle hills still model
   const EX = 2.4, Ln = Math.hypot(1, 1.3, 1), LX = -1 / Ln, LY = 1.3 / Ln, LZ = -1 / Ln;
-  const img = ctx.createImageData(B, B), d = img.data;
-  for (let j = 0; j < B; j++) {
-    const row = (i0 + j) * N + i0;
-    for (let k = 0; k < B; k++) {
+  const img = ctx.createImageData(BX, BZ), d = img.data;
+  for (let j = 0; j < BZ; j++) {
+    const row = (iz0 + j) * N + ix0;
+    for (let k = 0; k < BX; k++) {
       const gi = row + k, h = H[gi];
       const gx = (H[gi + 1] - H[gi - 1]) * inv2c, gz = (H[gi + N] - H[gi - N]) * inv2c;
       const nx = -gx * EX, nz = -gz * EX;
@@ -133,27 +140,27 @@ function mapPaintRelief(ctx, B, i0) {
       if (sh > 0) { const t = Math.min(sh * 1.3, 0.55); r += (253 - r) * t; g += (244 - g) * t; b += (220 - b) * t; }
       else { const t = Math.min(-sh * 1.15, 0.75); r += (72 - r) * t; g += (58 - g) * t; b += (64 - b) * t; }
       // printed on parchment
-      const o = (j * B + k) * 4;
+      const o = (j * BX + k) * 4;
       d[o] = r + (232 - r) * 0.15; d[o + 1] = g + (222 - g) * 0.15; d[o + 2] = b + (196 - b) * 0.15; d[o + 3] = 255;
     }
   }
   const tmp = document.createElement('canvas');
-  tmp.width = tmp.height = B;
+  tmp.width = BX; tmp.height = BZ;
   tmp.getContext('2d').putImageData(img, 0, 0);
   const cpx = WORLD.cell * MAP_PPM;                                     // map px per sample
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(tmp, -cpx / 2, -cpx / 2, B * cpx, B * cpx);             // sample k's centre lands on −half + k·cell
+  ctx.drawImage(tmp, -cpx / 2, -cpx / 2, BX * cpx, BZ * cpx);           // sample k's centre lands on MAP_X0 + k·cell
   tmp.width = tmp.height = 0;
 }
 
 /* Contours by marching squares on every 2nd sample (4 m): ~160k cells,
    nearly all crossing no level at all. Saddles pair top-right/bottom-left. */
-function mapPaintContours(ctx, B, i0) {
-  const N = TER.N, H = TER.H, STEP = 2, M = Math.floor((B - 1) / STEP) + 1, IV = 20;
-  const V = new Float32Array(M * M);
-  for (let j = 0; j < M; j++) for (let k = 0; k < M; k++) V[j * M + k] = H[(i0 + j * STEP) * N + i0 + k * STEP];
+function mapPaintContours(ctx, { BX, BZ, ix0, iz0 }) {
+  const N = TER.NX, H = TER.H, STEP = 2, M = Math.floor((BX - 1) / STEP) + 1, MZ = Math.floor((BZ - 1) / STEP) + 1, IV = 20;
+  const V = new Float32Array(M * MZ);
+  for (let j = 0; j < MZ; j++) for (let k = 0; k < M; k++) V[j * M + k] = H[(iz0 + j * STEP) * N + ix0 + k * STEP];
   const q = STEP * WORLD.cell * MAP_PPM, minor = new Path2D(), major = new Path2D(), P = new Float32Array(8);
-  for (let j = 0; j < M - 1; j++) for (let k = 0; k < M - 1; k++) {
+  for (let j = 0; j < MZ - 1; j++) for (let k = 0; k < M - 1; k++) {
     const a = V[j * M + k], b = V[j * M + k + 1], c = V[(j + 1) * M + k + 1], d = V[(j + 1) * M + k];
     const lo = Math.min(a, b, c, d), hi = Math.max(a, b, c, d);
     for (let L = Math.ceil(lo / IV) * IV; L < hi; L += IV) {
@@ -176,34 +183,34 @@ function mapPaintContours(ctx, B, i0) {
 /* Water at full resolution, but only near water: flag the samples it can
    touch, then shade pixels inside their bounds. Coverage comes from smooth
    fields (river distance, depth under the lake), so edges antialias. */
-function mapPaintWater(ctx, B, i0) {
-  const N = TER.N, H = TER.H, WA = TER.WATER, RD = TER.RIVD, c = WORLD.cell, e = WORLD.ext, inv = 1 / c;
+function mapPaintWater(ctx, { BX, BZ, ix0, iz0 }) {
+  const N = TER.NX, H = TER.H, WA = TER.WATER, RD = TER.RIVD, c = WORLD.cell, inv = 1 / c;
   const lvl = WORLD.lakeLevel, rEdge = RIVER_WIDTH / 2 + 2.5, lr2 = (LAKE.r + 4) ** 2, lf2 = (LAKE.r + 8) ** 2;
-  const near = new Uint8Array(B * B);
-  let k0 = B, k1 = -1, j0 = B, j1 = -1;
-  for (let j = 0; j < B; j++) {
-    const dz = -MAP_HALF + j * c - LAKE.z;
-    for (let k = 0; k < B; k++) {
-      const gi = (i0 + j) * N + i0 + k, dx = -MAP_HALF + k * c - LAKE.x;
+  const near = new Uint8Array(BX * BZ);
+  let k0 = BX, k1 = -1, j0 = BZ, j1 = -1;
+  for (let j = 0; j < BZ; j++) {
+    const dz = MAP_Z0 + j * c - LAKE.z;
+    for (let k = 0; k < BX; k++) {
+      const gi = (iz0 + j) * N + ix0 + k, dx = MAP_X0 + k * c - LAKE.x;
       if (WA[gi] > NO_WATER || RD[gi] < rEdge + 2 || (dx * dx + dz * dz < lf2 && H[gi] < lvl + 0.6)) {
-        near[j * B + k] = 1;
+        near[j * BX + k] = 1;
         if (k < k0) k0 = k; if (k > k1) k1 = k; if (j < j0) j0 = j; if (j > j1) j1 = j;
       }
     }
   }
   if (k1 < 0) return;
   const S = MAP_PPM, pm = 1 / S;
-  const px0 = Math.max(0, Math.floor(k0 * c * S) - 3), px1 = Math.min(MAP_RES, Math.ceil(k1 * c * S) + 4);
-  const py0 = Math.max(0, Math.floor(j0 * c * S) - 3), py1 = Math.min(MAP_RES, Math.ceil(j1 * c * S) + 4);
+  const px0 = Math.max(0, Math.floor(k0 * c * S) - 3), px1 = Math.min(MAP_RES_X, Math.ceil(k1 * c * S) + 4);
+  const py0 = Math.max(0, Math.floor(j0 * c * S) - 3), py1 = Math.min(MAP_RES_Z, Math.ceil(j1 * c * S) + 4);
   const W = px1 - px0, Hh = py1 - py0, img = ctx.createImageData(W, Hh), d = img.data;
   for (let py = py0; py < py1; py++) {
-    const z = -MAP_HALF + (py + 0.5) * pm, bj = Math.round((z + MAP_HALF) * inv);
-    if (bj < 0 || bj >= B) continue;
-    const fz = (z + e) * inv, iz = fz | 0, tz = fz - iz, dzl = z - LAKE.z;
+    const z = MAP_Z0 + (py + 0.5) * pm, bj = Math.round((z - MAP_Z0) * inv);
+    if (bj < 0 || bj >= BZ) continue;
+    const fz = (z - WORLD.z0) * inv, iz = fz | 0, tz = fz - iz, dzl = z - LAKE.z;
     for (let px = px0; px < px1; px++) {
-      const x = -MAP_HALF + (px + 0.5) * pm, bk = Math.round((x + MAP_HALF) * inv);
-      if (bk < 0 || bk >= B || !near[bj * B + bk]) continue;
-      const fx = (x + e) * inv, ix = fx | 0, tx = fx - ix, gi = iz * N + ix;
+      const x = MAP_X0 + (px + 0.5) * pm, bk = Math.round((x - MAP_X0) * inv);
+      if (bk < 0 || bk >= BX || !near[bj * BX + bk]) continue;
+      const fx = (x - WORLD.x0) * inv, ix = fx | 0, tx = fx - ix, gi = iz * N + ix;
       const rd = (RD[gi] * (1 - tx) + RD[gi + 1] * tx) * (1 - tz) + (RD[gi + N] * (1 - tx) + RD[gi + N + 1] * tx) * tz;
       const h = (H[gi] * (1 - tx) + H[gi + 1] * tx) * (1 - tz) + (H[gi + N] * (1 - tx) + H[gi + N + 1] * tx) * tz;
       const dxl = x - LAKE.x;
@@ -239,12 +246,12 @@ function mapPaintWater(ctx, B, i0) {
    south-east shadow offset expressed in that rotated frame. */
 function mapPropFrame(ctx, p) {
   const o = p.obj;
-  if (!o || Math.abs(o.position.x) > MAP_HALF + 40 || Math.abs(o.position.z) > MAP_HALF + 40) return null;
+  if (!o || !inMapFrame(o.position.x, o.position.z, 40)) return null;
   const sz = typeof propSize === 'function' ? propSize(p.name) : null, s = o.scale.x, rot = o.rotation.y;
   const c = Math.cos(rot), si = Math.sin(rot), S = MAP_PPM;
   const ox = sz ? (sz.cx * c + sz.cz * si) * s : 0, oz = sz ? (-sz.cx * si + sz.cz * c) * s : 0;
   ctx.save();
-  ctx.translate((o.position.x + ox + MAP_HALF) * S, (o.position.z + oz + MAP_HALF) * S);
+  ctx.translate(mapX(o.position.x + ox), mapY(o.position.z + oz));
   ctx.rotate(-rot);
   return { w: (sz ? sz.hx * s : 4) * S, h: (sz ? sz.hz * s : 4) * S, sx: 1.4 * c - 1.8 * si, sy: 1.4 * si + 1.8 * c };
 }
@@ -277,7 +284,7 @@ function mapPaintProps(ctx, pass) {
   // the cave mouth: a dark arch in the cliff, open to the south
   const m = pass === 'build' && typeof STRUCT !== 'undefined' && STRUCT.caveMouth;
   if (m) {
-    const X = (m.x + MAP_HALF) * MAP_PPM, Y = (m.z + MAP_HALF) * MAP_PPM, r = 7 * MAP_PPM;
+    const X = mapX(m.x), Y = mapY(m.z), r = 7 * MAP_PPM;
     ctx.beginPath(); ctx.ellipse(X, Y + r * 0.15, r, r * 0.8, 0, Math.PI, TAU); ctx.closePath();
     ctx.fillStyle = '#1c1418'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#6a5d50'; ctx.stroke();
   }
@@ -291,8 +298,8 @@ function mapPaintForest(ctx) {
   const crowns = new Path2D(), lights = new Path2D(), pines = new Path2D(), scrub = new Path2D();
   let n = 0;
   for (const t of trees) {
-    if (Math.abs(t.x) > MAP_HALF || Math.abs(t.z) > MAP_HALF) continue;
-    const X = (t.x + MAP_HALF) * S, Y = (t.z + MAP_HALF) * S, h = t.h || 8;
+    if (!inMapFrame(t.x, t.z)) continue;
+    const X = mapX(t.x), Y = mapY(t.z), h = t.h || 8;
     if (t.kind === 'pine') {
       const r = (1.5 + h * 0.11) * S;
       pines.moveTo(X, Y - r * 1.6); pines.lineTo(X + r * 0.9, Y + r * 0.75); pines.lineTo(X - r * 0.9, Y + r * 0.75); pines.closePath();
@@ -317,7 +324,7 @@ function mapPaintForest(ctx) {
 /* The road: a pale worn verge under a warm-brown dashed line. */
 function mapPaintRoad(ctx) {
   const pts = TER.roadPath || catmull(ROAD, 8), S = MAP_PPM, path = new Path2D();
-  pts.forEach(([x, z], i) => { const X = (x + MAP_HALF) * S, Y = (z + MAP_HALF) * S; if (i) path.lineTo(X, Y); else path.moveTo(X, Y); });
+  pts.forEach(([x, z], i) => { const X = mapX(x), Y = mapY(z); if (i) path.lineTo(X, Y); else path.moveTo(X, Y); });
   ctx.lineCap = ctx.lineJoin = 'round';
   ctx.strokeStyle = 'rgba(240,229,200,0.6)'; ctx.lineWidth = 6.5; ctx.stroke(path);
   ctx.strokeStyle = '#7a5532'; ctx.lineWidth = 2.4; ctx.setLineDash([9, 6]); ctx.stroke(path);
@@ -335,15 +342,19 @@ function mapPaintPaper(ctx) {
   }
   tc.putImageData(img, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, MAP_RES, MAP_RES);
-  for (let i = 0; i < 16; i++) {
-    const x = R() * MAP_RES, y = R() * MAP_RES, r = 80 + R() * 260, g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, MAP_RES_X, MAP_RES_Z);
+  for (let i = 0, n = Math.round(16 * MAP_RES_X * MAP_RES_Z / (2048 * 2048)); i < n; i++) {
+    const x = R() * MAP_RES_X, y = R() * MAP_RES_Z, r = 80 + R() * 260, g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, `rgba(150,110,60,${(0.04 + R() * 0.05).toFixed(3)})`); g.addColorStop(1, 'rgba(150,110,60,0)');
     ctx.fillStyle = g; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
-  const c = MAP_RES / 2, v = ctx.createRadialGradient(c, c, MAP_RES * 0.42, c, c, MAP_RES * 0.74);
+  // burnt edges: a vignette stretched to the sheet's aspect
+  const cx = MAP_RES_X / 2, cy = MAP_RES_Z / 2, m = Math.min(MAP_RES_X, MAP_RES_Z);
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(MAP_RES_X / m, MAP_RES_Z / m);
+  const v = ctx.createRadialGradient(0, 0, m * 0.42, 0, 0, m * 0.74);
   v.addColorStop(0, 'rgba(120,80,40,0)'); v.addColorStop(1, 'rgba(110,72,36,0.42)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, MAP_RES, MAP_RES);
+  ctx.fillStyle = v; ctx.fillRect(-m / 2, -m / 2, m, m);
+  ctx.restore();
   tile.width = tile.height = 0;
 }
 
@@ -351,27 +362,27 @@ function mapPaintPaper(ctx) {
 // Which G the mask belongs to; a different G (new game, continue) re-reads it.
 function mapSyncOwner() { if (G && MAP.owner !== G) mapDeserialize(); }
 
-// How seen a world point is, 0..1 (bilinear over the mask).
+/// How seen a world point is, 0..1 (bilinear over the mask).
 function mapSeen(x, z) {
-  const R = MAP_RV, k = R / (2 * MAP_HALF), rv = MAP.reveal;
-  const fx = clamp((x + MAP_HALF) * k - 0.5, 0, R - 1.001), fz = clamp((z + MAP_HALF) * k - 0.5, 0, R - 1.001);
-  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * R + ix;
-  return ((rv[i] * (1 - tx) + rv[i + 1] * tx) * (1 - tz) + (rv[i + R] * (1 - tx) + rv[i + R + 1] * tx) * tz) / 255;
+  const RX = MAP_RVX, RZ = MAP_RVZ, rv = MAP.reveal;
+  const fx = clamp((x - MAP_X0) / MAP_TEXEL - 0.5, 0, RX - 1.001), fz = clamp((z - MAP_Z0) / MAP_TEXEL - 0.5, 0, RZ - 1.001);
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * RX + ix;
+  return ((rv[i] * (1 - tx) + rv[i + 1] * tx) * (1 - tz) + (rv[i + RX] * (1 - tx) + rv[i + RX + 1] * tx) * tz) / 255;
 }
 
 // Stamp a soft-edged disc of "seen" into the mask. Returns whether anything changed.
 function mapRevealAt(x, z, r) {
   if (!G || !isFinite(x) || !isFinite(z) || !(r > 0)) return false;
   mapSyncOwner();
-  const R = MAP_RV, cm = 2 * MAP_HALF / R, cx = (x + MAP_HALF) / cm - 0.5, cz = (z + MAP_HALF) / cm - 0.5;
+  const RX = MAP_RVX, RZ = MAP_RVZ, cm = MAP_TEXEL, cx = (x - MAP_X0) / cm - 0.5, cz = (z - MAP_Z0) / cm - 0.5;
   const rr = r / cm, inner = (r - Math.min(r * 0.4, 60)) / cm, rv = MAP.reveal;
-  const x0 = Math.max(0, Math.floor(cx - rr)), x1 = Math.min(R - 1, Math.ceil(cx + rr));
-  const z0 = Math.max(0, Math.floor(cz - rr)), z1 = Math.min(R - 1, Math.ceil(cz + rr));
+  const x0 = Math.max(0, Math.floor(cx - rr)), x1 = Math.min(RX - 1, Math.ceil(cx + rr));
+  const z0 = Math.max(0, Math.floor(cz - rr)), z1 = Math.min(RZ - 1, Math.ceil(cz + rr));
   let changed = false;
   for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) {
     const dd = Math.hypot(ix - cx, iz - cz);
     if (dd >= rr) continue;
-    const v = Math.round(255 * (1 - smooth(inner, rr, dd))), i = iz * R + ix;
+    const v = Math.round(255 * (1 - smooth(inner, rr, dd))), i = iz * RX + ix;
     if (v > rv[i]) { rv[i] = v; changed = true; }
   }
   if (changed) MAP.fogDirty = true;
@@ -396,7 +407,7 @@ function mapSerialize() {
   try {
     let s = '';
     for (let i = 0; i < MAP.reveal.length; i += 0x2000) s += String.fromCharCode.apply(null, MAP.reveal.subarray(i, i + 0x2000));
-    G.mapReveal = btoa(s);
+    G.mapReveal = btoa(s); G.mapRevealW = MAP_RVX;
   } catch (e) { console.error('map save', e); }
 }
 
@@ -406,8 +417,16 @@ function mapDeserialize() {
   MAP.revealT = 0;
   if (G && typeof G.mapReveal === 'string' && G.mapReveal) {
     try {
-      const s = atob(G.mapReveal);
-      if (s.length === MAP.reveal.length) for (let i = 0; i < s.length; i++) MAP.reveal[i] = s.charCodeAt(i);
+      const s = atob(G.mapReveal), W = G.mapRevealW || 128;     // saves before Roa: a 128×128 mask over Buena's ±800
+      if (s.length === MAP.reveal.length && W === MAP_RVX) for (let i = 0; i < s.length; i++) MAP.reveal[i] = s.charCodeAt(i);
+      else if (s.length % W === 0) {
+        // an older, smaller mask: same texel size, same north-west corner — copy it row by row
+        const H = s.length / W, ox = Math.round((-WORLD.half - MAP_X0) / MAP_TEXEL), oz = Math.round((-WORLD.half - MAP_Z0) / MAP_TEXEL);
+        for (let j = 0; j < H; j++) for (let k = 0; k < W; k++) {
+          const tx = k + ox, tz = j + oz;
+          if (tx >= 0 && tx < MAP_RVX && tz >= 0 && tz < MAP_RVZ) MAP.reveal[tz * MAP_RVX + tx] = s.charCodeAt(j * W + k);
+        }
+      }
     } catch (e) { /* a damaged map is just an unexplored one */ }
   }
   if (DEV && /[?&]reveal\b/.test(location.search)) MAP.reveal.fill(255);
@@ -416,33 +435,34 @@ function mapDeserialize() {
 
 // Fixed cloud texture that roughens the fog's edge (built once).
 function mapFogNoise() {
-  const F = MAP_FOG_RES, out = new Float32Array(F * F), n = Noise.make(WORLD.seed + 505);
-  for (let y = 0; y < F; y++) for (let x = 0; x < F; x++) out[y * F + x] = clamp(fbm(n, x / 22, y / 22, 3) * 0.5 + 0.5, 0, 1);
+  const FX = MAP_FOGX, FZ = MAP_FOGZ, out = new Float32Array(FX * FZ), n = Noise.make(WORLD.seed + 505);
+  for (let y = 0; y < FZ; y++) for (let x = 0; x < FX; x++) out[y * FX + x] = clamp(fbm(n, x / 22, y / 22, 3) * 0.5 + 0.5, 0, 1);
   return out;
 }
 
-/* The mask → a 256² parchment fog: bilinear, pushed through a noisy
-   threshold so the edge is torn cloud, with a sepia wash along it.
-   Rebuilt lazily, only when the mask changed and someone draws. */
+/* The mask → a parchment fog at twice its resolution: bilinear, pushed
+   through a noisy threshold so the edge is torn cloud, with a sepia wash
+   along it. Rebuilt lazily, only when the mask changed and someone draws. */
 function mapFogRefresh() {
   if (!MAP.fog) {
     const cv = document.createElement('canvas');
-    cv.width = cv.height = MAP_FOG_RES;
-    MAP.fog = cv; MAP.fogCtx = cv.getContext('2d'); MAP.fogImg = MAP.fogCtx.createImageData(MAP_FOG_RES, MAP_FOG_RES);
+    cv.width = MAP_FOGX; cv.height = MAP_FOGZ;
+    MAP.fog = cv; MAP.fogCtx = cv.getContext('2d'); MAP.fogImg = MAP.fogCtx.createImageData(MAP_FOGX, MAP_FOGZ);
     MAP.fogDirty = true;
   }
   if (!MAP.fogDirty) return;
   if (!MAP.fogNoise) MAP.fogNoise = mapFogNoise();
   MAP.fogDirty = false;
-  const F = MAP_FOG_RES, R = MAP_RV, rv = MAP.reveal, nz = MAP.fogNoise, d = MAP.fogImg.data, k = R / F;
-  for (let y = 0; y < F; y++) {
-    const fy = clamp((y + 0.5) * k - 0.5, 0, R - 1.001), iy = fy | 0, ty = fy - iy;
-    for (let x = 0; x < F; x++) {
-      const fx = clamp((x + 0.5) * k - 0.5, 0, R - 1.001), ix = fx | 0, tx = fx - ix, i = iy * R + ix;
-      const v = ((rv[i] * (1 - tx) + rv[i + 1] * tx) * (1 - ty) + (rv[i + R] * (1 - tx) + rv[i + R + 1] * tx) * ty) / 255;
-      const n = nz[y * F + x], s = clamp((v - 0.5 + (n - 0.5) * 0.5) * 2.6 + 0.5, 0, 1);
+  const FX = MAP_FOGX, FZ = MAP_FOGZ, RX = MAP_RVX, RZ = MAP_RVZ, rv = MAP.reveal, nz = MAP.fogNoise, d = MAP.fogImg.data;
+  const kx = RX / FX, kz = RZ / FZ;
+  for (let y = 0; y < FZ; y++) {
+    const fy = clamp((y + 0.5) * kz - 0.5, 0, RZ - 1.001), iy = fy | 0, ty = fy - iy;
+    for (let x = 0; x < FX; x++) {
+      const fx = clamp((x + 0.5) * kx - 0.5, 0, RX - 1.001), ix = fx | 0, tx = fx - ix, i = iy * RX + ix;
+      const v = ((rv[i] * (1 - tx) + rv[i + 1] * tx) * (1 - ty) + (rv[i + RX] * (1 - tx) + rv[i + RX + 1] * tx) * ty) / 255;
+      const n = nz[y * FX + x], s = clamp((v - 0.5 + (n - 0.5) * 0.5) * 2.6 + 0.5, 0, 1);
       const a = 1 - s * s * (3 - 2 * s), rim = Math.max(0, 1 - Math.abs(a - 0.5) * 3.2);
-      const tone = (0.95 + (n - 0.5) * 0.12) * (1 - rim * 0.2), o = (y * F + x) * 4;
+      const tone = (0.95 + (n - 0.5) * 0.12) * (1 - rim * 0.2), o = (y * FX + x) * 4;
       d[o] = 228 * tone; d[o + 1] = 216 * tone; d[o + 2] = 188 * tone; d[o + 3] = a * 248;
     }
   }
@@ -609,13 +629,14 @@ function mapTravel() {
     .finally(() => { if (MAP.open && MAP.travelling) mapClose(); });
 }
 
-const mapBaseScale = (vw, vh) => Math.min(vw, vh) * 0.92 / (2 * MAP_HALF);   // screen px per metre at 1×
+const mapBaseScale = (vw, vh) => Math.min(vw / MAP_W, vh / MAP_H) * 0.92;   // screen px per metre at 1× (whole sheet in view)
 const mapUiScale = (vw, vh) => clamp(Math.min(vw, vh) / 900, 0.8, 1.5);
 
 function mapClampView(vw, vh) {
-  const v = MAP.view, s = mapBaseScale(vw, vh) * v.zoom, lim = MAP_HALF + 40, hw = vw / 2 / s, hh = vh / 2 / s;
-  v.cx = hw >= lim ? 0 : clamp(v.cx, -lim + hw, lim - hw);
-  v.cz = hh >= lim ? 0 : clamp(v.cz, -lim + hh, lim - hh);
+  const v = MAP.view, s = mapBaseScale(vw, vh) * v.zoom, hw = vw / 2 / s, hh = vh / 2 / s;
+  // each axis: centre the sheet if it fits, otherwise keep it on screen (40 m of table allowed)
+  v.cx = 2 * hw >= MAP_W + 80 ? (MAP_X0 + MAP_X1) / 2 : clamp(v.cx, MAP_X0 - 40 + hw, MAP_X1 + 40 - hw);
+  v.cz = 2 * hh >= MAP_H + 80 ? (MAP_Z0 + MAP_Z1) / 2 : clamp(v.cz, MAP_Z0 - 40 + hh, MAP_Z1 + 40 - hh);
 }
 
 // Smooth wheel zoom that keeps the anchored world point under the cursor.
@@ -640,9 +661,9 @@ function mapHitWaystone(x, y) {
 }
 
 // Copy the world rect [wx, wx+ww]×[wz, wz+wh] (already inside the map) of a square map image.
-function mapBlit(ctx, img, res, wx, wz, ww, wh, dx, dy, s) {
-  const k = res / (2 * MAP_HALF);
-  ctx.drawImage(img, (wx + MAP_HALF) * k, (wz + MAP_HALF) * k, ww * k, wh * k, dx, dy, ww * s, wh * s);
+function mapBlit(ctx, img, wx, wz, ww, wh, dx, dy, s) {
+  const kx = img.width / MAP_W, kz = img.height / MAP_H;      // image px per metre (the sheet, or its fog)
+  ctx.drawImage(img, (wx - MAP_X0) * kx, (wz - MAP_Z0) * kz, ww * kx, wh * kz, dx, dy, ww * s, wh * s);
 }
 
 function mapDraw(t) {
@@ -653,27 +674,27 @@ function mapDraw(t) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, vw, vh);
   mapClampView(vw, vh);
-  const v = MAP.view, s = mapBaseScale(vw, vh) * v.zoom, H = MAP_HALF;
+  const v = MAP.view, s = mapBaseScale(vw, vh) * v.zoom;
   const f = MAP.frame = { vw, vh, s, ox: vw / 2 - v.cx * s, oy: vh / 2 - v.cz * s, k: mapUiScale(vw, vh) };  // screen = o + world·s
   // the sheet, lifted off the table (its shadow only matters while an edge is in view)
-  const sx0 = f.ox - H * s, sy0 = f.oy - H * s, side = 2 * H * s;
-  if (sx0 > 0 || sy0 > 0 || sx0 + side < vw || sy0 + side < vh) {
+  const sx0 = f.ox + MAP_X0 * s, sy0 = f.oy + MAP_Z0 * s, sw = MAP_W * s, sh = MAP_H * s;
+  if (sx0 > 0 || sy0 > 0 || sx0 + sw < vw || sy0 + sh < vh) {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
-    ctx.fillStyle = MAP_COL.parch; ctx.fillRect(sx0, sy0, side, side);
+    ctx.fillStyle = MAP_COL.parch; ctx.fillRect(sx0, sy0, sw, sh);
     ctx.restore();
   }
   // painted map, then its fog — only the part on screen
-  const wx0 = Math.max(-H, -f.ox / s), wz0 = Math.max(-H, -f.oy / s), wx1 = Math.min(H, (vw - f.ox) / s), wz1 = Math.min(H, (vh - f.oy) / s);
+  const wx0 = Math.max(MAP_X0, -f.ox / s), wz0 = Math.max(MAP_Z0, -f.oy / s), wx1 = Math.min(MAP_X1, (vw - f.ox) / s), wz1 = Math.min(MAP_Z1, (vh - f.oy) / s);
   if (wx1 > wx0 && wz1 > wz0) {
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = s < MAP_PPM ? 'high' : 'medium';
-    if (MAP.canvas) mapBlit(ctx, MAP.canvas, MAP_RES, wx0, wz0, wx1 - wx0, wz1 - wz0, f.ox + wx0 * s, f.oy + wz0 * s, s);
+    if (MAP.canvas) mapBlit(ctx, MAP.canvas, wx0, wz0, wx1 - wx0, wz1 - wz0, f.ox + wx0 * s, f.oy + wz0 * s, s);
     mapFogRefresh();
-    mapBlit(ctx, MAP.fog, MAP_FOG_RES, wx0, wz0, wx1 - wx0, wz1 - wz0, f.ox + wx0 * s, f.oy + wz0 * s, s);
+    mapBlit(ctx, MAP.fog, wx0, wz0, wx1 - wx0, wz1 - wz0, f.ox + wx0 * s, f.oy + wz0 * s, s);
   }
   mapDrawLabels(ctx, f);
   mapDrawBorder(ctx, f);
-  mapDrawCompass(ctx, f.ox + (H - 150) * s, f.oy + (H - 150) * s, 70 * s);
+  mapDrawCompass(ctx, f.ox + (MAP_X1 - 150) * s, f.oy + (MAP_Z1 - 150) * s, 70 * s);
   mapDrawCartouche(ctx, f);
   mapDrawMarkers(ctx, f, t);
   // the travel panel rides above its waystone
@@ -728,26 +749,29 @@ function mapDrawLabels(ctx, f) {
 
 // Double border: heavy and fine rules, an ink scale every 100 m between, gold hairline, corner bosses.
 function mapDrawBorder(ctx, f) {
-  const s = f.s, x0 = f.ox - MAP_HALF * s, y0 = f.oy - MAP_HALF * s, L = 2 * MAP_HALF * s;
+  const s = f.s, x0 = f.ox + MAP_X0 * s, y0 = f.oy + MAP_Z0 * s, LX = MAP_W * s, LZ = MAP_H * s;
   const i1 = 6 * s, i2 = 16 * s, seg = 100 * s, mid = (i1 + i2) / 2, th = (i2 - i1) * 0.38;
   ctx.save();
-  ctx.beginPath(); ctx.rect(x0 + i1, y0 + i1, L - 2 * i1, L - 2 * i1); ctx.rect(x0 + i2, y0 + i2, L - 2 * i2, L - 2 * i2);
+  ctx.beginPath(); ctx.rect(x0 + i1, y0 + i1, LX - 2 * i1, LZ - 2 * i1); ctx.rect(x0 + i2, y0 + i2, LX - 2 * i2, LZ - 2 * i2);
   ctx.fillStyle = '#ebe2c8'; ctx.fill('evenodd');
   ctx.clip('evenodd');
   ctx.fillStyle = 'rgba(52,38,24,0.85)';
-  for (let i = 0; i < 2 * MAP_HALF / 100; i += 2) {
+  for (let i = 0; i < MAP_W / 100; i += 2) {                       // ink every other 100 m, top and bottom
     const a = i * seg;
-    ctx.fillRect(x0 + a, y0 + mid - th / 2, seg, th); ctx.fillRect(x0 + a, y0 + L - mid - th / 2, seg, th);
-    ctx.fillRect(x0 + mid - th / 2, y0 + a, th, seg); ctx.fillRect(x0 + L - mid - th / 2, y0 + a, th, seg);
+    ctx.fillRect(x0 + a, y0 + mid - th / 2, seg, th); ctx.fillRect(x0 + a, y0 + LZ - mid - th / 2, seg, th);
+  }
+  for (let i = 0; i < MAP_H / 100; i += 2) {                       // …and down both sides
+    const a = i * seg;
+    ctx.fillRect(x0 + mid - th / 2, y0 + a, th, seg); ctx.fillRect(x0 + LX - mid - th / 2, y0 + a, th, seg);
   }
   ctx.restore();
   ctx.strokeStyle = MAP_COL.rule;
-  ctx.lineWidth = Math.max(1.4, 2.4 * s); ctx.strokeRect(x0 + i1, y0 + i1, L - 2 * i1, L - 2 * i1);
-  ctx.lineWidth = Math.max(0.8, s); ctx.strokeRect(x0 + i2, y0 + i2, L - 2 * i2, L - 2 * i2);
+  ctx.lineWidth = Math.max(1.4, 2.4 * s); ctx.strokeRect(x0 + i1, y0 + i1, LX - 2 * i1, LZ - 2 * i1);
+  ctx.lineWidth = Math.max(0.8, s); ctx.strokeRect(x0 + i2, y0 + i2, LX - 2 * i2, LZ - 2 * i2);
   ctx.strokeStyle = 'rgba(201,162,39,0.8)'; ctx.lineWidth = Math.max(1, 1.2 * s);
-  ctx.strokeRect(x0 + 2 * s, y0 + 2 * s, L - 4 * s, L - 4 * s);
+  ctx.strokeRect(x0 + 2 * s, y0 + 2 * s, LX - 4 * s, LZ - 4 * s);
   const r = (i2 - i1) * 0.9;
-  for (const [cx, cy] of [[x0 + mid, y0 + mid], [x0 + L - mid, y0 + mid], [x0 + mid, y0 + L - mid], [x0 + L - mid, y0 + L - mid]]) {
+  for (const [cx, cy] of [[x0 + mid, y0 + mid], [x0 + LX - mid, y0 + mid], [x0 + mid, y0 + LZ - mid], [x0 + LX - mid, y0 + LZ - mid]]) {
     ctx.beginPath(); ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy); ctx.closePath();
     ctx.fillStyle = MAP_COL.rule; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.35, 0, TAU); ctx.fillStyle = MAP_COL.gold; ctx.fill();
@@ -791,7 +815,7 @@ function mapDrawCartouche(ctx, f) {
     ctx.beginPath(); ctx.moveTo(-W, -Hh); ctx.lineTo(W, -Hh); ctx.lineTo(W - nd, 0); ctx.lineTo(W, Hh); ctx.lineTo(-W, Hh); ctx.lineTo(-W + nd, 0); ctx.closePath();
   };
   ctx.save();
-  ctx.translate(f.ox - 562 * s + 2 * s, f.oy - 742 * s + 3 * s);
+  ctx.translate(f.ox + (MAP_X0 + 238) * s + 2 * s, f.oy + (MAP_Z0 + 58) * s + 3 * s);   // the sheet's top-left corner
   ribbon(0); ctx.fillStyle = 'rgba(30,20,10,0.3)'; ctx.fill();
   ctx.translate(-2 * s, -3 * s);
   ribbon(0); ctx.fillStyle = '#f0e7cf'; ctx.fill();
@@ -901,18 +925,18 @@ function mapDrawMarkers(ctx, f, t) {
 function mapMinimapDraw(ctx, size, zoomMetres = 140) {
   if (!ctx || !(size > 0)) return;
   if (G) mapSyncOwner();
-  const R = size / 2, zm = Math.max(20, zoomMetres || 140), s = R / zm, H = MAP_HALF, t = performance.now() / 1000;
+  const R = size / 2, zm = Math.max(20, zoomMetres || 140), s = R / zm, t = performance.now() / 1000;
   const p = G && PL.body ? PL.body.pos : null, cx = p ? p.x : 0, cz = p ? p.z : 0;
   const ox = R - cx * s, oy = R - cz * s, k = clamp(size / 180, 0.55, 1.2);
   ctx.save();
   ctx.beginPath(); ctx.arc(R, R, R, 0, TAU); ctx.clip();
   ctx.fillStyle = '#17151f'; ctx.fillRect(0, 0, size, size);
-  const wx0 = Math.max(-H, cx - zm), wz0 = Math.max(-H, cz - zm), wx1 = Math.min(H, cx + zm), wz1 = Math.min(H, cz + zm);
+  const wx0 = Math.max(MAP_X0, cx - zm), wz0 = Math.max(MAP_Z0, cz - zm), wx1 = Math.min(MAP_X1, cx + zm), wz1 = Math.min(MAP_Z1, cz + zm);
   if (wx1 > wx0 && wz1 > wz0) {
     ctx.imageSmoothingEnabled = true;
-    if (MAP.canvas) mapBlit(ctx, MAP.canvas, MAP_RES, wx0, wz0, wx1 - wx0, wz1 - wz0, ox + wx0 * s, oy + wz0 * s, s);
+    if (MAP.canvas) mapBlit(ctx, MAP.canvas, wx0, wz0, wx1 - wx0, wz1 - wz0, ox + wx0 * s, oy + wz0 * s, s);
     mapFogRefresh();
-    mapBlit(ctx, MAP.fog, MAP_FOG_RES, wx0, wz0, wx1 - wx0, wz1 - wz0, ox + wx0 * s, oy + wz0 * s, s);
+    mapBlit(ctx, MAP.fog, wx0, wz0, wx1 - wx0, wz1 - wz0, ox + wx0 * s, oy + wz0 * s, s);
   }
   if (G && G.waystones) for (const w of mapWaystones()) {
     if (!G.waystones[w.id]) continue;

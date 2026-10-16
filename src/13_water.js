@@ -11,7 +11,7 @@ const WATER = { meshes: [], mat: null };
 
 function waterMaterial() {
   const u = {
-    uHeight: { value: TER.heightTex }, uN: { value: TER.N }, uExt: { value: WORLD.ext }, uCell: { value: WORLD.cell },
+    uHeight: { value: TER.heightTex }, uN: { value: new THREE.Vector2(TER.NX, TER.NZ) }, uOrigin: { value: new THREE.Vector2(WORLD.x0, WORLD.z0) }, uCell: { value: WORLD.cell },
     uTime: { value: 0 }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() },
     uSunCol: { value: new THREE.Color() }, uSunVis: { value: 1 },
   };
@@ -29,7 +29,7 @@ function waterMaterial() {
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D uHeight; uniform float uN, uExt, uCell, uTime, uSunVis;
+      uniform sampler2D uHeight; uniform vec2 uN, uOrigin; uniform float uCell, uTime, uSunVis;
       uniform vec3 uZen, uHor, uSunCol;
       ${FOG_FRAG_DECL}
       varying vec2 vUv; varying float vSteep; varying float vFlow;
@@ -37,7 +37,7 @@ function waterMaterial() {
       float wn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(wh(i),wh(i+vec2(1,0)),f.x), mix(wh(i+vec2(0,1)),wh(i+vec2(1,1)),f.x), f.y); }
       void main(){
-        float ground = texture2D(uHeight, ((vWFPos.xz + uExt) / uCell + 0.5) / uN).r;
+        float ground = texture2D(uHeight, ((vWFPos.xz - uOrigin) / uCell + 0.5) / uN).r;
         float depth = max(vWFPos.y - ground, 0.0);
         // flowing ripple normals: two noise layers scrolled downstream
         float spd = mix(0.05, 1.0 + vSteep * 6.0, vFlow);

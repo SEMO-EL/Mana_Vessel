@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    TERRAIN — one heightfield, sculpted from WORLD data, cut into chunks.
 
-   Fields on the same grid (N×N, 2 m spacing, ±1100 m):
+   Fields on the same grid (NX×NZ, 2 m spacing, WORLD.x0..x1 × z0..z1):
      H       ground height
      WATER   water surface height, or NO_WATER
      RIVD    distance to the river centreline      (for banks, grass, audio)
@@ -12,17 +12,17 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const NO_WATER = -1e4;
 const TER = {
-  N: 0, H: null, WATER: null, RIVD: null, RIVL: null, ROADD: null, GRASS: null,
+  NX: 0, NZ: 0, H: null, WATER: null, RIVD: null, RIVL: null, ROADD: null, GRASS: null,
   group: new THREE.Group(), chunks: [], heightTex: null, grassTex: null, riverPath: [],
 };
 
 function terIndex(x, z) {
-  const c = WORLD.cell, e = WORLD.ext, N = TER.N;
-  return [clamp((x + e) / c, 0, N - 1.001), clamp((z + e) / c, 0, N - 1.001)];
+  const c = WORLD.cell;
+  return [clamp((x - WORLD.x0) / c, 0, TER.NX - 1.001), clamp((z - WORLD.z0) / c, 0, TER.NZ - 1.001)];
 }
 function sampleField(F, x, z) {
   const [fx, fz] = terIndex(x, z);
-  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, N = TER.N;
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, N = TER.NX;
   const i = iz * N + ix;
   const a = F[i], b = F[i + 1], c = F[i + N], d = F[i + N + 1];
   return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
@@ -37,25 +37,25 @@ function normalAt(x, z, out = new THREE.Vector3()) {
 // blending, so the shoreline doesn't average water with "no water".
 function waterAt(x, z) {
   const [fx, fz] = terIndex(x, z);
-  return TER.WATER[Math.round(fz) * TER.N + Math.round(fx)];
+  return TER.WATER[Math.round(fz) * TER.NX + Math.round(fx)];
 }
 const riverDistAt = (x, z) => sampleField(TER.RIVD, x, z);
 const roadDistAt = (x, z) => sampleField(TER.ROADD, x, z);
 
 /* rasterise distance-to-polyline into a field, touching only nearby cells */
 function rasterPolyline(pts, levels, F, L, reach) {
-  const c = WORLD.cell, e = WORLD.ext, N = TER.N;
+  const c = WORLD.cell, X0 = WORLD.x0, Z0 = WORLD.z0, N = TER.NX;
   for (let s = 0; s < pts.length - 1; s++) {
     const [ax, az] = pts[s], [bx, bz] = pts[s + 1];
-    const minx = Math.max(0, Math.floor((Math.min(ax, bx) - reach + e) / c));
-    const maxx = Math.min(N - 1, Math.ceil((Math.max(ax, bx) + reach + e) / c));
-    const minz = Math.max(0, Math.floor((Math.min(az, bz) - reach + e) / c));
-    const maxz = Math.min(N - 1, Math.ceil((Math.max(az, bz) + reach + e) / c));
+    const minx = Math.max(0, Math.floor((Math.min(ax, bx) - reach - X0) / c));
+    const maxx = Math.min(TER.NX - 1, Math.ceil((Math.max(ax, bx) + reach - X0) / c));
+    const minz = Math.max(0, Math.floor((Math.min(az, bz) - reach - Z0) / c));
+    const maxz = Math.min(TER.NZ - 1, Math.ceil((Math.max(az, bz) + reach - Z0) / c));
     const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
     for (let iz = minz; iz <= maxz; iz++) {
-      const z = iz * c - e;
+      const z = iz * c + Z0;
       for (let ix = minx; ix <= maxx; ix++) {
-        const x = ix * c - e;
+        const x = ix * c + X0;
         const t = clamp(((x - ax) * dx + (z - az) * dz) / len2, 0, 1);
         const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
         const i = iz * N + ix;
@@ -66,9 +66,10 @@ function rasterPolyline(pts, levels, F, L, reach) {
 }
 
 async function buildTerrain() {
-  const c = WORLD.cell, e = WORLD.ext;
-  const N = TER.N = Math.round(2 * e / c) + 1;
-  const NN = N * N;
+  const c = WORLD.cell, X0 = WORLD.x0, Z0 = WORLD.z0;
+  const N = TER.NX = Math.round((WORLD.x1 - WORLD.x0) / c) + 1;     // N: the row stride
+  const NZ = TER.NZ = Math.round((WORLD.z1 - WORLD.z0) / c) + 1;
+  const NN = N * NZ;
   TER.H = new Float32Array(NN);
   TER.WATER = new Float32Array(NN).fill(NO_WATER);
   TER.RIVD = new Float32Array(NN).fill(1e6);
@@ -95,10 +96,10 @@ async function buildTerrain() {
   const hw = RIVER_WIDTH / 2;
   const rdx = RIDGE.bx - RIDGE.ax, rdz = RIDGE.bz - RIDGE.az, rlen2 = rdx * rdx + rdz * rdz;
 
-  for (let iz = 0; iz < N; iz++) {
-    const z = iz * c - e;
+  for (let iz = 0; iz < NZ; iz++) {
+    const z = iz * c + Z0;
     for (let ix = 0; ix < N; ix++) {
-      const x = ix * c - e;
+      const x = ix * c + X0;
       const i = iz * N + ix;
       let h = 32 + fbm(n1, x / 480, z / 480, 4) * 20 + fbm(n2, x / 130, z / 130, 3) * 5.5 + n3(x / 38, z / 38) * 1.0;
 
@@ -171,14 +172,14 @@ async function buildTerrain() {
       if (rv < hw + 2.5) TER.WATER[i] = L;
       else if (dl < LAKE.r + 4 && h < WORLD.lakeLevel + 0.05) TER.WATER[i] = WORLD.lakeLevel;
     }
-    if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / N * 100) + '%'); await nextFrame(); }
+    if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / NZ * 100) + '%'); await nextFrame(); }
   }
 
   /* --- grass density: none on water, road, rock, steep ground, or the basin core --- */
-  for (let iz = 1; iz < N - 1; iz++) {
+  for (let iz = 1; iz < NZ - 1; iz++) {
     for (let ix = 1; ix < N - 1; ix++) {
-      const i = iz * N + ix, x = ix * c - e, z = iz * c - e;
-      if (TER.WATER[i] > NO_WATER || Math.abs(x) > 820 || Math.abs(z) > 820) continue;
+      const i = iz * N + ix, x = ix * c + X0, z = iz * c + Z0;
+      if (TER.WATER[i] > NO_WATER || x < WORLD.px0 - 40 || x > WORLD.px1 + 40 || z < WORLD.pz0 - 40 || z > WORLD.pz1 + 40) continue;
       // rise over run: central differences span two cells
       const slope = Math.hypot(TER.H[i + 1] - TER.H[i - 1], TER.H[i + N] - TER.H[i - N]) / (2 * c);
       let g = 1 - smooth(0.45, 0.8, slope);
@@ -199,32 +200,32 @@ async function buildTerrain() {
 
 /* Ground colour at 4 m resolution, so grass matches the soil it grows from. */
 function buildColorTexture(nA, nB) {
-  const N = TER.N, M = (N - 1) / 2 + 1, c = WORLD.cell, e = WORLD.ext;
-  const data = new Uint8Array(M * M * 4), col = new THREE.Color(), n = new THREE.Vector3();
-  for (let j = 0; j < M; j++) for (let k = 0; k < M; k++) {
+  const N = TER.NX, MX = (TER.NX - 1) / 2 + 1, MZ = (TER.NZ - 1) / 2 + 1, c = WORLD.cell;
+  const data = new Uint8Array(MX * MZ * 4), col = new THREE.Color(), n = new THREE.Vector3();
+  for (let j = 0; j < MZ; j++) for (let k = 0; k < MX; k++) {
     const ix = k * 2, iz = j * 2, i = iz * N + ix;
-    const x = ix * c - e, z = iz * c - e;
+    const x = ix * c + WORLD.x0, z = iz * c + WORLD.z0;
     normalAt(x, z, n);
     const slope = Math.sqrt(1 - n.y * n.y) / Math.max(n.y, 0.05);
     terrainColor(x, z, TER.H[i], slope, i, nA, nB, col);
-    const o = (j * M + k) * 4;
+    const o = (j * MX + k) * 4;
     // store sqrt(linear): spends the 8 bits where the dark greens live
     data[o] = Math.sqrt(col.r) * 255; data[o + 1] = Math.sqrt(col.g) * 255; data[o + 2] = Math.sqrt(col.b) * 255; data[o + 3] = 255;
   }
-  const t = new THREE.DataTexture(data, M, M, THREE.RGBAFormat, THREE.UnsignedByteType);
+  const t = new THREE.DataTexture(data, MX, MZ, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
-  TER.colorTex = t; TER.colorM = M;
+  TER.colorTex = t; TER.colorMX = MX; TER.colorMZ = MZ;
 }
 
 /* GPU copies of the height + grass fields, for grass placement in shaders */
 function buildTerrainTextures() {
-  const N = TER.N;
-  const half = new Uint16Array(N * N);
-  for (let i = 0; i < N * N; i++) half[i] = THREE.DataUtils.toHalfFloat(TER.H[i]);
-  const ht = new THREE.DataTexture(half, N, N, THREE.RedFormat, THREE.HalfFloatType);
+  const NX = TER.NX, NZ = TER.NZ;
+  const half = new Uint16Array(NX * NZ);
+  for (let i = 0; i < NX * NZ; i++) half[i] = THREE.DataUtils.toHalfFloat(TER.H[i]);
+  const ht = new THREE.DataTexture(half, NX, NZ, THREE.RedFormat, THREE.HalfFloatType);
   ht.minFilter = ht.magFilter = THREE.LinearFilter; ht.needsUpdate = true;
   TER.heightTex = ht;
-  const gt = new THREE.DataTexture(TER.GRASS, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+  const gt = new THREE.DataTexture(TER.GRASS, NX, NZ, THREE.RedFormat, THREE.UnsignedByteType);
   gt.minFilter = gt.magFilter = THREE.LinearFilter; gt.needsUpdate = true;
   TER.grassTex = gt;
 }
@@ -309,13 +310,15 @@ function terrainMaterial() {
 }
 
 function buildTerrainChunks(nA, nB) {
-  const e = WORLD.ext, CH = 100, per = Math.round(2 * e / CH);
+  const CH = 100, perX = Math.round((WORLD.x1 - WORLD.x0) / CH), perZ = Math.round((WORLD.z1 - WORLD.z0) / CH);
   const mat = terrainMaterial();
   TER.material = mat;
-  for (let cz = 0; cz < per; cz++) {
-    for (let cx = 0; cx < per; cx++) {
-      const x0 = -e + cx * CH, z0 = -e + cz * CH;
-      const inner = Math.max(Math.abs(x0 + CH / 2), Math.abs(z0 + CH / 2)) < 860;
+  for (let cz = 0; cz < perZ; cz++) {
+    for (let cx = 0; cx < perX; cx++) {
+      const x0 = WORLD.x0 + cx * CH, z0 = WORLD.z0 + cz * CH;
+      // full detail where you can walk (plus a margin); the far mountains at half
+      const mx = x0 + CH / 2, mz = z0 + CH / 2;
+      const inner = mx > WORLD.px0 - 80 && mx < WORLD.px1 + 80 && mz > WORLD.pz0 - 80 && mz < WORLD.pz1 + 80;
       const step = inner ? 2 : 4;
       const geo = chunkGeometry(x0, z0, CH, step, nA, nB);
       const mesh = new THREE.Mesh(geo, mat);
@@ -334,7 +337,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
   const pos = new Float32Array((V * V + skirt + 4) * 3);
   const nor = new Float32Array(pos.length);
   const col = new Float32Array(pos.length);
-  const N = TER.N, c = WORLD.cell, e = WORLD.ext;
+  const N = TER.NX, c = WORLD.cell;
   const n = new THREE.Vector3(), cl = new THREE.Color();
   let p = 0;
   const put = (x, y, z, i) => {
@@ -347,8 +350,8 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
   };
   for (let j = 0; j < V; j++) for (let k = 0; k < V; k++) {
     const x = x0 + k * step, z = z0 + j * step;
-    const ix = Math.round((x + e) / c), iz = Math.round((z + e) / c);
-    const gi = clamp(iz, 0, N - 1) * N + clamp(ix, 0, N - 1);
+    const ix = Math.round((x - WORLD.x0) / c), iz = Math.round((z - WORLD.z0) / c);
+    const gi = clamp(iz, 0, TER.NZ - 1) * N + clamp(ix, 0, N - 1);
     put(x, TER.H[gi], z, gi);
   }
   const idx = [];

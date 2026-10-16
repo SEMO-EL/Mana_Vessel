@@ -136,9 +136,8 @@ function moveBody(b, dt) {
 
   pushOut(_p, b.r, feet, b.h);
 
-  // playable boundary — soft wall well inside the mountain ring
-  const lim = WORLD.half - 20;
-  if (!b.noBounds) { _p.x = clamp(_p.x, -lim, lim); _p.z = clamp(_p.z, -lim, lim); }
+  // playable boundary — a soft wall well inside the mountains
+  if (!b.noBounds) { _p.x = clamp(_p.x, WORLD.px0, WORLD.px1); _p.z = clamp(_p.z, WORLD.pz0, WORLD.pz1); }
 
   b.pos.x = _p.x; b.pos.z = _p.z;
 

@@ -45,7 +45,8 @@ function buildGrass() {
 
   const U = FOL.grassU = {
     uHeightTex: { value: TER.heightTex }, uGrassTex: { value: TER.grassTex }, uColorTex: { value: TER.colorTex },
-    uN: { value: TER.N }, uM: { value: TER.colorM }, uExt: { value: WORLD.ext }, uCell: { value: WORLD.cell },
+    uN: { value: new THREE.Vector2(TER.NX, TER.NZ) }, uM: { value: new THREE.Vector2(TER.colorMX, TER.colorMZ) },
+    uOrigin: { value: new THREE.Vector2(WORLD.x0, WORLD.z0) }, uCell: { value: WORLD.cell },
     uOriginCell: { value: new THREE.Vector2() }, uSpacing: { value: spacing }, uRadius: { value: radius },
     uTime: { value: 0 }, uWind: { value: 1 }, uPlayer: { value: new THREE.Vector3(0, -999, 0) },
   };
@@ -55,15 +56,15 @@ function buildGrass() {
       .replace('#include <common>', /* glsl */`#include <common>
         attribute vec2 aCell;
         uniform sampler2D uHeightTex, uGrassTex, uColorTex;
-        uniform float uN, uM, uExt, uCell, uSpacing, uRadius, uTime, uWind;
-        uniform vec2 uOriginCell; uniform vec3 uPlayer;
+        uniform float uCell, uSpacing, uRadius, uTime, uWind;
+        uniform vec2 uN, uM, uOrigin, uOriginCell; uniform vec3 uPlayer;
         varying vec3 vGrassCol; varying float vGrassT;
         float gH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`)
       .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(0.0, 1.0, 0.0);')
       .replace('#include <begin_vertex>', /* glsl */`
         vec2 wc = uOriginCell + aCell;
         vec2 wxz = (wc + vec2(gH(wc), gH(wc + 7.13))) * uSpacing;
-        vec2 huv = ((wxz + uExt) / uCell + 0.5) / uN;
+        vec2 huv = ((wxz - uOrigin) / uCell + 0.5) / uN;
         float dens = texture2D(uGrassTex, huv).r;
         float keep = step(gH(wc + 17.3), dens);
         float gy = texture2D(uHeightTex, huv).r;
@@ -83,7 +84,7 @@ function buildGrass() {
         p.xz += bend * t * t * hgt;
         p.y -= length(bend) * t * t * hgt * 0.35;
         vec3 transformed = p;
-        vec2 cuv = ((wxz + uExt) / (uCell * 2.0) + 0.5) / uM;
+        vec2 cuv = ((wxz - uOrigin) / (uCell * 2.0) + 0.5) / uM;
         vec3 gc = texture2D(uColorTex, cuv).rgb; gc *= gc;               // stored as sqrt(linear)
         float flower = step(0.985, gH(wc + 41.0)) * step(0.6, dens);
         vec3 fcol = mix(vec3(0.95, 0.9, 0.55), vec3(0.85, 0.45, 0.6), gH(wc + 5.0));
@@ -240,8 +241,8 @@ function treeMaterial() {
 FOL.windTime = { value: 0 };
 
 function treeDensity(x, z, n) {
-  if (Math.abs(x) > 790 || Math.abs(z) > 790) return 0;
-  const i = terIndex(x, z), idx = Math.round(i[1]) * TER.N + Math.round(i[0]);
+  if (x < WORLD.px0 - 10 || x > WORLD.px1 + 10 || z < WORLD.pz0 - 10 || z > WORLD.pz1 + 10) return 0;
+  const i = terIndex(x, z), idx = Math.round(i[1]) * TER.NX + Math.round(i[0]);
   if (TER.WATER[idx] > NO_WATER) return 0;
   if (TER.ROADD[idx] < ROAD_WIDTH * 0.5 + 3) return 0;
   if (TER.RIVD[idx] < RIVER_WIDTH * 0.5 + 3) return 0;
@@ -274,11 +275,11 @@ async function buildTrees() {
   ];
   const variants = kinds.map(k => ({ ...k, ...makeTreeVariant(k.kind, k.seed) }));
   const mat = treeMaterial();
-  const CELL = 200, per = Math.ceil(1600 / CELL);
+  const CELL = 200, X0 = WORLD.px0 - 10, Z0 = WORLD.pz0 - 10;   // instancing buckets: one per 200 m cell
   const buckets = new Map();
   const step = 7.5 / Math.sqrt(q.trees);
-  for (let z = -790; z < 790; z += step) {
-    for (let x = -790; x < 790; x += step) {
+  for (let z = WORLD.pz0 - 10; z < WORLD.pz1 + 10; z += step) {
+    for (let x = WORLD.px0 - 10; x < WORLD.px1 + 10; x += step) {
       const px = x + (R() - 0.5) * step * 0.9, pz = z + (R() - 0.5) * step * 0.9;
       const d = treeDensity(px, pz, n);
       if (R() > d) continue;
@@ -291,7 +292,7 @@ async function buildTrees() {
       else if (r < 0.95) vi = R() < 0.18 ? 2 : (R() < 0.5 ? 0 : 1);   // broadleaf / oak
       else vi = 6;                                                     // dead
       const s = 0.8 + R() * 0.55;
-      const key = Math.floor((px + 800) / CELL) + ',' + Math.floor((pz + 800) / CELL);
+      const key = Math.floor((px - X0) / CELL) + ',' + Math.floor((pz - Z0) / CELL);
       if (!buckets.has(key)) buckets.set(key, variants.map(() => []));
       buckets.get(key)[vi].push([px, h - 0.15, pz, R() * TAU, s]);
       FOL.trees.push({ x: px, z: pz, r: vi === 5 ? 0 : variants[vi].trunkR * s, kind: variants[vi].kind, h: variants[vi].height * s });
@@ -300,7 +301,7 @@ async function buildTrees() {
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   for (const [key, lists] of buckets) {
     const [cx, cz] = key.split(',').map(Number);
-    const cell = { center: new THREE.Vector3(cx * CELL - 800 + CELL / 2, 30, cz * CELL - 800 + CELL / 2), parts: [] };
+    const cell = { center: new THREE.Vector3(X0 + cx * CELL + CELL / 2, 30, Z0 + cz * CELL + CELL / 2), parts: [] };
     lists.forEach((list, vi) => {
       if (!list.length) return;
       const mk = geo => {
@@ -336,9 +337,10 @@ function scatterRocks() {
   const R = mulberry32(WORLD.seed + 91), n = Noise.make(WORLD.seed + 92);
   const names = ['rock_single_A', 'rock_single_B', 'rock_single_C', 'rock_single_D', 'rock_single_E'];
   const lists = names.map(() => []);
-  for (let i = 0; i < 2600; i++) {
-    const x = (R() - 0.5) * 1560, z = (R() - 0.5) * 1560;
-    const ii = terIndex(x, z), idx = Math.round(ii[1]) * TER.N + Math.round(ii[0]);
+  const tries = Math.round(2600 * (WORLD.px1 - WORLD.px0) * (WORLD.pz1 - WORLD.pz0) / (1560 * 1560));   // same density, any size
+  for (let i = 0; i < tries; i++) {
+    const x = lerp(WORLD.px0, WORLD.px1, R()), z = lerp(WORLD.pz0, WORLD.pz1, R());
+    const ii = terIndex(x, z), idx = Math.round(ii[1]) * TER.NX + Math.round(ii[0]);
     if (TER.WATER[idx] > NO_WATER || TER.ROADD[idx] < 6) continue;
     const nn = normalAt(x, z, _tmpN);
     const steep = 1 - nn.y;
