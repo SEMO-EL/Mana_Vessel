@@ -31,7 +31,7 @@ const RUN_SPEED = 5.4, SPRINT_SPEED = 8.2, WALK_SPEED = 2.2, JUMP_V = 8.4;
 function newGameState({ name, race, style, aff }) {
   const R = RACES[race];
   return {
-    v: 3, name, race, style, aff,
+    v: 4, name, race, style, aff,
     lvl: 1, xp: 0, xpNext: 60, breaks: 0, kills: 0,
     maxHp: R.hp, hp: R.hp, maxStamina: 100, stamina: 100, maxMana: R.mana, mana: R.mana,
     prof: { fire: 0, water: 0, wind: 0, earth: 0, heal: 0, [aff]: 3 },

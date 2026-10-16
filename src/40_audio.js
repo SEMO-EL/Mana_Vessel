@@ -421,6 +421,13 @@ const AUDIO_SFX = {
     auNz(d, 0.5, 0.12, 200, 120, 'lowpass', 1);
     for (let i = 0; i < 6; i++) auNz(d, 0.025, 0.16, rnd(2000, 5000), 0, 'bandpass', 2.5, { at: rnd(0, 0.55), atk: 0.002 });
   },
+  gate: d => {                                                         // a great bar lifted, two doors swinging on old hinges
+    auNz(d, 0.35, 0.3, 300, 120, 'lowpass', 1, { atk: 0.01 });                                   // the bar
+    auTone(d, 'sawtooth', 92, 70, 1.6, 0.05, { lp: 500, atk: 0.3, at: 0.4, vib: [5, 6] });      // the creak, low
+    auTone(d, 'sawtooth', 138, 104, 1.4, 0.035, { lp: 700, atk: 0.4, at: 0.55, vib: [7, 9] });  // …and its harmonic
+    auNz(d, 2.2, 0.12, 180, 90, 'lowpass', 0.8, { atk: 0.8, at: 0.3 });                         // the doors' weight
+    auNz(d, 0.4, 0.28, 140, 60, 'lowpass', 1, { at: 2.6, atk: 0.005 });                          // they come to rest
+  },
   ignite: d => {                                                       // a brazier catching: breathy whoosh, a few sparks
     auNz(d, 0.45, 0.2, 260, 1400, 'bandpass', 0.9, { atk: 0.04 });
     auNz(d, 0.3, 0.1, 150, 90, 'lowpass', 1);
@@ -797,6 +804,9 @@ const AUDIO_MOODS = {
   village: { root: 130.81, scale: [0, 2, 4, 7, 9],  step: 2.1, cut: 560, drone: 0.04 },
   forest:  { root: 110.00, scale: [0, 3, 5, 7, 10], step: 1.9, cut: 420, drone: 0.046 },
   cave:    { root: 87.31,  scale: [0, 2, 3, 7, 8],  step: 3.0, cut: 260, drone: 0.05 },
+  // Roa: a city's bright major, quicker steps; the outskirts: dry, hollow, sparse
+  roa:     { root: 146.83, scale: [0, 4, 7, 9, 11], step: 1.8, cut: 640, drone: 0.036 },
+  outskirts: { root: 98.0, scale: [0, 1, 5, 7, 8],  step: 2.8, cut: 380, drone: 0.048 },
 };
 // eighth-note ostinati in semitones from the region root (null = rest)
 const AUDIO_OSTINATO = [[0, 0, 7, 0, 3, 0, 7, 10], [0, 0, 7, 0, 8, 7, 3, 2]];
@@ -808,6 +818,10 @@ function auRegionAt(x, z) {
   const inside = (P, key) => Math.hypot(x - P.x, z - P.z) < P.r * (cur === key ? 1.12 : 1);   // hysteresis
   if (inside(PLACES.village, 'village')) return 'village';
   if (inside(PLACES.forest, 'forest')) return 'forest';
+  if (x > 900) {
+    if (rectDist(x, z, ROA_CITY) < (cur === 'roa' ? 40 : 25)) return 'roa';
+    if (outskirtsW(x, z) > (cur === 'outskirts' ? 0.3 : 0.5)) return 'outskirts';
+  }
   return 'field';
 }
 function auMakeLayer(key) {

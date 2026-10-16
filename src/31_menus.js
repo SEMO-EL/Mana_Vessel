@@ -37,6 +37,7 @@ function titleCamera(dt) {
 function showTitle() {
   GAME.state = 'title';
   leaveCaveNow();
+  if (typeof clearWhiteOut === 'function') { clearWhiteOut(); OMEN.reset(); }
   TOD.hour = 17.2; TOD.frozen = true;
   Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 1e9;
   $('hud').classList.add('off');
@@ -139,7 +140,7 @@ async function beginJourney() {
 function continueJourney() {
   const s = loadGame();
   if (!s) return;
-  G = Object.assign(newGameState({ name: s.name, race: s.race, style: s.style, aff: s.aff }), s);
+  G = migrateSave(Object.assign(newGameState({ name: s.name, race: s.race, style: s.style, aff: s.aff }), s));
   if (typeof mapDeserialize === 'function') mapDeserialize();
   TOD.hour = s.hour ?? 12; TOD.frozen = false; WEATHER.timer = 60;
   resetWorldState();
@@ -154,13 +155,14 @@ function continueJourney() {
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
   for (const e of [...ENT.enemies]) e.remove();
-  UI.spar = null; CAM.lockTarget = null; LATER.length = 0;
+  UI.spar = null; UI.sparInfo = null; CAM.lockTarget = null; LATER.length = 0;
   if (SHOT.fn) { SHOT.fn = null; CAM.override = null; letterbox(false); }
   for (const enc of ENCOUNTERS) { enc.active = false; enc.live = []; enc.cleared = !!(enc.opts.boss && G.flags[enc.id]); }
   leaveCaveNow();
   if (NPCS.paul) NPCS.paul.setVisible(true);
   if (G.quest === 'stones') spawnRuneStones();
   for (const P of PAGES) P.mesh.visible = !G.pages.includes(P.i);
+  resetRoaState();
   buildSpellBar();
 }
 function enterPlay() {
@@ -311,9 +313,21 @@ function openTravel() {
 }
 
 /* ───────────── endcard ───────────── */
-function showEndcard() {
+// The end of a milestone: what you did, and what comes next.
+let _endKind = 'm1';
+function showEndcard(kind = 'm1') {
   GAME.state = 'end';
-  $('endText').textContent = `${G.name}, level ${G.lvl}, Adventurer Rank ${guildRank(G.lvl)}. You broke the vessel ${G.breaks} times; it is ${Math.round(G.maxMana)} deep now. ${G.kills} kills, ${G.pages.length} of Roxy's pages, ${G.deaths} deaths. The Boreas estate is waiting in Roa — and a girl who punches.`;
+  _endKind = kind;
+  const stats = `${G.name}, level ${G.lvl}, Adventurer Rank ${guildRank(G.lvl)}. You broke the vessel ${G.breaks} times; it is ${Math.round(G.maxMana)} deep now. ${G.kills} kills, ${G.pages.length} of Roxy's pages, ${G.deaths} deaths.`;
+  if (kind === 'm2') {
+    $('endSub').textContent = 'End of Milestone 2';
+    $('endTitle').textContent = 'The Boreas Girl';
+    $('endText').textContent = stats + ' The light over Fittoa was the last thing anyone in Roa saw that night. Chapter III — The Displaced — comes next.';
+  } else {
+    $('endSub').textContent = 'End of Milestone 1';
+    $('endTitle').textContent = 'The Road to Roa';
+    $('endText').textContent = stats + ' The Boreas estate is waiting in Roa — and a girl who punches.';
+  }
   $('hud').classList.add('off'); $('toasts').innerHTML = ''; letterbox(false);
   openScreen('endcard');
   autosave();
@@ -337,7 +351,15 @@ function initMenus() {
   $('sBack').onclick = () => closeSettings();
   $('sReset').onclick = () => { SETTINGS.binds = { ...DEFAULT_BINDS }; Object.assign(SETTINGS, { quality: 'high', master: 0.7, music: 0.45, sfx: 0.8, sens: 1, invertY: false, fov: 60, shake: true, damageNumbers: true }); afterSettingChange('quality'); buildSettings(); };
   $('dRise').onclick = () => riseAgain();
-  $('eKeep').onclick = () => { enterPlay(); lockPointer(); };
+  $('eKeep').onclick = () => {
+    // after the light: the world goes on as it was, the next morning
+    if (_endKind === 'm2') {
+      TOD.hour = 8.5;
+      Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 90;
+      resetRoaState();
+    }
+    enterPlay(); lockPointer();
+  };
   $('eTitle').onclick = () => showTitle();
   BUS.on('key', code => {
     if (BUS.rebinding) return;

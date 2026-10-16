@@ -148,9 +148,16 @@ function groundPoint(p) { return new THREE.Vector3(p.x, groundAt(p.x, p.z, p.y +
 
 /* ───────────── projectiles (the player's AND enemies') ───────────── */
 const _projGeo = new THREE.IcosahedronGeometry(1, 1);
+// a thrown boulder: lumpy, lit like the ground it came out of, no glow
+const _rockGeo = (() => { const g = new THREE.DodecahedronGeometry(1, 1), p = g.attributes.position, n = Noise.make(31);
+  for (let i = 0; i < p.count; i++) { const k = 1 + n(p.getX(i) * 2.1, p.getY(i) * 2.1 + p.getZ(i)) * 0.18; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.9, p.getZ(i) * k); }
+  g.computeVertexNormals(); return g; })();
+let _rockMat = null;
 function spawnProjectile(o) {
   const col = o.col || SCHOOLS[o.school]?.col || '#ffffff';
-  const core = new THREE.Mesh(_projGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(o.hostile ? 2.2 : 3.2) }));
+  const core = o.rock ? new THREE.Mesh(_rockGeo, _rockMat || (_rockMat = toonMat({ color: '#8a7a64' })))
+    : new THREE.Mesh(_projGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(o.hostile ? 2.2 : 3.2) }));
+  if (o.rock) core.castShadow = true;
   core.scale.setScalar(o.r);
   core.position.copy(o.pos);
   scene.add(core);
@@ -177,9 +184,14 @@ function updateProjectiles(dt) {
     const prevY = p.pos.y;
     p.pos.addScaledVector(p.vel, dt);
     p.mesh.position.copy(p.pos);
-    // trail + light
-    emit(p.school === 'wind' ? 1 : 2, { pos: p.pos, col: p.col, spread: p.r * 0.5, velSpread: 0.6, life: 0.35, size: p.r * 1.6, size2: 0.02, bright: 1.6 });
-    requestLight(p.pos, p.col, 5 + p.r * 6, 9);
+    // trail + light (a boulder tumbles and sheds grit instead)
+    if (p.rock) {
+      p.mesh.rotation.x += dt * 5; p.mesh.rotation.z += dt * 3;
+      if (Math.random() < 0.5) emit(1, { pool: 'soft', pos: p.pos, col: '#8a7458', spread: p.r * 0.6, velSpread: 0.5, life: 0.6, size: 0.5, size2: 1.2, gravity: 2 });
+    } else {
+      emit(p.school === 'wind' ? 1 : 2, { pos: p.pos, col: p.col, spread: p.r * 0.5, velSpread: 0.6, life: 0.35, size: p.r * 1.6, size2: 0.02, bright: 1.6 });
+      requestLight(p.pos, p.col, 5 + p.r * 6, 9);
+    }
     let done = p.life <= 0;
     // water: a freezing bolt that crosses the surface makes an ice floe
     const w = waterAt(p.pos.x, p.pos.z);
@@ -208,7 +220,7 @@ function updateProjectiles(dt) {
         if (Math.hypot(p.pos.x - cx, p.pos.z - cz) > e.r + p.r) continue;
         if (p.pos.y < e.pos.y - 0.2 || p.pos.y > e.pos.y + e.h + 0.2) continue;
         p.hits.add(e);
-        damageEnemy(e, p.dmg, { dir: _pp.copy(p.vel).setY(0).normalize().clone(), knock: p.knock, slow: p.slow, burn: p.burn, poise: p.poise, kind: 'magic' });
+        damageEnemy(e, p.dmg, { dir: _pp.copy(p.vel).setY(0).normalize().clone(), knock: p.knock, slow: p.slow, burn: p.burn, poise: p.poise, kind: 'magic', school: p.school });
         BUS.emit('sfx', { id: 'impact_' + p.school, pos: p.pos });
         if (p.pierce > 0) p.pierce--; else { done = true; break; }
       }
@@ -220,10 +232,17 @@ function updateProjectiles(dt) {
       }
     }
     if (done) {
-      emit(18, { pos: p.pos, col: p.col, spread: 0.2, velSpread: 4, life: 0.45, size: 0.35, bright: 2, gravity: p.school === 'earth' ? 9 : 0 });
-      if (p.school === 'fire' && !p.hostile) burnNear(p.pos, 2);         // fire splashes: a near miss still catches
-      if (p.school === 'earth') emit(10, { pool: 'soft', pos: p.pos, col: '#8a7458', spread: 0.3, velSpread: 3, life: 0.8, size: 0.4, size2: 1.2, gravity: 6 });
-      scene.remove(p.mesh); p.mesh.material.dispose();
+      if (p.rock) {
+        emit(30, { pool: 'soft', pos: p.pos, col: '#7a6a52', spread: p.r, velSpread: 5, upBias: 3, life: 1.1, size: 0.9, size2: 2.4, gravity: 7 });
+        emit(16, { pos: p.pos, col: '#a08c70', spread: p.r * 0.5, velSpread: 7, upBias: 4, life: 0.8, size: 0.3, gravity: 14 });
+        BUS.emit('sfx', { id: 'pillar', pos: p.pos });
+        if (p.pos.distanceToSquared(PL.body.pos) < 15 * 15) shake(0.3);
+      } else {
+        emit(18, { pos: p.pos, col: p.col, spread: 0.2, velSpread: 4, life: 0.45, size: 0.35, bright: 2, gravity: p.school === 'earth' ? 9 : 0 });
+        if (p.school === 'fire' && !p.hostile) burnNear(p.pos, 2);       // fire splashes: a near miss still catches
+        if (p.school === 'earth') emit(10, { pool: 'soft', pos: p.pos, col: '#8a7458', spread: 0.3, velSpread: 3, life: 0.8, size: 0.4, size2: 1.2, gravity: 6 });
+      }
+      scene.remove(p.mesh); if (!p.rock) p.mesh.material.dispose();   // (boulders share one material)
       MAGIC.projectiles.splice(i, 1);
     }
   }
@@ -262,7 +281,7 @@ function updateEffects(dt) {
             const dx = en.pos.x - o.x, dz = en.pos.z - o.z, d = Math.hypot(dx, dz);
             if (d > e.range + en.r) continue;
             if ((dx * fx + dz * fz) / Math.max(d, 1e-4) < 0.82) continue;
-            damageEnemy(en, e.dmg * 0.12, { dir: new THREE.Vector3(fx, 0, fz), burn: e.burn, poise: 3, kind: 'magic' });
+            damageEnemy(en, e.dmg * 0.12, { dir: new THREE.Vector3(fx, 0, fz), burn: e.burn, poise: 3, kind: 'magic', school: 'fire' });
           }
           burnNear(o.clone().add(new THREE.Vector3(fx * e.range * 0.6, 0, fz * e.range * 0.6)), e.range * 0.5);
         }
@@ -282,7 +301,7 @@ function updateEffects(dt) {
           if (d > r + en.r) continue;
           e.hits.add(en);
           const dir = new THREE.Vector3(en.pos.x - e.pos.x, 0, en.pos.z - e.pos.z).normalize();
-          damageEnemy(en, e.dmg, { dir, knock: e.knock || 3, slow: e.slow, burn: e.burn, poise: 30, kind: 'magicAoE' });
+          damageEnemy(en, e.dmg, { dir, knock: e.knock || 3, slow: e.slow, burn: e.burn, poise: 30, kind: 'magicAoE', school: e.school });
         }
         if (e.school === 'fire') burnNear(e.pos, r);
         done = e.t > e.life;
@@ -319,7 +338,7 @@ function updateEffects(dt) {
           for (const en of ENT.enemies) {
             if (en.dead || en.inactive) continue;
             if (Math.hypot(en.pos.x - e.pos.x, en.pos.z - e.pos.z) > e.r + en.r) continue;
-            damageEnemy(en, e.dmg, { slow: e.slow, poise: 4, kind: 'magicAoE' });
+            damageEnemy(en, e.dmg, { slow: e.slow, poise: 4, kind: 'magicAoE', school: 'water' });
           }
         }
         done = e.t > e.life;
@@ -334,7 +353,7 @@ function updateEffects(dt) {
           for (const en of ENT.enemies) {
             if (en.dead || en.inactive) continue;
             if (Math.hypot(en.pos.x - e.pos.x, en.pos.z - e.pos.z) > e.r + en.r) continue;
-            damageEnemy(en, e.dmg, { root: e.root, poise: 40, kind: 'magicAoE' });
+            damageEnemy(en, e.dmg, { root: e.root, poise: 40, kind: 'magicAoE', school: 'earth' });
             spikeRing(en.pos, 1.4 + en.r);
           }
           spikeRing(e.pos, e.r * 0.7);
@@ -427,7 +446,7 @@ function raisePillar(pos, life) {
     if (en.dead || en.inactive) continue;
     if (Math.hypot(en.pos.x - pos.x, en.pos.z - pos.z) < 1.4 + en.r) {
       en.body.vel.y = 12; en.body.grounded = false;
-      damageEnemy(en, 18, { poise: 50, kind: 'magic' });
+      damageEnemy(en, 18, { poise: 50, kind: 'magic', school: 'earth' });
     }
   }
 }

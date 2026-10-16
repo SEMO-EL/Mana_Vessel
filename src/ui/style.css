@@ -209,3 +209,9 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
   #creator .row{margin-top:12px}
   #creator input{padding:7px 12px;font-size:15px}
 }
+/* companion barks: a line at the bottom of the screen that never stops play */
+#bark{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:12;pointer-events:none;opacity:0;transition:opacity .35s;
+  max-width:min(720px,80vw);text-align:center;font:italic 400 16px var(--body);color:var(--parch);text-shadow:0 2px 10px #000,0 0 2px #000}
+#bark.on{opacity:1}
+#bark b{font:700 12px var(--display);letter-spacing:.2em;text-transform:uppercase;margin-right:10px;font-style:normal}
+body.lb #bark{bottom:13vh}

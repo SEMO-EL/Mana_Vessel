@@ -244,7 +244,7 @@ async function buildTerrain() {
       g *= 0.55 + 0.45 * smooth(-0.2, 0.4, n3(x / 25, z / 25));
       if (x > 900) {
         g *= 1 - 0.62 * outskirtsW(x, z);                                   // the outskirts: dry and patchy
-        g *= 0.2 + 0.8 * smooth(2, 18, rectDist(x, z, ROA_CITY));           // trodden flat inside the walls
+        g *= 0.03 + 0.97 * smooth(2, 18, rectDist(x, z, ROA_CITY));         // trodden flat inside the walls
       }
       TER.GRASS[i] = Math.round(clamp(g, 0, 1) * 255);
     }

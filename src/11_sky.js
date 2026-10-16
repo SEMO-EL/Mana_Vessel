@@ -93,6 +93,7 @@ const skyMat = new THREE.ShaderMaterial({
     uniform vec3 uZen, uHor, uGnd, uSunDir, uSunCol, uMoonDir; uniform float uNight, uCloud, uTime;
     varying vec3 vDir;
     float h2(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 45758.5453); }
+    vec3 h33(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
     float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
       return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
     float fbm(vec2 p){ float s=0.0,a=0.5; for(int i=0;i<5;i++){ s+=vn(p)*a; p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
@@ -108,11 +109,19 @@ const skyMat = new THREE.ShaderMaterial({
       // moon + stars at night
       float md = max(dot(d, uMoonDir), 0.0);
       col += vec3(0.75, 0.82, 1.0) * (pow(md, 1600.0) * 6.0 + pow(md, 40.0) * 0.12) * uNight;
-      if (y > 0.0) {
-        vec3 sp = d * 180.0; vec2 cell = floor(sp.xz / (0.4 + y)) ;
-        float st = h2(cell + floor(sp.y));
-        float tw = 0.6 + 0.4 * sin(uTime * 2.0 + st * 60.0);
-        col += vec3(0.9, 0.95, 1.0) * step(0.9965, st) * tw * uNight * smoothstep(0.0, 0.2, y) * 1.8;
+      if (y > 0.0 && uNight > 0.0) {
+        // stars: one candidate per cell of a 3D grid the dome passes through, each a
+        // soft round point (the dome's slice through a small ball, so sizes vary)
+        vec3 sp = d * 260.0, ci = floor(sp), cf = fract(sp);
+        vec3 hc = h33(ci);
+        if (hc.x > 0.972) {
+          vec3 at = h33(ci + 17.0) * 0.6 + 0.2;
+          float r = length(cf - at);
+          float mag = hc.y * hc.y;
+          float tw = 0.7 + 0.3 * sin(uTime * (1.5 + hc.z * 2.5) + hc.y * 60.0);
+          vec3 tint = mix(vec3(0.78, 0.86, 1.0), vec3(1.0, 0.9, 0.76), hc.z);
+          col += tint * smoothstep(0.42, 0.0, r) * (0.35 + mag * 2.4) * tw * uNight * smoothstep(0.02, 0.25, y);
+        }
       }
       // painted clouds on a dome projection
       if (y > 0.01) {

@@ -195,7 +195,10 @@ class Enemy {
     this.burn = 0; this.burnT = 0; this.slow = 0; this.slowT = 0; this.rootT = 0; this.staggerT = 0; this.hurtT = 0;
     this.fade = 1;
     if (d.rig === 'wolf') {
-      this.rig = buildWolfRig(d.scale || 1, key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168']));
+      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])));
+      this.root = this.rig.root;
+    } else if (d.rig === 'golem') {
+      this.rig = buildGolemRig();
       this.root = this.rig.root;
     } else if (d.rig === 'treant') {
       this.rig = buildTreantRig();
@@ -204,7 +207,7 @@ class Enemy {
       this.rig = buildStoneRig();
       this.root = this.rig.root;
     } else {
-      this.actor = new Actor({ base: d.base, recolor: d.recolor, show: d.show || [], hide: d.hide || [], scale: opts.scale || 1 });
+      this.actor = new Actor({ base: d.base, recolor: d.recolor, show: d.show || [], hide: d.hide || [], scale: opts.scale || d.scale || 1, extra: d.extra });
       for (const [from, mesh, bone] of d.borrow || []) { borrowMesh(this.actor, from, mesh, bone); this.actor.show(mesh, true); }
       this.root = this.actor.root;
       if (this.state === 'dormant') this.actor.once('Skeletons_Inactive_Floor_Pose', { fade: 0 });
@@ -318,12 +321,20 @@ class Enemy {
     BUS.emit('bossPhase', this);
     BUS.emit('sfx', { id: 'howl', pos: this.pos });
     shake(0.5);
-    for (let i = 0; i < 3; i++) {
-      const a = i / 3 * TAU, x = this.pos.x + Math.cos(a) * 7, z = this.pos.z + Math.sin(a) * 7;
-      const t = new Enemy('thrall', x, z, { dormant: true, encounter: this.encounter });   // cleared with the cave
-      t.aggro = true; t.lockable = false; t.set('awaken');
-      t.actor.once('Spawn_Ground_Skeletons', { speed: 1.4, fade: 0 });
+    // reinforcements, if this one calls for them (the Warden raises its dead; a captain whistles up his men)
+    const sm = P2.summon;
+    if (sm) for (let i = 0; i < sm.n; i++) {
+      const a = i / sm.n * TAU + 0.4, x = this.pos.x + Math.cos(a) * (sm.dist || 7), z = this.pos.z + Math.sin(a) * (sm.dist || 7);
+      if (sm.rise) {
+        const t = new Enemy(sm.key, x, z, { dormant: true, encounter: this.encounter });   // cleared with the encounter
+        t.aggro = true; t.lockable = false; t.set('awaken');
+        if (t.actor) t.actor.once('Spawn_Ground_Skeletons', { speed: 1.4, fade: 0 });
+      } else {
+        const t = new Enemy(sm.key, x, z, { encounter: this.encounter });
+        alertEnemy(t, true);
+      }
     }
+    if (P2.onEnter) P2.onEnter(this);
   }
 
   /* ───── the brain ───── */
@@ -486,7 +497,7 @@ class Enemy {
         const dir = target.clone().sub(from).normalize();
         if (n > 1) dir.applyAxisAngle(_up, (i - (n - 1) / 2) * R.spread);
         dir.y += (R.gravity || 0) * from.distanceTo(target) / (R.spd * R.spd) * 0.5;
-        spawnProjectile({ pos: from.clone(), dir: dir.normalize(), spd: R.spd, r: R.r, dmg: R.dmg, hostile: true, col: R.col, life: 3, gravity: R.gravity || 0, poise: 18,
+        spawnProjectile({ pos: from.clone(), dir: dir.normalize(), spd: R.spd, r: R.r, dmg: R.dmg, hostile: true, col: R.col, life: R.life || 3, gravity: R.gravity || 0, poise: R.poise || 18, rock: R.rock,
           target: R.homing ? 'player' : null, homing: R.homing || 0 });
       }
       BUS.emit('sfx', { id: a.chant ? 'enemyCast' : 'crossbow', pos: this.pos });
@@ -576,7 +587,7 @@ function updateEnemies(dt) {
 // heavier things move less. The player counts as weight 1.
 function separateBodies() {
   const list = ENT.enemies.filter(e => !e.dead && e.state !== 'dormant');
-  const all = PL.state !== 'dead' ? [{ body: PL.body, w: 1 }, ...list.map(e => ({ body: e.body, w: e.def.weight || 1 }))] : list.map(e => ({ body: e.body, w: e.def.weight || 1 }));
+  const all = [...(PL.state !== 'dead' ? [{ body: PL.body, w: 1 }] : []), ...allyBodies().map(body => ({ body, w: 1 })), ...list.map(e => ({ body: e.body, w: e.def.weight || 1 }))];
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
     const a = all[i].body, b = all[j].body;
     if (Math.abs(a.pos.y - b.pos.y) > 1.6) continue;

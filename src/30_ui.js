@@ -352,3 +352,16 @@ function updateFlash(dt) {
   const collapse = G && PL.state === 'collapse' ? 0.7 : G && PL.state === 'dead' ? 0.9 : 0;
   gradePass.uniforms.uDesat.value = damp(gradePass.uniforms.uDesat.value, collapse, 3, dt);
 }
+
+/* ───────────── barks ───────────── */
+// A companion's line: speaker in their colour, text in italics, gone in a few seconds.
+let _barkT = null;
+function bark(who, text, col = '#e6dcc2') {
+  const el = $('bark');
+  $('barkName').textContent = who; $('barkName').style.color = col;
+  $('barkText').textContent = text;
+  el.classList.add('on');
+  clearTimeout(_barkT);
+  _barkT = setTimeout(() => el.classList.remove('on'), 1800 + text.length * 45);
+  BUS.emit('sfx', { id: 'uiMove' });
+}

@@ -230,14 +230,14 @@ function buildFirstWall(R) {
     const a = i / 14 * TAU;
     if (Math.abs(Math.sin(a) - 1) < 0.12 || Math.abs(Math.sin(a) + 1) < 0.12) continue;   // the two ways in (south, north)
     const x = F.x + Math.cos(a) * rr, z = F.z + Math.sin(a) * rr;
-    const o = placeProp('wall_straight', x, z, { s: 6 + R() * 1.5, rot: -a - Math.PI / 2, sink: 1 + R() * 3.5 });
+    const o = placeProp('wall_straight', x, z, { s: 6 + R() * 1.5, rot: -a - Math.PI / 2, sink: 1 + R() * 3.5, mat: ruinMaterial() });
     o.rotation.z = (R() - 0.5) * 0.12; o.updateMatrixWorld(true);
   }
-  for (const [a, r] of [[0.8, rr + 6], [2.6, rr + 5], [4.0, rr + 7], [5.5, rr + 6]]) placeProp('building_tower_base_red', F.x + Math.cos(a) * r, F.z + Math.sin(a) * r, { s: 5.5, sink: 2.5 + R() * 2 });
-  placeProp('building_destroyed', F.x + 12, F.z - rr - 16, { s: 12, rot: 2.6 });
+  for (const [a, r] of [[0.8, rr + 6], [2.6, rr + 5], [4.0, rr + 7], [5.5, rr + 6]]) placeProp('building_tower_base_red', F.x + Math.cos(a) * r, F.z + Math.sin(a) * r, { s: 5.5, sink: 2.5 + R() * 2, mat: ruinMaterial() });
+  placeProp('building_destroyed', F.x + 12, F.z - rr - 16, { s: 12, rot: 2.6, mat: ruinMaterial() });
   for (let i = 0; i < 8; i++) {
     const a = R() * TAU, r = F.r * (0.45 + R() * 0.45);
-    placeProp('resource_stone', F.x + Math.cos(a) * r, F.z + Math.sin(a) * r, { s: 5 + R() * 3, rot: R() * TAU, pad: 0.6 });
+    placeProp('resource_stone', F.x + Math.cos(a) * r, F.z + Math.sin(a) * r, { s: 5 + R() * 3, rot: R() * TAU, pad: 0.6, mat: ruinMaterial() });
   }
   ROA.spots.arena = { x: F.x, z: F.z };
 }

@@ -44,6 +44,11 @@ function damageEnemy(e, dmg, o = {}) {
   if (e.dead || e.inactive) return;
   dmg *= DIFFICULTY[SETTINGS.difficulty].dealt;
   if (e.def.fireWeak && (o.burn || o.school === 'fire')) dmg *= e.def.fireWeak;   // the Treant fears fire
+  if (e.def.waterWeak && o.school === 'water') dmg *= e.def.waterWeak;            // stone soaked cold cracks
+  if (e.def.steelRes && (o.kind === 'sword' || o.kind === 'ally')) {               // …and steel barely marks it
+    dmg *= e.def.steelRes;
+    if (!e.toldSteel) { e.toldSteel = true; BUS.emit('hint', 'Steel barely scratches it. Magic will do better.'); }
+  }
   if (e.def.magicOnly && o.kind === 'sword') {                                    // Roxy's rune-stones
     BUS.emit('sfx', { id: 'block', pos: e.pos }); BUS.emit('hint', 'Magic, not a stick.'); return;
   }

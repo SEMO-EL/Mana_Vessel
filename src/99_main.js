@@ -70,7 +70,9 @@ async function boot() {
   buildCave();
   bootStatus('Waking the people');
   buildPeople();
+  buildRoaPeople();
   defineEncounters();
+  defineRoaEncounters();
   buildPages();
   batchStaticProps();
   initVFX();
@@ -93,6 +95,8 @@ function startDevPlay() {
   G = newGameState({ name: 'Rudeus', race: QS.get('race') || 'human', style: QS.get('style') || 'sword', aff: QS.get('aff') || 'fire' });
   if (QS.has('quest')) G.quest = QS.get('quest');
   if (QS.has('allspells')) for (const k in G.prof) G.prof[k] = 130;
+  if (QS.has('gate')) G.flags.gateOpen = true;                 // dev: the pass gate already open
+  if (QS.has('eris')) G.flags.erisWith = true;                 // dev: Eris along
   TOD.hour = +(QS.get('hour') || 16.5); TOD.frozen = QS.has('freeze');
   const W = WSTONE.list[0];
   spawnPlayer(W.x + 4, W.z + 6, Math.PI * 0.75);
@@ -123,6 +127,7 @@ function frame(dtReal) {
       updatePlayer(dt);
       updateEncounters();
       updateEnemies(dt);
+      updateAllies(dt);
       updateMagic(dt);
       updateStory(dt);
     }
@@ -169,7 +174,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },

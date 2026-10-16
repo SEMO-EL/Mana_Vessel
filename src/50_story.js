@@ -93,6 +93,7 @@ function setQuest(id, { quiet = false } = {}) {
   const q = questStep();
   if (!quiet) { toast(q.title, 'big'); later(0.7, () => toast(q.text)); }
   BUS.emit('sfx', { id: 'page' });
+  BUS.emit('quest', id);
   autosave();
 }
 function currentObjective() { if (!G) return null; const q = questStep(); return { title: q.title, text: q.text }; }
@@ -126,6 +127,14 @@ class NPC {
     NPCS[id] = this;
   }
   setVisible(on) { this.visible = on; this.actor.root.visible = on; this.col.y1 = on ? this.pos.y + 1.8 : this.pos.y - 5; }
+  // stand somewhere else (a scene, a visit): the talk prompt and the body come along
+  moveTo(x, z, face = this.face) {
+    this.pos.set(x, heightAt(x, z), z);
+    removeCollider(this.col);
+    this.col = addCircle(x, z, 0.4, this.pos.y, this.pos.y + (this.visible ? 1.8 : -5), 'npc');
+    this.face = this.baseFace = face;
+    this.actor.root.position.copy(this.pos); this.actor.root.rotation.y = face;
+  }
   update(dt) {
     if (!this.visible) return;
     const d = PL.body.pos.distanceTo(this.pos);
@@ -224,46 +233,49 @@ ENEMY_DEFS.paulSpar = {
     { clip: '1H_Melee_Attack_Stab', speed: 0.9, hitAt: 0.44, range: [1.8, 4.2], reach: 3.1, arc: 0.45, dmg: 12, poise: 25, lunge: 7 },
   ],
 };
-function startSpar() {
-  const p = NPCS.paul;
-  p.setVisible(false);
-  const e = new Enemy('paulSpar', p.pos.x, p.pos.z, { face: p.face });
+// A spar: the NPC steps out and an enemy stand-in fights you — one that
+// yields at a threshold instead of dying, and wins by pulling its last blow.
+function startSpar(npcId = 'paul', defKey = 'paulSpar', o = {}) {
+  const n = NPCS[npcId];
+  n.setVisible(false);
+  const e = new Enemy(defKey, n.pos.x, n.pos.z, { face: n.face });
   e.aggro = true; e.set('alert');
   e.sparring = true;
   UI.spar = e;
+  UI.sparInfo = {
+    npc: n, yieldAt: o.yieldAt ?? 0.3,
+    onWin: o.onWin || (() => { gainXp(60); npcSay(NPCS.paul, SCRIPT.paul2).then(() => setQuest('wolves')); }),
+    onLose: o.onLose || (() => {
+      setQuest('findPaul', { quiet: true });
+      npcSay(NPCS.paul, [
+        { s: 'Paul Greyrat', t: 'Hah! And that is why you watch the shoulders. Breathe, kid. You were closer than you think.' },
+        { s: 'Paul Greyrat', t: 'Wait for my swing, get out of its way, then hit me while I\'m still recovering. Come talk to me when you want another go.' },
+      ]);
+    }),
+  };
 }
-// Losing to Paul: he stops the blade an inch short, and you go again when ready.
-BUS.on('sparLost', () => {
-  const e = UI.spar;
-  if (!e) return;
+function endSpar() {
+  const e = UI.spar, info = UI.sparInfo;
+  if (!e) return null;
   e.dead = true; e.releaseToken();
   if (CAM.lockTarget === e) CAM.lockTarget = null;
   e.remove();
-  UI.spar = null;
-  NPCS.paul.setVisible(true);
+  UI.spar = null; UI.sparInfo = null;
+  if (info) info.npc.setVisible(true);
+  return info;
+}
+// Losing: the blade stops an inch short, and you go again when ready.
+BUS.on('sparLost', () => {
+  const info = endSpar();
+  if (!info) return;
   G.hp = Math.max(G.hp, G.maxHp * 0.5);
-  setQuest('findPaul', { quiet: true });
-  npcSay(NPCS.paul, [
-    { s: 'Paul Greyrat', t: 'Hah! And that is why you watch the shoulders. Breathe, kid. You were closer than you think.' },
-    { s: 'Paul Greyrat', t: 'Wait for my swing, get out of its way, then hit me while I\'m still recovering. Come talk to me when you want another go.' },
-  ]);
+  info.onLose();
 });
 function checkSpar() {
   const e = UI.spar;
   if (!e) return;
-  if (!e.dead && e.hp / e.maxHp < 0.3) {
-    // he yields: no death, a bow, and back to being your father
-    e.dead = true; e.releaseToken();
-    if (CAM.lockTarget === e) CAM.lockTarget = null;
-    e.remove();
-    UI.spar = null;
-    NPCS.paul.setVisible(true);
-    gainXp(60);
-    npcSay(NPCS.paul, SCRIPT.paul2).then(() => setQuest('wolves'));
-  }
-  if (PL.state === 'dead') {  // Paul would never let it go that far
-    e.remove(); UI.spar = null; NPCS.paul.setVisible(true);
-  }
+  if (!e.dead && e.hp / e.maxHp < UI.sparInfo.yieldAt) { endSpar().onWin(); return; }   // a yield, a bow
+  if (PL.state === 'dead') endSpar();                                                  // they'd never let it go that far
 }
 
 /* ───────────── world encounters ───────────── */
@@ -565,20 +577,12 @@ function updateDiscovery() {
     if (G.discovered[id]) continue;
     if (Math.hypot(p.x - pl.x, p.z - pl.z) < pl.r) {
       G.discovered[id] = true;
-      if (id === 'gate' && G.quest === 'road') { onReachGate(); continue; }
       BUS.emit('place', { name: pl.name, sub: pl.sub || '' });
       gainXp(8);
     }
   }
-  if (G.quest === 'road' && Math.hypot(p.x - PLACES.gate.x, p.z - PLACES.gate.z) < PLACES.gate.r) onReachGate();
+  if (G.quest === 'road' && !GAME.inCave && Math.hypot(p.x - 786, p.z - 380) < 16) gateScene();
   if (G.quest === 'cave' && GAME.inCave) setQuest('warden');
-}
-async function onReachGate() {
-  if (G.flags.gateEnd) return;
-  G.flags.gateEnd = true;
-  await say(SCRIPT.gate);
-  setQuest('done', { quiet: true });       // the endcard says it
-  showEndcard();
 }
 
 /* ───────────── per-frame story ───────────── */
@@ -604,6 +608,7 @@ function updateStory(dt) {
   checkSpar();
   updateDiscovery();
   updatePages(dt);
+  updateRoaStory(dt);
 }
 
 /* ───────────── save / load ───────────── */

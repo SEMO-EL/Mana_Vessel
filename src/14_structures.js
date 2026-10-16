@@ -16,6 +16,21 @@ function propMaterial() {
   if (!_propMat) _propMat = toonMat({ map: assetTexture('textures/hexagons_medieval.png') });
   return _propMat;
 }
+// Old stone: the same atlas, drained of its bright paint and weathered grey —
+// for ruins, where a fresh red roof cap would say "built last week".
+let _ruinMat = null;
+function ruinMaterial() {
+  if (!_ruinMat) {
+    const onShader = s => {
+      s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        { float l = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(l) * vec3(1.03, 1.0, 0.88), 0.82) * 0.86; }`);
+    };
+    onShader.key = 'ruin';
+    _ruinMat = toonMat({ map: propMaterial().map, onShader });
+  }
+  return _ruinMat;
+}
 
 async function loadPropsLibrary() {
   const g = await parseGLB('models/props.glb');
@@ -48,6 +63,7 @@ function placeProp(name, x, z, o = {}) {
   if (!tpl) { console.warn('no prop', name); return null; }
   const s = o.s ?? 10, rot = o.rot || 0, sz = propSize(name);
   const obj = tpl.clone(true);
+  if (o.mat) obj.traverse(m => { if (m.isMesh) m.material = o.mat; });
   obj.rotation.y = rot;
   obj.scale.setScalar(s);
   const c = Math.cos(rot), si = Math.sin(rot);
@@ -312,10 +328,10 @@ function buildStructures() {
 
   /* the Sunken Chapel ruins, its heart behind brambles */
   const RU = PLACES.ruinsE;
-  placeProp('building_destroyed', RU.x, RU.z, { s: 14, rot: 0.8 });
+  placeProp('building_destroyed', RU.x, RU.z, { s: 14, rot: 0.8, mat: ruinMaterial() });
   for (let i = 0; i < 8; i++) {
     const a = i / 8 * TAU + 0.3;
-    placeProp(i % 3 ? 'fence_stone_straight' : 'fence_stone_straight_gate', RU.x + Math.cos(a) * 20, RU.z + Math.sin(a) * 20, { s: 6, rot: a, pad: 0.8 });
+    placeProp(i % 3 ? 'fence_stone_straight' : 'fence_stone_straight_gate', RU.x + Math.cos(a) * 20, RU.z + Math.sin(a) * 20, { s: 6, rot: a, pad: 0.8, mat: ruinMaterial() });
   }
   addBramble(RU.x + 12, RU.z + 14, 4.5);
 
