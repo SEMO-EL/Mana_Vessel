@@ -306,17 +306,21 @@ async function birthdayScene() {
   await fadeOut(0.9);
   TOD.hour = 22.6;
   NPCS.ghislaine.setVisible(false); NPCS.sauros.setVisible(false);
-  // side by side at the terrace's edge, both facing east
-  const tx = fx + 30, tz = fz - 4;
-  NPCS.eris.moveTo(tx, tz - 0.7, Math.PI / 2);
-  PL.body.pos.set(tx, floorAt(tx, tz + 0.7), tz + 0.7); PL.face = Math.PI / 2;
+  // side by side on the terrace, both facing east
+  const tx = ROA.spots.terrace.x, tz = ROA.spots.terrace.z;
+  NPCS.eris.moveTo(tx, tz - 0.5, Math.PI / 2); NPCS.eris.hold = true;     // she looks at the sky, not at you
+  PL.body.pos.set(tx, floorAt(tx, tz + 0.5), tz + 0.5); PL.face = Math.PI / 2;
   PL.actor.root.position.copy(PL.body.pos); PL.actor.root.rotation.y = PL.face;
   const yt = heightAt(tx, tz);
-  // a quiet two-shot from the front; on Eris's line, a cut behind them and a slow tilt up to the sky
+  // 1. a quiet two-shot from the front
   const calm = { pos: new THREE.Vector3(tx + 5.5, yt + 2.1, tz + 3.5), look: new THREE.Vector3(tx, yt + 1.25, tz), fov: 40 };
-  const look0 = new THREE.Vector3(tx + 12, yt + 1.4, tz - 1), look1 = new THREE.Vector3(tx + 40, yt + 6, tz - 4);
-  const sky = { pos: new THREE.Vector3(tx - 5, yt + 1.95, tz + 2.2), look: look0.clone(), fov: 48 };
-  const lines = SCRIPT2.birthday2.map((L, i) => ({ ...L, t: L.t.replace('{name}', G.name), cam: i ? sky : calm }));
+  // 2. Eris's line: low and close behind them, on the line from the light through them,
+  //    tilting up from their heads to the sky (heads clear of the rooftops, the light above)
+  const look0 = new THREE.Vector3(tx, yt + 1.0, tz), look1 = new THREE.Vector3(tx + 44.2, yt + 14.1, tz - 7.6);
+  const sky = { pos: new THREE.Vector3(tx - 3.15, yt + 0.35, tz + 0.54), look: look0.clone(), fov: 40 };
+  // 3. their faces, lit by it
+  const faces = { pos: new THREE.Vector3(tx + 3.6, yt + 1.15, tz + 0.25), look: new THREE.Vector3(tx, yt + 0.95, tz), fov: 36 };
+  const lines = SCRIPT2.birthday2.map((L, i) => ({ ...L, t: L.t.replace('{name}', G.name), cam: [calm, sky, faces][i] || sky }));
   lines[1].onShow = () => {
     OMEN.start(new THREE.Vector3(tx, yt, tz));
     tween(3.4, k => sky.look.lerpVectors(look0, look1, k * k * (3 - 2 * k)));
@@ -324,13 +328,21 @@ async function birthdayScene() {
   CAM.override = calm; CAM.ovBlend = 1;
   await fadeIn(1.2);
   await say(lines, { cam: calm });
-  // it opens
+  // it opens (the talk closing handed control back again: hold it to the end)
+  setPlayerState('talk'); $('hud').classList.add('off');
+  CAM.override = sky; letterbox(true);
   OMEN.burst();
   BUS.emit('sfx', { id: 'break' }); shake(0.8);
   await whiteOut(2.4);
+  await new Promise(r => setTimeout(r, 900));                 // hold the white a beat
   CAM.override = null; letterbox(false);
   setQuest('done', { quiet: true });
   showEndcard('m2');
+  if (OMEN.core) OMEN.core.material.opacity = 0.3;               // what is left of the light: a violet haze, not a white wall
+  // the white recedes and leaves the card (over what is left of the light)
+  const e = fadeEl();
+  e.style.transition = 'opacity 2.6s ease-out'; e.style.opacity = 0;
+  setTimeout(() => { if (e.style.opacity === '0') e.style.background = ''; }, 2700);
 }
 // The light over the east: a still, impossible star that swells, then opens.
 // A hot core, a wide bloom that lights the sky around it, and slow halos
@@ -357,6 +369,7 @@ const OMEN = {
   },
   start(from) {
     if (!this.core) this.build();
+    this.core.material.opacity = 1;
     this.from = from.clone(); this.on = true; this.t = 0; this.burstT = -1;
     scene.add(this.core, this.glow, ...this.halos);
   },
@@ -367,7 +380,7 @@ const OMEN = {
     this.t += dt;
     if (this.burstT >= 0) this.burstT += dt;
     // far over the eastern horizon, low in the sky
-    const p = this.core.position.set(this.from.x + 700, this.from.y + 160, this.from.z - 120);
+    const p = this.core.position.set(this.from.x + 700, this.from.y + 310, this.from.z - 120);
     const rise = 0.4 + 0.6 * smooth(0, 3, this.t);
     const swell = 1 + Math.sin(this.t * 2.3) * 0.06 + (this.burstT >= 0 ? this.burstT * this.burstT * 40 : 0);
     this.core.scale.setScalar(70 * swell * rise);
@@ -380,7 +393,7 @@ const OMEN = {
       h.scale.setScalar((80 + k * 150) * swell);
       h.material.opacity = Math.pow(1 - k, 1.6) * smooth(0, 0.25, k) * 0.6 * smooth(0.5, 3, this.t);
     });
-    requestLight(PL.body.pos.clone().setY(PL.body.pos.y + 6).add(new THREE.Vector3(8, 0, -2)), '#c8b8ff', 4 + (this.burstT >= 0 ? this.burstT * 30 : 0), 40);
+    requestLight(PL.body.pos.clone().setY(PL.body.pos.y + 6).add(new THREE.Vector3(8, 0, -2)), '#c8b8ff', 6 + (this.burstT >= 0 ? this.burstT * 30 : 0), 40);
   },
 };
 // the whole screen goes to white, and stays there
@@ -407,7 +420,7 @@ function resetRoaState() {
   ROA.tweens.length = 0; ROA.gateBusy = false;
   UI.sparInfo = null;
   const S = ROA.spots, F = S.forecourt;
-  NPCS.eris.moveTo(F.x, F.z, Math.PI * 0.95);
+  NPCS.eris.moveTo(F.x, F.z, Math.PI * 0.95); NPCS.eris.hold = false;
   NPCS.ghislaine.moveTo(S.yard.x, S.yard.z + 3, Math.PI); NPCS.ghislaine.setVisible(true);
   NPCS.sauros.moveTo(S.keepDoor.x + 5, S.keepDoor.z + 2, 0.2); NPCS.sauros.setVisible(true);
   const withYou = !!G.flags.erisWith;

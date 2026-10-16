@@ -358,6 +358,7 @@ function initMenus() {
       Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 90;
       resetRoaState();
     }
+    if (PL.state === 'talk') setPlayerState('move');            // a scene may have ended holding you
     enterPlay(); lockPointer();
   };
   $('eTitle').onclick = () => showTitle();

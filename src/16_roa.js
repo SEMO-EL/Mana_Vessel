@@ -52,6 +52,9 @@ function buildRoa() {
   placeProp('weaponrack', yard.x + 13, yard.z + 4, { s: 6, rot: -Math.PI / 2 });
   for (const [lx, lz] of [[C.x - 10, 330], [C.x + 10, 330]]) lampPost(lx, lz);
   ROA.spots.forecourt = { x: C.x - 12, z: 334 };
+  // the east end of the terrace, where the birthday ends: a lamp of its own
+  ROA.spots.terrace = { x: C.x + 18, z: 330 };
+  lampPost(C.x + 18.8, 327.4);
 
   /* the plaza: a fountain with the founder on a plinth, market stalls round it */
   const P = ROA_PLAZA;

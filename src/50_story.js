@@ -142,8 +142,8 @@ class NPC {
     this._acc = (this._acc || 0) + dt;
     if (d > 60 && this._acc < 0.2) return;
     const step = this._acc; this._acc = 0;
-    // turn to face you when you come close
-    const want = d < 6 ? Math.atan2(PL.body.pos.x - this.pos.x, PL.body.pos.z - this.pos.z) : this.baseFace;
+    // turn to face you when you come close (unless a scene has them looking somewhere else)
+    const want = d < 6 && !this.hold ? Math.atan2(PL.body.pos.x - this.pos.x, PL.body.pos.z - this.pos.z) : this.baseFace;
     this.face = dampAngle(this.face, want, 3, step);
     this.actor.root.rotation.y = this.face;
     this.actor.update(step);
@@ -571,7 +571,7 @@ function updatePages(dt) {
 
 /* ───────────── discovery ───────────── */
 function updateDiscovery() {
-  if (GAME.inCave) return;
+  if (GAME.inCave || UI.dlg || PL.state === 'talk') return;      // no banners across a scene; it shows after
   const p = PL.body.pos;
   for (const [id, pl] of Object.entries(PLACES)) {
     if (G.discovered[id]) continue;
