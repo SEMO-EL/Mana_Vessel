@@ -363,12 +363,13 @@ function selfTests() {
     const snap = JSON.parse(JSON.stringify(G)), p0 = PL.body.pos.clone();
     G.coin = 20; G.hp = 10;
     const stew = buyWare('stew', 'marga') && G.hp === G.maxHp && G.coin === 14 && !buyWare('stew', 'marga');
+    G.hp = 10; const cakes = buyWare('cakes', 'maryl') && G.hp === G.maxHp && G.coin === 6 && VENDORS.maryl.wares().length === 2;
     const K = NPCS.roa5; let kid = false;
     if (K) { K.setVisible(true); PL.body.pos.copy(K.pos).add(new THREE.Vector3(3, 0, 0)); const m0 = G.maxMana; BUS.emit('cast', { spell: { school: 'fire' }, incanted: true }); kid = G.flags.kidFire === true && G.maxMana === m0 + 6; }
     PL.body.pos.copy(p0);
     for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
     Object.assign(G, snap);
-    return stew && kid;
+    return stew && cakes && kid;
   });
   // Magister Wenna's lesson: Quagmire is taught (a flag), not studied; cast, it mires what stands in it
   check('quagmire', () => {

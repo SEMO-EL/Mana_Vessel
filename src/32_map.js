@@ -761,6 +761,7 @@ function mapServices() {
   if (typeof NPCS === 'undefined') return out;
   at(NPCS.roa3 && NPCS.roa3.pos, "Hilde's stall");
   at(NPCS.roa7 && NPCS.roa7.pos, 'The Red Hearth (inn)');
+  at(NPCS.v1 && NPCS.v1.pos, "Maryl's pantry");
   at(NPCS.stable && NPCS.stable.pos, 'Boreas Stables');
   at(NPCS.clerk && NPCS.clerk.pos, 'Adventurer Guild · bounties');
   if (typeof BOARDS !== 'undefined') at(BOARDS.buena, 'Village notices');

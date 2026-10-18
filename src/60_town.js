@@ -37,6 +37,7 @@ BUS.on('cast', ({ spell, incanted }) => {
 });
 function buildTown() {
   buildTownErrands();
+  if (NPCS.v1) NPCS.v1.talk = talkMaryl;
   if (NPCS.roa7) NPCS.roa7.talk = talkMarga;
   if (NPCS.roa5) NPCS.roa5.talk = n => npcSay(n, [{ s: n.name, t: G.flags.kidFire ? pick(['That fireball was the best thing that ever happened in Roa. EVER.', 'Teach me magic! Tomorrow? The day after?']) : 'Are you the mage? Do a fireball! Hold it and say the words — do a BIG one!' }]);
 }
@@ -113,4 +114,18 @@ function townRows() {
   if (f.mud === 'asked') out.push(['Mud and Patience', clayGot() < 3 ? 'River clay: ' + clayGot() + ' / 3 (the banks round Buena)' : 'Back to Magister Wenna by the Guild']);
   if (f.mud === 'done') out.push(['Mud and Patience', 'Done — Quagmire learned']);
   return out;
+}
+
+/* ───────────── Old Maryl's pantry, by Buena's mill ───────────── */
+// Draughts before Roa (dearer than Hilde's — it's a long way to carry them) and honey cakes
+const MARYL_WARES = [
+  { id: 'mDraught', name: 'Healing Draught', price: 36, desc: () => `Lilia's recipe, or near enough. Drink it (${IN.label('drink')}) and nearly half your wounds close in a breath. Dearer than in Roa: it's a long way to carry them.`,
+    sold: () => (G.draughts || 0) >= draughtCap(), soldTag: () => 'Flasks full', have: () => (G.draughts || 0) + ' / ' + draughtCap(), buy: () => { G.draughts = (G.draughts || 0) + 1; } },
+  { id: 'cakes', name: 'Honey Cakes', price: 8, sold: () => G.hp >= G.maxHp, soldTag: () => 'Not hungry',
+    desc: () => 'Still warm. You eat three before you notice. Closes your wounds.', buy: () => { const h = Math.round(G.maxHp - G.hp); G.hp = G.maxHp; if (h > 0) BUS.emit('healNumber', h); } },
+];
+VENDORS.maryl = { title: 'Maryl\'s Pantry', wares: () => MARYL_WARES, price: p => p };
+async function talkMaryl(n) {
+  await npcSay(n, [{ s: n.name, t: pick(['Harvest\'s early this year. The mill can barely keep up — but I\'ve cakes, and a few draughts for the road.', 'Off adventuring again? Take something warm with you.', 'Silver for cakes, silver for draughts. Kindness I give away free.']) }]);
+  openShop('maryl');
 }

@@ -74,7 +74,7 @@ function buyWare(id, vendor = 'hilde') {
   if (w.sold() || (w.needs && !w.needs()) || (G.coin || 0) < price) return false;
   G.coin -= price; w.buy();
   BUS.emit('sfx', { id: 'pickup' });
-  if (id === 'draught' && !G.flags.toldDrink) { G.flags.toldDrink = true; later(0.3, () => hint(IN.label('drink') + ' to drink a healing draught', 4)); }
+  if ((id === 'draught' || id === 'mDraught') && !G.flags.toldDrink) { G.flags.toldDrink = true; later(0.3, () => hint(IN.label('drink') + ' to drink a healing draught', 4)); }
   autosave();
   return true;
 }
