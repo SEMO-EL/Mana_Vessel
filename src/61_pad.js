@@ -81,3 +81,14 @@ function padMap(dt) {
   }
   if (padHit(PAD.A) && MAP.sel) mapTravel();
 }
+
+// Rumble, for controllers that have it: a blow taken, a parry, a hard landing, a level gained
+function rumble(strong, weak, ms) {
+  const g = IN.gp, a = g && g.vibrationActuator;
+  if (!a || !IN.usingPad || SETTINGS.rumble === false) return;
+  try { a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { /* not every pad, not every browser */ }
+}
+BUS.on('playerHurt', o => rumble(Math.min(1, 0.35 + (o && o.dmg || 0) / 60), 0.5, 160));
+BUS.on('parry', () => rumble(0.2, 0.8, 110));
+BUS.on('land', v => { if (v > 12) rumble(0.5, 0.3, 120); });
+BUS.on('levelUp', () => rumble(0, 0.5, 260));
