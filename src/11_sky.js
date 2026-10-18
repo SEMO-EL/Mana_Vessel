@@ -140,13 +140,13 @@ const skyMat = new THREE.ShaderMaterial({
     uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uGnd: { value: new THREE.Color() },
     uSunDir: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() },
     uMoonDir: { value: new THREE.Vector3() }, uNight: { value: 0 },
-    uCloud: { value: 0.3 }, uTime: { value: 0 },
+    uCloud: { value: 0.3 }, uTime: { value: 0 }, uRainbow: { value: 0 },
   },
   vertexShader: /* glsl */`
     varying vec3 vDir;
     void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: /* glsl */`
-    uniform vec3 uZen, uHor, uGnd, uSunDir, uSunCol, uMoonDir; uniform float uNight, uCloud, uTime;
+    uniform vec3 uZen, uHor, uGnd, uSunDir, uSunCol, uMoonDir; uniform float uNight, uCloud, uTime, uRainbow;
     varying vec3 vDir;
     float h2(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 45758.5453); }
     vec3 h33(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
@@ -190,6 +190,15 @@ const skyMat = new THREE.ShaderMaterial({
         vec3 cc = mix(shade, lit, smoothstep(0.3, 0.9, fbm(uv * 1.6 + uSunDir.xz * 0.35)));
         cc += uSunCol * pow(sd, 6.0) * 0.6 * (1.0 - uNight);
         col = mix(col, cc, c * smoothstep(0.01, 0.12, y) * 0.9);
+      }
+      // after rain, with the sun low behind you: a bow 42° round the point opposite the sun (red outside)
+      if (uRainbow > 0.001 && y > 0.0) {
+        float ang = acos(clamp(dot(d, -uSunDir), -1.0, 1.0));
+        float r = (ang - 0.733) / 0.036;
+        if (abs(r) < 1.0) {
+          vec3 spec = clamp(vec3(1.6 - abs(r * 2.0 - 1.2) * 1.8, 1.6 - abs(r * 2.0) * 1.8, 1.6 - abs(r * 2.0 + 1.2) * 1.8), 0.0, 1.0);
+          col += spec * (1.0 - r * r) * uRainbow * 0.32 * smoothstep(0.0, 0.1, y);
+        }
       }
       gl_FragColor = vec4(col, 1.0);
     }`,
@@ -248,6 +257,9 @@ function updateSky(dt, focus, time) {
   skyMat.uniforms.uNight.value = S.night;
   skyMat.uniforms.uCloud.value = WEATHER.cur.cloud;
   skyMat.uniforms.uTime.value = time;
+  // the rainbow: wet ground, the rain gone, broken cloud, a low sun
+  const bow = WEATHER.wet > 0.2 && WEATHER.cur.rain < 0.12 && WEATHER.cur.cloud < 0.88 && S.elev > 0.04 && S.elev < 0.6 && !GAME.inCave ? Math.min(1, WEATHER.wet * 1.6) : 0;
+  skyMat.uniforms.uRainbow.value = damp(skyMat.uniforms.uRainbow.value, bow, 0.15, dt);
   skyDome.position.copy(camera.position);
   skyDome.scale.setScalar(camera.far * 0.95);
 
