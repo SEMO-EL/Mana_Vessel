@@ -602,6 +602,7 @@ function auWarn(err) { if (!AUDIO.warned) { AUDIO.warned = true; console.warn('[
 function auSurface(x, z) {
   if (GAME.inCave) return 'gravel';
   if (waterAt(x, z) > heightAt(x, z)) return 'water';
+  if (x > 1400 && roaPaved(x, z, roadDistAt(x, z)) > 0.5) return 'stone';
   if (roadDistAt(x, z) < 3.5) return 'gravel';
   return 'grass';
 }
@@ -613,6 +614,11 @@ function auStep(kind, L) {
     const f = rnd(450, 650);
     auTone(d, 'sine', f, f * 0.5, 0.07, 0.025 * L, { at: 0.03 });
     auNz(d, 0.14, 0.04 * L, 3500, 2000, 'highpass', 0.7, { at: 0.05 });
+  } else if (kind === 'stone') {
+    // laid stone: a hard heel-tap and a little scuff
+    auNz(d, 0.035, 0.085 * L, rnd(1800, 2400), 1100, 'bandpass', 2.2, { atk: 0.002 });
+    auTone(d, 'sine', auVar(170, 0.1), 85, 0.045, 0.035 * L);
+    auNz(d, 0.06, 0.02 * L, 4200, 2500, 'highpass', 0.8, { at: 0.02 });
   } else if (kind === 'gravel') {
     auNz(d, 0.07, 0.07 * L, rnd(1100, 1500), 600, 'bandpass', 1.3, { atk: 0.004 });
     for (let i = 0; i < 3; i++) auNz(d, 0.012, 0.04 * L, rnd(2500, 5000), 0, 'bandpass', 5, { at: rnd(0, 0.05), atk: 0.002 });

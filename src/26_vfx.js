@@ -298,6 +298,46 @@ function dustAround(cp) {
   }
 }
 
+/* Feet on the ground: dust off dry earth when you run, water thrown up when
+   you wade, a ring of dust where you land hard. */
+const STEPS = { x: 0, z: 0, acc: 0, init: false };
+const _fv = new THREE.Vector3();
+function dryGround(x, z) {
+  if (GAME.inCave) return 0;
+  const dry = x > 900 ? outskirtsW(x, z) : 0, road = 1 - smooth(2.5, 4.5, roadDistAt(x, z));
+  return Math.max(dry, road * (x > 1400 && roaPaved(x, z, roadDistAt(x, z)) > 0.5 ? 0 : 0.7), DUST.k);
+}
+function updateSteps() {
+  if (!G || !PL.body || GAME.state !== 'play') { STEPS.init = false; return; }
+  const b = PL.body, p = b.pos;
+  if (!STEPS.init) { STEPS.init = true; STEPS.x = p.x; STEPS.z = p.z; return; }
+  const moved = Math.hypot(p.x - STEPS.x, p.z - STEPS.z);
+  STEPS.x = p.x; STEPS.z = p.z;
+  if (moved > 4 || !b.grounded) return;
+  STEPS.acc += moved;
+  const sp = Math.hypot(b.vel.x, b.vel.z);
+  if (STEPS.acc < 1.1) return;
+  STEPS.acc = 0;
+  if (b.inWater > 0.08) {
+    emit(7, { pos: _fv.set(p.x, p.y + b.inWater, p.z), spread: 0.25, col: '#dcf0fa', velSpread: 1.1, upBias: 2.6, gravity: 9, life: 0.55, size: 0.09, size2: 0.03 });
+    return;
+  }
+  const dry = dryGround(p.x, p.z);
+  if (sp > 4.5 && dry > 0.25 && Math.random() < dry) {
+    emit(2, { pool: 'soft', pos: _fv.set(p.x, p.y + 0.15, p.z), spread: 0.2, col: SKY_NOW.night > 0.5 ? '#3c3630' : '#bca784', velSpread: 0.5, upBias: 0.6, drag: 2.2, life: 0.9, size: 0.35, size2: 1.3 });
+  }
+}
+BUS.on('land', v => {
+  if (!G || !PL.body || +v < 9) return;
+  const p = PL.body.pos;
+  if (PL.body.inWater > 0.08) { emit(24, { pos: _fv.set(p.x, p.y + PL.body.inWater, p.z), spread: 0.4, col: '#dcf0fa', velSpread: 2.6, upBias: 4, gravity: 10, life: 0.8, size: 0.12, size2: 0.04 }); return; }
+  if (dryGround(p.x, p.z) < 0.2 && !(G && GAME.inCave)) return;
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * TAU;
+    emit(1, { pool: 'soft', pos: _fv.set(p.x + Math.cos(a) * 0.4, p.y + 0.1, p.z + Math.sin(a) * 0.4), vel: { x: Math.cos(a) * 3, y: 0.4, z: Math.sin(a) * 3 }, velSpread: 0.4, drag: 3, col: GAME.inCave ? '#6a6258' : '#bca784', life: 0.9, size: 0.4, size2: 1.4 });
+  }
+});
+
 let _ambT = 0;
 function updateVFX(dt) {
   VFX.time += dt;
@@ -314,6 +354,7 @@ function updateVFX(dt) {
     if (k >= 1) { scene.remove(r.m); r.m.material.dispose(); VFX.rings.splice(i, 1); }
   }
   updatePickups(dt);
+  updateSteps();
   // rain follows weather
   if (VFX.rain) {
     const u = VFX.rain.material.uniforms;
