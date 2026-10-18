@@ -142,6 +142,7 @@ function updateCaches(dt) {
     // a glint, now and then, when you're near enough to notice it
     const d2 = (C.x - p.x) ** 2 + (C.z - p.z) ** 2;
     if (d2 > 40 * 40) continue;
+    if (d2 < 10 * 10 && !C.erisSaw) { C.erisSaw = true; erisSays('chest'); }
     if ((C.glintT -= dt) <= 0) {
       C.glintT = 1.4 + Math.random() * 1.6;
       emit(1, { pos: _chV.set(C.x + rnd(-0.3, 0.3), C.y + 0.5, C.z + rnd(-0.2, 0.2)), col: '#fff2c0', vel: { x: 0, y: 0.25, z: 0 }, velSpread: 0.05, life: 0.7, size: 0.22, size2: 0.0, bright: 3, gravity: 0 });

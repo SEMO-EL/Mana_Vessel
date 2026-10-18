@@ -20,7 +20,16 @@ const ERIS_BARKS = {
   vessel: ['{name}?! ...Show-off.'],
   mount: ['Move over. I\'m riding too.', 'Budge up, tutor.', 'Don\'t you dare leave without me!'],
   ride: ['FASTER!', 'Hah! Kestrel likes me better.', 'If you fall off, I\'m not stopping.', 'Grandfather says I ride like a bandit. Good!'],
+  event: ['Someone\'s in trouble — come ON, {name}!', 'Hear that? Let\'s GO!', 'Finally, something worth doing!'],
+  saved: ['See? Heroes. Obviously.', 'You\'re welcome! ...We\'re welcome.', 'Hmph. They should carry a sword.'],
+  chest: ['A chest! Open it, open it!', 'There\'d better be a sword in that.', 'Finders keepers. That\'s a rule.'],
 };
+// her say on what happens about you (road events, chests): only when she's with you
+function erisSays(kind, delay = 0) {
+  const E = ALLY.eris;
+  if (!E || !E.active) return;
+  if (delay > 0) later(delay, () => { if (E.active) E.bark(kind, true); }); else E.bark(kind, true);
+}
 
 class Companion {
   constructor(spec, name, col) {

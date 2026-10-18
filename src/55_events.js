@@ -117,6 +117,7 @@ function startRoadEvent(s) {
   EVENTS.cur = E;
   if (E.beasts) BUS.emit('sfx', { id: pack[0] === 'boar' ? 'snarl' : 'howl', pos });
   hint(E.beasts ? 'Howling, somewhere up the road — and someone shouting.' : 'Shouting, somewhere up the road.', 3.5);
+  erisSays('event', 1.6);
   return E;
 }
 
@@ -170,6 +171,7 @@ function updateRoadEvent(E, dt) {
       G.flags.helped = (G.flags.helped || 0) + 1;
       bark(E.name, pick(EVENT_LINES.thanks));
       toast('Traveller saved  ·  +' + xp + ' xp', 'good');
+      erisSays('saved', 3.2);
       BUS.emit('sfx', { id: 'discover' });
     } else if (d > 230 && !live.some(e => e.aggro && e.dist() < 60)) { endRoadEvent(E); return; }   // you rode on
   } else {
