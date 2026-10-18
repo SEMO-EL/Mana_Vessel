@@ -6,7 +6,7 @@
    pointer is captured, so "the pointer was released during play" is the
    only pause signal that works everywhere.
    ═══════════════════════════════════════════════════════════════════════ */
-const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard', 'bounties'];
+const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard', 'bounties', 'journal'];
 let _settingsFrom = 'title';
 function openScreen(id) {
   for (const s of SCREENS) $(s).classList.toggle('on', s === id);
@@ -217,6 +217,40 @@ function openGrimoire() {
   openScreen('grimoire');
 }
 
+/* ───────────── journal ─────────────
+   Where you are in the story, the jobs you've taken, and what's left to find. */
+const JOURNAL_FOES = [['warden', 'The Barrow Warden'], ['treant', 'The Elder Treant'], ['alpha', 'The Grey Alpha'], ['wagons', 'Brannoc, Brigand Captain'],
+  ['firstWall', 'The First Golem'], ['oldScar', 'Old Scar'], ['edric', 'Sir Edric, the Unburied']];
+function openJournal() {
+  const q = questStep(), b = $('journalBody');
+  const row = (k, v) => `<div class="jr"><span>${k}</span><b>${v}</b></div>`;
+  let html = `<div class="jq"><div class="jt">${q.title}</div><p>${q.text}</p></div>`;
+  // jobs
+  const jobs = typeof BOUNTIES !== 'undefined' ? BOUNTIES.filter(x => G.bounties && G.bounties[x.id]) : [];
+  html += '<h4>Bounties</h4>';
+  if (!jobs.length) html += `<p class="flavor">${G.flags.guildF ? 'None taken. The board by the Guild door has work.' : 'Register at the Adventurer Guild in Roa to take bounties.'}</p>`;
+  for (const x of jobs) {
+    const st = G.bounties[x.id];
+    html += row(x.title + (G.trackBounty === x.id ? ' ✦' : ''), st === 'taken' ? x.where : st === 'done' ? 'Done — claim at the board' : 'Paid');
+  }
+  // what's left to find
+  const places = Object.keys(PLACES), found = places.filter(k => G.discovered[k]).length;
+  const ways = WSTONE.list.length, woke = WSTONE.list.filter(w => G.waystones[w.id]).length;
+  html += '<h4>Found</h4>';
+  html += row('Places discovered', found + ' / ' + places.length);
+  html += row('Waystones awakened', woke + ' / ' + ways);
+  html += row('Roxy\'s pages', G.pages.length + ' / 5');
+  if (typeof CRYSTALS !== 'undefined' && CRYSTALS.list.length) html += row('Mana crystals', crystalsGot() + ' / ' + CRYSTALS.list.length);
+  // foes
+  const down = JOURNAL_FOES.filter(([k]) => G.flags[k]);
+  html += '<h4>Great foes felled</h4>';
+  html += down.length ? down.map(([, n]) => row(n, '✓')).join('') : '<p class="flavor">None yet.</p>';
+  html += row('Kills', G.kills) + row('Times the vessel broke', G.breaks) + row('Deaths', G.deaths);
+  b.innerHTML = html;
+  GAME.state = 'journal';
+  openScreen('journal');
+}
+
 /* ───────────── settings ───────────── */
 function openSettings(from) {
   _settingsFrom = from;
@@ -344,6 +378,8 @@ function initMenus() {
   $('pResume').onclick = () => resumeGame();
   $('pMap').onclick = () => { closeAllScreens(); if (typeof mapOpen === 'function') { GAME.state = 'map'; mapOpen(); } else resumeGame(); };
   $('pGrimoire').onclick = () => openGrimoire();
+  $('pJournal').onclick = () => openJournal();
+  $('jBack').onclick = () => { GAME.state = 'paused'; openScreen('pause'); };
   $('pSettings').onclick = () => openSettings('pause');
   $('pSave').onclick = () => saveGame(false);
   $('pQuit').onclick = () => { saveGame(true); showTitle(); };
@@ -374,6 +410,7 @@ function initMenus() {
     else if (GAME.state === 'paused' && is('pause')) resumeGame();
     else if (GAME.state === 'grimoire' && (is('menu') || is('pause'))) resumeGame();
     else if (GAME.state === 'bounties' && (is('pause') || is('interact'))) resumeGame();
+    else if (GAME.state === 'journal' && is('pause')) { GAME.state = 'paused'; openScreen('pause'); }
     else if (GAME.state === 'settings' && is('pause')) closeSettings();
   });
 }
