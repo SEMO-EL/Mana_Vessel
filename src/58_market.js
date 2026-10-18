@@ -46,25 +46,32 @@ async function talkHilde(n) {
   G.flags.metHilde = true;
   openShop();
 }
-function openShop() {
-  const body = $('shopBody');
+// a vendor: a title, a list of wares, a way of pricing them
+const VENDORS = {
+  hilde: { title: 'Hilde\'s Wares', wares: () => WARES, price: p => hildePrice(p) },
+  marga: { title: 'The Red Hearth', wares: () => INN_WARES, price: p => p },
+};
+function openShop(vendor = 'hilde') {
+  const V = VENDORS[vendor], body = $('shopBody');
+  $('shop').querySelector('.h').textContent = V.title;
   let html = `<p class="flavor" style="margin:0 auto 12px;text-align:center">Your purse: <b class="silver">${G.coin || 0} silver</b> · Healing draughts ${(G.draughts || 0)} / ${draughtCap()}</p>`;
-  for (const w of WARES) {
-    const price = hildePrice(w.price), sold = w.sold(), locked = w.needs && !w.needs(), poor = (G.coin || 0) < price;
+  for (const w of V.wares()) {
+    const price = V.price(w.price), sold = w.sold(), locked = w.needs && !w.needs(), poor = (G.coin || 0) < price;
     const btn = sold ? `<span class="tag">${w.soldTag ? w.soldTag() : 'Bought'}</span>` : locked ? `<span class="tag">${w.needsTag}</span>`
       : `<button data-buy="${w.id}"${poor ? ' disabled' : ''}>${poor ? 'Not enough silver' : 'Buy'}</button>`;
     html += `<div class="bounty ware ${sold ? 'paid' : ''}"><div class="bh"><b>${w.name}</b><span>${price} silver${price < w.price ? ' (a friend\'s price)' : ''}${w.have ? ' · ' + w.have() : ''}</span></div>
       <p>${w.desc()}</p><div class="bb">${btn}</div></div>`;
   }
   body.innerHTML = html;
-  for (const el of body.querySelectorAll('[data-buy]')) el.onclick = () => { buyWare(el.dataset.buy); openShop(); };
+  for (const el of body.querySelectorAll('[data-buy]')) el.onclick = () => { buyWare(el.dataset.buy, vendor); if (GAME.state === 'shop') openShop(vendor); };
   if (GAME.state !== 'shop') { GAME._suppressPause = true; GAME.state = 'shop'; setTimeout(() => GAME._suppressPause = false, 50); }
   openScreen('shop');
 }
-function buyWare(id) {
-  const w = WARES.find(x => x.id === id);
-  const price = hildePrice(w.price);
-  if (!w || w.sold() || (w.needs && !w.needs()) || (G.coin || 0) < price) return false;
+function buyWare(id, vendor = 'hilde') {
+  const V = VENDORS[vendor], w = V && V.wares().find(x => x.id === id);
+  if (!w) return false;
+  const price = V.price(w.price);
+  if (w.sold() || (w.needs && !w.needs()) || (G.coin || 0) < price) return false;
   G.coin -= price; w.buy();
   BUS.emit('sfx', { id: 'pickup' });
   if (id === 'draught' && !G.flags.toldDrink) { G.flags.toldDrink = true; later(0.3, () => hint(IN.label('drink') + ' to drink a healing draught', 4)); }
