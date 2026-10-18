@@ -562,6 +562,7 @@ function updateEncounters() {
     if (enc.active && enc.live.length && enc.live.every(e => e.dead)) {
       enc.cleared = true; enc.active = false;
       if (enc.opts.onClear) enc.opts.onClear();
+      BUS.emit('encounterClear', enc.id);
     }
   }
 }

@@ -178,7 +178,8 @@ async function talkClerk(n) {
   return npcSay(n, [{ p: 'guild', s: 'Guild Clerk', t: G.flags.firstWall
     ? 'A golem. A real one, from the First Wall. You\'ll be Rank E by the end of the week, mark me.'
     : G.flags.wagons ? 'Wagonbreak\'s clear? The merchants will be singing. Badly, but singing.'
-    : 'Rank F work is honest work. Mostly it\'s rats. Today it\'s brigands. Lucky you.' }]);
+    : 'Rank F work is honest work. Mostly it\'s rats. Today it\'s brigands. Lucky you.' },
+    { p: 'guild', s: 'Guild Clerk', t: 'And there\'s the board by the door, when the Lady\'s business leaves you an afternoon. Bounties pay. Some of them pay very well.' }]);
 }
 async function talkSauros(n) {
   if (G.quest === 'toRoa' || G.quest === 'findEris')

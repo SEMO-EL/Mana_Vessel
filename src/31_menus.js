@@ -6,7 +6,7 @@
    pointer is captured, so "the pointer was released during play" is the
    only pause signal that works everywhere.
    ═══════════════════════════════════════════════════════════════════════ */
-const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard'];
+const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard', 'bounties'];
 let _settingsFrom = 'title';
 function openScreen(id) {
   for (const s of SCREENS) $(s).classList.toggle('on', s === id);
@@ -351,6 +351,7 @@ function initMenus() {
   $('sBack').onclick = () => closeSettings();
   $('sReset').onclick = () => { SETTINGS.binds = { ...DEFAULT_BINDS }; Object.assign(SETTINGS, { quality: 'high', master: 0.7, music: 0.45, sfx: 0.8, sens: 1, invertY: false, fov: 60, shake: true, damageNumbers: true }); afterSettingChange('quality'); buildSettings(); };
   $('dRise').onclick = () => riseAgain();
+  $('bBack').onclick = () => resumeGame();
   $('eKeep').onclick = () => {
     // after the light: the world goes on as it was, the next morning
     if (_endKind === 'm2') {
@@ -372,6 +373,7 @@ function initMenus() {
     } else if (GAME.state === 'map' && (is('map') || is('pause'))) { mapClose(); GAME.state = 'play'; lockPointer(); }
     else if (GAME.state === 'paused' && is('pause')) resumeGame();
     else if (GAME.state === 'grimoire' && (is('menu') || is('pause'))) resumeGame();
+    else if (GAME.state === 'bounties' && (is('pause') || is('interact'))) resumeGame();
     else if (GAME.state === 'settings' && is('pause')) closeSettings();
   });
 }

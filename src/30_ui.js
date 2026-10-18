@@ -187,6 +187,8 @@ function compassMarks() {
   for (const W of WSTONE.list) if (G.waystones[W.id]) out.push({ ang: Math.atan2(W.x - p.x, W.z - p.z), label: '◈', cls: 'way', d: Math.hypot(W.x - p.x, W.z - p.z) });
   const q = typeof questMarker === 'function' ? questMarker() : null;
   if (q) out.push({ ang: Math.atan2(q.x - p.x, q.z - p.z), label: '◆', cls: 'quest' });
+  const bm = typeof bountyMarker === 'function' ? bountyMarker() : null;
+  if (bm) out.push({ ang: Math.atan2(bm.x - p.x, bm.z - p.z), label: '✦', cls: 'bounty' });
   for (const e of ENT.enemies) if (e.aggro && !e.dead && e.dist() < 40) out.push({ ang: e.angleToPlayer() + Math.PI, label: '•', cls: 'enemy' });
   return out;
 }

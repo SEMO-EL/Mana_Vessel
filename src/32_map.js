@@ -921,6 +921,18 @@ function mapDrawMarkers(ctx, f, t) {
       ctx.restore();
     }
   }
+  // a tracked bounty: a blood-red star with its name
+  const bm = G && typeof bountyMarker === 'function' ? bountyMarker() : null;
+  if (bm) {
+    const X = f.ox + bm.x * f.s, Y = f.oy + bm.z * f.s;
+    if (inside(X, Y, 20 * k)) {
+      const r = 9 * k * (1 + Math.sin(t * 3) * 0.06);
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? r * 0.42 : r; ctx.lineTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fillStyle = MAP_COL.blood; ctx.fill(); ctx.lineWidth = 1.2 * k; ctx.strokeStyle = MAP_COL.parch; ctx.stroke();
+      mapText(ctx, bm.label, X, Y + 22 * k, `italic 400 ${12 * k}px Spectral, Georgia, serif`, 0.3, MAP_COL.blood, MAP_COL.halo, 4 * k);
+    }
+  }
   if (G && PL.body) mapArrow(ctx, f.ox + PL.body.pos.x * f.s, f.oy + PL.body.pos.z * f.s, PL.face, k, t);
 }
 

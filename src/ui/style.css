@@ -56,6 +56,7 @@ kbd{font-family:var(--display);font-size:11px;font-weight:700;min-width:22px;dis
 #compassStrip .cm.way{color:var(--mana)}
 #compassStrip .cm.quest{color:var(--hot);font-size:14px;top:2px}
 #compassStrip .cm.enemy{color:var(--hp);font-size:9px;top:8px}
+#compassStrip .cm.bounty{color:#e05a4a;font-size:14px;top:2px}
 #compassNeedle{position:absolute;left:50%;bottom:0;width:1px;height:6px;background:var(--hot)}
 #objective{position:absolute;top:54px;left:50%;transform:translateX(-50%);text-align:center;font-size:13px;color:var(--parch);text-shadow:0 1px 10px #000;opacity:.9;transition:opacity .6s}
 #objective b{display:block;font-family:var(--display);font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
@@ -188,6 +189,17 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
 .bindrow{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(201,162,39,.08);font-size:13px}
 .bindrow button{min-width:88px;padding:5px 8px;font-size:11px}
 .bindrow button.listen{border-color:var(--mana);color:var(--mana);animation:blink .8s infinite}
+.bounty{margin:12px 0;padding:12px 16px;border:1px solid rgba(201,162,39,.2);background:rgba(10,12,26,.55)}
+.bounty .bh{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.bounty .bh b{font-family:var(--display);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--parch)}
+.bounty .bh span{font-family:var(--display);font-size:11px;letter-spacing:.12em;color:var(--hot);white-space:nowrap}
+.bounty .bw{font-style:italic;color:var(--hot);opacity:.8;font-size:13px;margin-top:2px}
+.bounty p{margin:6px 0 8px;color:var(--dim);font-size:14px;line-height:1.6}
+.bounty .bb{display:flex;justify-content:flex-end}
+.bounty .bb button{padding:7px 16px;font-size:11px}
+.bounty .bb button.hot{border-color:var(--hot);color:var(--hot)}
+.bounty .tag{font-family:var(--display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.bounty.paid{opacity:.5}.bounty.done{border-color:rgba(240,207,98,.6)}
 .school{margin:14px 0;padding:12px 14px;border:1px solid rgba(201,162,39,.18);background:rgba(10,12,26,.5)}
 .school h3{margin:0 0 6px;font-family:var(--display);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
 .school .rank{float:right;font-family:var(--display);font-size:11px;letter-spacing:.14em;color:var(--hot)}

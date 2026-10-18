@@ -492,7 +492,8 @@ function roaPaved(x, z, ro) {
   const street = 1 - smooth(ROAD_WIDTH * 0.5 - 0.5, ROAD_WIDTH * 0.5 + 1.2, ro);
   const plaza = 1 - smooth(ROA_PLAZA.r - 3, ROA_PLAZA.r + 1, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z));
   const court = 1 - smooth(0, 2, rectDist(x, z, ROA_FORECOURT));
-  return Math.max(street, plaza, court) * inside;
+  const guild = 1 - smooth(9, 11.5, Math.hypot(x - 1592, z - 411));                // the Guild's yard, the board in it
+  return Math.max(street, plaza, court, guild) * inside;
 }
 function roaGroundColor(x, z, h, v1, v2, out) {
   const ok = outskirtsW(x, z);

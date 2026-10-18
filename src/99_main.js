@@ -75,6 +75,8 @@ async function boot() {
   buildTownsfolk();
   defineEncounters();
   defineRoaEncounters();
+  defineBountyEncounters();
+  buildBountyBoard();
   buildPages();
   batchStaticProps();
   initVFX();
@@ -133,6 +135,7 @@ function frame(dtReal) {
       updateTownsfolk(dt);
       updateMagic(dt);
       updateStory(dt);
+      updateBounties();
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -179,7 +182,7 @@ window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, PROPS_LIB, propSize,
   PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
-  Enemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
+  Enemy, damageEnemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
   mapDraw(t = performance.now() / 1000) { if (typeof mapDraw === 'function' && MAP.open) mapDraw(t); },   // a map frame without rAF (hidden pane)
   hold(keys, n = 30, dt = 1 / 60) {
