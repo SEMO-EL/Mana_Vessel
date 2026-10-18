@@ -932,6 +932,21 @@ function mapDrawMarkers(ctx, f, t) {
     ctx.lineWidth = 1.2 * k; ctx.strokeStyle = got ? 'rgba(42,33,22,.55)' : MAP_COL.ink; ctx.stroke();
     if (!got) { ctx.fillStyle = MAP_COL.mana; ctx.fill(); }
   }
+  // hidden chests you've opened: a small inked box (a record, never a hint)
+  if (G && G.caches && typeof CACHES !== 'undefined') for (const C of CACHES.list) {
+    if (!G.caches.includes(C.id)) continue;
+    const X = f.ox + C.x * f.s, Y = f.oy + C.z * f.s, w = 6 * k, h = 4.3 * k;
+    if (!inside(X, Y, 10 * k)) continue;
+    ctx.beginPath(); ctx.rect(X - w, Y - h * 0.4, w * 2, h * 1.4);
+    ctx.fillStyle = '#9a6a3a'; ctx.fill(); ctx.lineWidth = 1.2 * k; ctx.strokeStyle = MAP_COL.ink; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X - w, Y - h * 0.4); ctx.lineTo(X - w * 0.8, Y - h); ctx.lineTo(X + w * 0.8, Y - h); ctx.lineTo(X + w, Y - h * 0.4); ctx.stroke();
+  }
+  // someone in trouble on the road: a red exclamation, while it lasts
+  const em = G && typeof eventMarker === 'function' ? eventMarker() : null;
+  if (em) {
+    const X = f.ox + em.x * f.s, Y = f.oy + em.z * f.s;
+    if (inside(X, Y, 14 * k)) mapText(ctx, '!', X, Y, `900 ${26 * k * (1 + Math.sin(t * 5) * 0.08)}px Cinzel, Georgia, serif`, 0, MAP_COL.blood, MAP_COL.halo, 4 * k);
+  }
   // Kestrel, waiting where you left her: a horseshoe
   if (typeof HORSE !== 'undefined' && (HORSE.mode === 'idle' || HORSE.mode === 'come') && HORSE.body) {
     const X = f.ox + HORSE.body.pos.x * f.s, Y = f.oy + HORSE.body.pos.z * f.s, r = 6 * k;
