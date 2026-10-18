@@ -134,6 +134,15 @@ ENEMY_DEFS.jackal = {
     { name: 'pounce', range: [3, 7.5], windup: 0.55, active: 0.34, recover: 0.8, reach: 1.6, arc: 1.0, dmg: 15, poise: 26, leap: 12 },
   ],
 };
+// Wild boars: heavy, short-tempered, a charge that bowls you over. Forest edges and farmland.
+ENEMY_DEFS.boar = {
+  name: 'Tusked Boar', rig: 'wolf', boar: true, tint: '#4a3426', hp: 92, poise: 40, r: 0.55, h: 0.85, walk: 1.8, run: 8.2, sight: 18, hear: 12,
+  xp: 24, weight: 1.6, flinchAt: 14, knockRes: 0.3,
+  attacks: [
+    { name: 'gore',   range: [0, 2.2], windup: 0.5, active: 0.16, recover: 0.6, reach: 2.0, arc: 0.8, dmg: 16, poise: 30, lunge: 4 },
+    { name: 'charge', range: [4, 12],  windup: 0.8, active: 0.5,  recover: 1.1, reach: 1.9, arc: 0.9, dmg: 22, poise: 55, leap: 13 },
+  ],
+};
 // The captain of Wagonbreak Camp: a field boss with a great axe and a whistle.
 ENEMY_DEFS.captain = {
   name: 'Brannoc, Brigand Captain', base: 'Barbarian', show: ['2H_Axe'], hide: ['Barbarian_Hat'], scale: 1.2,

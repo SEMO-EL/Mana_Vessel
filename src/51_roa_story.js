@@ -258,6 +258,8 @@ function defineRoaEncounters() {
   defineEncounter('jackalsEast', 2200, 250, [['jackal', 0, 0], ['jackal', 4, 1], ['jackal', -2, 4]]);
   defineEncounter('jackalsGardens', 1720, 650, [['jackal', 0, 0], ['jackal', 3, 3]], { night: true });
   defineEncounter('roadWatch', 1790, 285, [['bandit', 0, 0], ['marksman', -6, -8]]);
+  defineEncounter('boarsFarms', 1450, 690, [['boar', 0, 0], ['boar', 5, 3]]);
+  defineEncounter('boarsForest', 250, 260, [['boar', 0, 0], ['boar', -4, 4], ['boar', 4, 5]]);
 }
 
 /* ───────────── per frame ───────────── */

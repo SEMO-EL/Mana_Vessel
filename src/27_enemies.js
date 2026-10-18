@@ -101,6 +101,7 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
   const dark = tint, light = '#' + new THREE.Color(tint).lerp(new THREE.Color('#c9c3b8'), 0.55).getHexString(), nose = '#1a1a1c';
   const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd24a').multiplyScalar(2.2) });
   const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1);
+  if (o.boar) return buildBoarRig(scale, tint, mat, eyeM, ball, box);
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.set(0, 0.74, 0); root.add(body);
   body.add(mergedPart([[ball, dark, 0, 0, -0.05, 0.3, 0.29, 0.66], [ball, light, 0, -0.1, 0.1, 0.24, 0.2, 0.5], [ball, dark, 0, 0.06, 0.42, 0.33, 0.36, 0.34],
@@ -142,9 +143,14 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
   }
   root.scale.setScalar(scale);
   return {
-    root, body, neck, head, jaw, tail, legs, phase: Math.random() * 10, crouch: 0, bite: 0, deadT: -1, eyeM,
-    /* e: the enemy (reads speed, state, stateT). Drives every joint procedurally. */
-    update(dt, e) {
+    root, body, neck, head, jaw, tail, legs, phase: Math.random() * 10, crouch: 0, bite: 0, deadT: -1, eyeM, baseY: 0.74, scale,
+    update: quadRigUpdate, weaponPos: quadRigWeaponPos,
+  };
+}
+/* e: the enemy (reads speed, state, stateT). Drives every joint procedurally (wolves, jackals, boars). */
+function quadRigWeaponPos(out) { return this.head.getWorldPosition(out); }
+function quadRigUpdate(dt, e) {
+      const scale = this.scale;
       const sp = Math.hypot(e.body.vel.x, e.body.vel.z) / scale;
       const gallop = sp > 5;
       this.phase += dt * (sp < 0.3 ? 0 : gallop ? sp * 1.25 : sp * 2.6);
@@ -160,7 +166,7 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
         L.hip.rotation.x = s * amp * 0.75 - this.crouch * (L.front ? -0.35 : 0.6);
         L.knee.rotation.x = (L.front ? -1 : 1) * Math.max(0, Math.cos(ph + off)) * amp * 0.9 + this.crouch * (L.front ? 0.2 : -0.9);
       });
-      this.body.position.y = 0.74 + Math.abs(Math.sin(ph * (gallop ? 1 : 2))) * (gallop ? 0.07 : 0.03) - this.crouch * 0.2 + Math.sin(t * 2) * 0.006;
+      this.body.position.y = this.baseY + Math.abs(Math.sin(ph * (gallop ? 1 : 2))) * (gallop ? 0.07 : 0.03) - this.crouch * 0.2 + Math.sin(t * 2) * 0.006;
       this.body.rotation.x = (gallop ? Math.sin(ph) * 0.08 : 0) + this.crouch * 0.12 - (e.state === 'active' && e.attack && e.attack.leap ? 0.25 : 0);
       // head: look toward the player when hunting, snap forward to bite, howl on alert
       const howl = e.state === 'alert' ? 1 : 0;
@@ -169,12 +175,46 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
       const wag = e.aggro ? 0.2 : 0.45;
       this.tail.forEach((g, k) => { g.rotation.y = Math.sin(t * (e.aggro ? 9 : 4) + k * 0.8) * wag; g.rotation.x = (e.aggro ? 0.35 : -0.3) - k * 0.1; });
       // death: roll onto the side
-      if (e.dead) { this.deadT = this.deadT < 0 ? 0 : this.deadT + dt; this.root.rotation.z = smooth(0, 0.5, this.deadT) * 1.5; this.body.position.y = 0.74 - smooth(0, 0.5, this.deadT) * 0.45; }
+      if (e.dead) { this.deadT = this.deadT < 0 ? 0 : this.deadT + dt; this.root.rotation.z = smooth(0, 0.5, this.deadT) * 1.5; this.body.position.y = this.baseY - smooth(0, 0.5, this.deadT) * this.baseY * 0.6; }
       if (e.hurtT > 0) this.body.position.x = Math.sin(GAME.time * 70) * 0.03; else this.body.position.x = 0;
       this.eyeM.color.setRGB(2.2, 1.8 * (e.aggro ? 0.5 : 1), 0.4 * (e.aggro ? 0.2 : 1));
-    },
-    weaponPos(out) { return this.head.getWorldPosition(out); },
-  };
+}
+// The wild boar: low, heavy, bristle-backed, tusked — the wolf's animation on a different body.
+function buildBoarRig(scale, tint, mat, eyeM, ball, box) {
+  const dark = tint, light = '#' + new THREE.Color(tint).lerp(new THREE.Color('#8a7a68'), 0.45).getHexString(), bristle = '#241a12', tusk = '#efe6d2';
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.set(0, 0.52, 0); root.add(body);
+  const bp = [[ball, dark, 0, 0, -0.04, 0.34, 0.32, 0.6], [ball, dark, 0, 0.06, 0.34, 0.36, 0.38, 0.32], [ball, light, 0, -0.14, 0.04, 0.25, 0.16, 0.46]];
+  for (let i = 0; i < 6; i++) bp.push([box, bristle, 0, 0.36 - i * 0.02, 0.42 - i * 0.16, 0.05, 0.13, 0.11]);
+  body.add(mergedPart(bp, mat));
+  const neck = new THREE.Group(); neck.position.set(0, 0.06, 0.56); body.add(neck);
+  const head = new THREE.Group(); head.position.set(0, 0, 0.1); neck.add(head);
+  const snout = new THREE.CylinderGeometry(0.075, 0.1, 0.24, 8); snout.rotateX(Math.PI / 2);
+  const disc = new THREE.CylinderGeometry(0.08, 0.08, 0.03, 10); disc.rotateX(Math.PI / 2);
+  const hp = [[ball, dark, 0, 0, 0.04, 0.19, 0.18, 0.24], [snout, light, 0, -0.05, 0.26], [disc, '#5a3a36', 0, -0.05, 0.39]];
+  const eyes = [];
+  for (const s of [-1, 1]) {
+    hp.push([new THREE.ConeGeometry(0.05, 0.11, 4), dark, s * 0.1, 0.17, -0.05, 1, 1, 1, -0.2, 0, -s * 0.35]);
+    hp.push([new THREE.ConeGeometry(0.022, 0.13, 5), tusk, s * 0.075, -0.06, 0.3, 1, 1, 1, -0.5, 0, s * 0.35]);
+    eyes.push([ball, '#ffffff', s * 0.105, 0.06, 0.14, 0.022, 0.018, 0.018]);
+  }
+  head.add(mergedPart(hp, mat));
+  head.add(mergedPart(eyes, eyeM));
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.12, 0.1); head.add(jaw);
+  jaw.add(mergedPart([[box, light, 0, -0.01, 0.1, 0.1, 0.04, 0.18]], mat));
+  const tail = [new THREE.Group()]; tail[0].position.set(0, 0.12, -0.62); body.add(tail[0]);
+  tail[0].add(mergedPart([[ball, bristle, 0, 0, -0.06, 0.025, 0.025, 0.09]], mat));
+  const legs = [];
+  for (const [x, z, front] of [[-0.17, 0.36, 1], [0.17, 0.36, 1], [-0.18, -0.38, 0], [0.18, -0.38, 0]]) {
+    const hip = new THREE.Group(); hip.position.set(x, -0.12, z); body.add(hip);
+    hip.add(mergedPart([[ball, dark, 0, -0.1, 0, 0.09, 0.15, 0.1]], mat));
+    const knee = new THREE.Group(); knee.position.set(0, -0.22, 0); hip.add(knee);
+    knee.add(mergedPart([[ball, dark, 0, -0.1, 0, 0.05, 0.12, 0.055], [ball, '#1a1410', 0, -0.2, 0.01, 0.05, 0.03, 0.06]], mat));
+    legs.push({ hip, knee, front, side: Math.sign(x) });
+  }
+  root.scale.setScalar(scale);
+  return { root, body, neck, head, jaw, tail, legs, phase: Math.random() * 10, crouch: 0, bite: 0, deadT: -1, eyeM, baseY: 0.52, scale,
+    update: quadRigUpdate, weaponPos: quadRigWeaponPos };
 }
 
 /* ───────────── Enemy ───────────── */
@@ -202,7 +242,7 @@ class Enemy {
     this.burn = 0; this.burnT = 0; this.slow = 0; this.slowT = 0; this.rootT = 0; this.staggerT = 0; this.hurtT = 0;
     this.fade = 1;
     if (d.rig === 'wolf') {
-      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars });
+      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars, boar: d.boar });
       this.root = this.rig.root;
     } else if (d.rig === 'golem') {
       this.rig = buildGolemRig();
@@ -534,7 +574,7 @@ function alertEnemy(e, fromDamage) {
   e.aggro = true;
   e.set(fromDamage ? 'chase' : 'alert');
   BUS.emit('alert', e);
-  if (e.def.rig === 'wolf') BUS.emit('sfx', { id: 'howl', pos: e.pos });
+  if (e.def.rig === 'wolf') BUS.emit('sfx', { id: e.def.boar ? 'snarl' : 'howl', pos: e.pos });
   // the pack hears it
   for (const o of ENT.enemies) {
     if (o === e || o.dead || o.aggro || o.state === 'dormant') continue;
