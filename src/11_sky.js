@@ -37,7 +37,7 @@ scene.add(HEMI);
 
 /* palette keys, sRGB in / linear out */
 const SKYP = {
-  night:  { zen: '#070b1c', hor: '#1a2340', fog: '#18203a', sun: '#8fa8e0', sunI: 0.45, sky: '#26345e', gnd: '#0c0e16', hemiI: 0.55, lift: '#05081a', gain: '#9ab0ff' },
+  night:  { zen: '#070b1c', hor: '#1a2340', fog: '#18203a', sun: '#9ab2e8', sunI: 0.85, sky: '#30437a', gnd: '#151a28', hemiI: 0.78, lift: '#070b1e', gain: '#a8bcff' },
   dawn:   { zen: '#34447c', hor: '#f09d6a', fog: '#c8957e', sun: '#ffac70', sunI: 1.7,  sky: '#8b7fae', gnd: '#4a3a36', hemiI: 0.9,  lift: '#140810', gain: '#ffe0c8' },
   day:    { zen: '#3a74bd', hor: '#b9d2e8', fog: '#a8c1d8', sun: '#fff1dc', sunI: 2.7,  sky: '#9cc2ea', gnd: '#6b6049', hemiI: 1.15, lift: '#000000', gain: '#ffffff' },
 };
