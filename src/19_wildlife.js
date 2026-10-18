@@ -95,7 +95,44 @@ function buildWildlife() {
 }
 
 const _wm = new THREE.Matrix4(), _wq = new THREE.Quaternion(), _we = new THREE.Euler(), _ws = new THREE.Vector3(), _wp = new THREE.Vector3();
+/* A fish now and then: out of deep water in a short silver arc, a splash each end. */
+const FISH = { t: 6, m: null, p0: new THREE.Vector3(), p1: new THREE.Vector3(), k: -1, y: 0 };
+function updateFish(dt) {
+  if (!FISH.m) {
+    const g = new THREE.IcosahedronGeometry(1, 1); g.scale(0.07, 0.09, 0.26);
+    FISH.m = new THREE.Mesh(g, toonMat({ color: '#9aa8b4', emissive: '#10161c' })); FISH.m.visible = false; scene.add(FISH.m);
+  }
+  if (FISH.k >= 0) {
+    FISH.k += dt / 0.75;
+    const k = Math.min(1, FISH.k), h = Math.sin(k * Math.PI) * 0.9;
+    FISH.m.position.lerpVectors(FISH.p0, FISH.p1, k).setY(FISH.y + h - 0.1);
+    FISH.m.rotation.x = -Math.cos(k * Math.PI) * 0.9;            // nose up, then nose down
+    if (FISH.k >= 1) { FISH.k = -1; FISH.m.visible = false; splashAt(FISH.p1, FISH.y, 0.7); }
+    return;
+  }
+  FISH.t -= dt;
+  if (FISH.t > 0 || GAME.inCave || SKY_NOW.night > 0.6) return;
+  FISH.t = rnd(5, 14);
+  const c = camera.position;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * TAU, d = rnd(10, 45), x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
+    const w = waterAt(x, z);
+    if (w === NO_WATER || w - heightAt(x, z) < 0.7) continue;
+    const dir = Math.random() * TAU, x1 = x + Math.cos(dir) * 1.4, z1 = z + Math.sin(dir) * 1.4;
+    if (waterAt(x1, z1) === NO_WATER) continue;
+    FISH.p0.set(x, w, z); FISH.p1.set(x1, w, z1); FISH.y = w; FISH.k = 0;
+    FISH.m.visible = true; FISH.m.rotation.set(0, Math.atan2(x1 - x, z1 - z), 0, 'YXZ');
+    splashAt(FISH.p0, w, 0.5);
+    return;
+  }
+}
+function splashAt(p, y, s) {
+  emit(Math.round(10 * s + 4), { pos: new THREE.Vector3(p.x, y + 0.05, p.z), spread: 0.15, col: '#dcf0fa', velSpread: 1.0 * s, upBias: 2.2 * s, gravity: 9, life: 0.55, size: 0.07, size2: 0.03 });
+  ring(new THREE.Vector3(p.x, y + 0.03, p.z), { col: '#e8f6ff', r0: 0.15, r1: 1.4 * s + 0.4, life: 0.9, opacity: 0.5 });
+  if (p.distanceToSquared(camera.position) < 30 * 30) BUS.emit('sfx', { id: 'splash', pos: p });
+}
 function updateWildlife(dt) {
+  updateFish(dt);
   if (!WILD.birds) return;
   WILD.t += dt; WILD.uTime.value = WILD.t;
   const cam = camera.position, night = SKY_NOW.night, inside = GAME.inCave;

@@ -411,6 +411,11 @@ const AUDIO_SFX = {
     auTone(d, 'sine', 95, 38, 0.4, 0.32, { at: 0.38 });
     auNz(d, 0.3, 0.28, 600, 70, 'lowpass', 1, { at: 0.38 });
   },
+  // a small plop: a fish, a stone in the water
+  splash: d => {
+    auNz(d, 0.22, 0.09, rnd(1000, 1400), 380, 'bandpass', 0.9, { atk: 0.01 });
+    const f = rnd(520, 700); auTone(d, 'sine', f, f * 0.45, 0.09, 0.03, { at: 0.02 });
+  },
   freeze: d => {                                                       // v2 freeze + glassy crackle
     auTone(d, 'sine', 1400, 300, 0.7, 0.13);
     auNz(d, 0.7, 0.15, 3000, 700, 'bandpass', 2.2);
