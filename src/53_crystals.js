@@ -206,12 +206,32 @@ function buildCrystals() {
     CRYSTALS.list.push({ ...s, y, g, m, beam: b, pos: new THREE.Vector3(s.x, y, s.z) });
   }
 }
+// The shepherds were right: at dusk the Sunstones hum, and light rises off the altar.
+const SUNSTONES_DUSK = { t: 0, humT: 0 };
+function updateSunstones(dt) {
+  const S = LANDMARKS.sunstones, cam = camera.position, h = TOD.hour;
+  const dusk = smooth(17.3, 18.1, h) * (1 - smooth(19.2, 19.9, h));
+  if (dusk <= 0.01 || GAME.inCave) return;
+  const d = Math.hypot(cam.x - S.x, cam.z - S.z);
+  if (d > 140) return;
+  const y = heightAt(S.x, S.z);
+  SUNSTONES_DUSK.t -= dt;
+  if (SUNSTONES_DUSK.t <= 0) {
+    SUNSTONES_DUSK.t = 0.12 / dusk;
+    const a = Math.random() * TAU, r = Math.random() * 1.4;
+    emit(1, { pos: _crV.set(S.x + Math.cos(a) * r, y + 0.9, S.z + Math.sin(a) * r), vel: { x: 0, y: 0.9, z: 0 }, velSpread: 0.25, drag: 0.3, col: '#ffd98a', life: 3.2, size: 0.09, size2: 0.02, bright: 2.2 });
+  }
+  if (d < 45) requestLight(_crV.set(S.x, y + 1.5, S.z), '#ffcf7a', 2.5 * dusk, 14);
+  SUNSTONES_DUSK.humT -= dt;
+  if (d < 40 && SUNSTONES_DUSK.humT <= 0) { SUNSTONES_DUSK.humT = 2.3; BUS.emit('sfx', { id: 'hum', pos: _crV.set(S.x, y + 1, S.z) }); }
+}
 function crystalsGot() { return G && G.crystals ? G.crystals.length : 0; }
 function resetCrystals() {
   for (const c of CRYSTALS.list) c.g.visible = !(G && G.crystals && G.crystals.includes(c.id)) && (!c.after || !!(G && G.flags[c.after]));
 }
 function updateCrystals(dt) {
   if (!G || GAME.inCave) return;
+  updateSunstones(dt);
   G.crystals = G.crystals || [];
   const p = PL.body.pos, t = GAME.time;
   for (const c of CRYSTALS.list) {

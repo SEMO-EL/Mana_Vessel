@@ -411,6 +411,12 @@ const AUDIO_SFX = {
     auTone(d, 'sine', 95, 38, 0.4, 0.32, { at: 0.38 });
     auNz(d, 0.3, 0.28, 600, 70, 'lowpass', 1, { at: 0.38 });
   },
+  // the Sunstones at dusk: two low tones beating slowly against each other
+  hum: d => {
+    auTone(d, 'sine', 110, 110, 2.6, 0.05, { atk: 0.8 });
+    auTone(d, 'sine', 111.6, 111.6, 2.6, 0.04, { atk: 0.9 });
+    auTone(d, 'sine', 220, 220, 2.4, 0.012, { atk: 1.0 });
+  },
   // a small plop: a fish, a stone in the water
   splash: d => {
     auNz(d, 0.22, 0.09, rnd(1000, 1400), 380, 'bandpass', 0.9, { atk: 0.01 });
