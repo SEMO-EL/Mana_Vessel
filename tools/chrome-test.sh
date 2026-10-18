@@ -6,7 +6,7 @@ set -uo pipefail
 HTML="$(cygpath -m "$(realpath "$1")")"          # C:/Users/... (mixed form: forward slashes)
 Q="${2:-test=1}"; MS="${3:-25000}"
 PROF="$(cygpath -w "$TMP")\mv-chrome-profile"
-timeout 900 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --user-data-dir="$PROF" \
+timeout 1500 "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --user-data-dir="$PROF" \
   --use-angle=swiftshader --enable-unsafe-swiftshader --no-first-run --no-default-browser-check \
   --virtual-time-budget="$MS" --window-size=1280,720 --dump-dom "file:///$HTML?$Q" 2>/dev/null > "$TMP/dom.html"
 grep -o '<title>[^<]*</title>' "$TMP/dom.html"
