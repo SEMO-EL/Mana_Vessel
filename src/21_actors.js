@@ -69,12 +69,15 @@ function paletteTexture(texKey, recolor) {
   const key = texKey + JSON.stringify(recolor || {});
   if (_variantCache.has(key)) return _variantCache.get(key);
   const img = CHARS.images.get(texKey);
+  // The source is 1024² but only 8×4 smooth gradients: 256² keeps every swatch
+  // (32×64 texels each) at a sixteenth of the memory per recoloured character.
   const cv = document.createElement('canvas');
-  cv.width = img.width; cv.height = img.height;
+  cv.width = Math.min(256, img.width); cv.height = Math.min(256, img.height);
   const ctx = cv.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, cv.width, cv.height);
   if (recolor) {
-    const sw = img.width / 8, sh = img.height / 4;
+    const sw = cv.width / 8, sh = cv.height / 4;
     for (const [idx, hex] of Object.entries(recolor)) {
       const sx = (idx % 8) * sw, sy = Math.floor(idx / 8) * sh;
       const d = ctx.getImageData(sx, sy, sw, sh);
