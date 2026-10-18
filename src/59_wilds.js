@@ -191,6 +191,7 @@ function buildWilds() {
     { flag: 'sq_ashback', boss: true, onClear: () => { if (G.flags.ashback === 'asked') G.flags.ashback = 'killed'; G.flags.ashbackDown = true; banner('Field Boss Felled', 'The Ashback'); } });
   defineEncounter('caravan', S.wreck.x, S.wreck.z, [['bandit', 4, 3], ['bandit', -5, 2], ['marksman', 2, -9]], { flag: 'sq_caravan' });
   JOURNAL_FOES.push(['ashbackDown', 'The Ashback']);
+  defineScorpionNests();
 
   // the sheep, where they strayed (a few wolves have found the eastern one), and the fold by Gerard
   const pen = wildSpot(S.pen);
@@ -332,4 +333,55 @@ function errandRows() {
   if (f.caravan === 'found') out.push(['Hilde\'s Caravan', 'Back to Hilde by the plaza']);
   if (f.caravan === 'done') out.push(['Hilde\'s Caravan', 'Done — a friend\'s price at her stall']);
   return out;
+}
+
+/* ───────────── sand scorpions: the outskirts' gullies ───────────── */
+ENEMY_DEFS.scorpion = {
+  name: 'Sand Scorpion', rig: 'wolf', scorpion: true, tint: '#a8783e', scale: 1.35, hp: 96, poise: 55, r: 0.9, h: 1.0, walk: 2.0, run: 7.6, sight: 14, hear: 12,
+  xp: 32, weight: 1.6, flinchAt: 16, knockRes: 0.5, pack: true,
+  attacks: [
+    { name: 'pinch', range: [0, 2.2], windup: 0.4, active: 0.15, recover: 0.5, reach: 2.0, arc: 0.9, dmg: 14, poise: 20, lunge: 2.5 },
+    { name: 'sting', range: [1.2, 3.6], windup: 0.75, active: 0.2, recover: 0.8, reach: 3.2, arc: 0.6, dmg: 22, poise: 36, lunge: 3, unblockable: true },
+  ],
+};
+// six legs, two pincers, a tail curled up over its back (the sting arcs forward when it's angry)
+function buildScorpionRig(scale, tint, mat, eyeM, ball, box) {
+  const shell = tint, dark = '#' + new THREE.Color(tint).multiplyScalar(0.55).getHexString(), pale = '#' + new THREE.Color(tint).lerp(new THREE.Color('#e8d8b0'), 0.4).getHexString();
+  const root = new THREE.Group(), body = new THREE.Group(); body.position.set(0, 0.36, 0); root.add(body);
+  body.add(mergedPart([[ball, shell, 0, 0, 0.16, 0.3, 0.13, 0.3], [ball, shell, 0, 0.01, -0.12, 0.27, 0.12, 0.2], [ball, dark, 0, 0.02, -0.34, 0.22, 0.11, 0.16],
+    [ball, shell, 0, 0.02, -0.52, 0.17, 0.1, 0.13], [box, dark, 0, 0.11, 0.05, 0.32, 0.04, 0.5]], mat));
+  const neck = new THREE.Group(); neck.position.set(0, 0.02, 0.4); body.add(neck);
+  const head = new THREE.Group(); neck.add(head);
+  const hp = [[ball, dark, 0, 0, 0, 0.13, 0.08, 0.1]], eyes = [];
+  for (const s of [-1, 1]) {
+    hp.push([box, shell, s * 0.2, 0, 0.12, 0.06, 0.06, 0.3, 0, s * 0.5, 0], [ball, shell, s * 0.3, 0, 0.3, 0.1, 0.07, 0.14]);
+    eyes.push([ball, '#ffffff', s * 0.05, 0.06, 0.08, 0.02, 0.02, 0.02]);
+  }
+  head.add(mergedPart(hp, mat));
+  head.add(mergedPart(eyes, eyeM));
+  const jaw = new THREE.Group(); jaw.position.set(0, 0, 0.36); head.add(jaw);       // the pincers' moving fingers
+  jaw.add(mergedPart([[box, pale, -0.3, 0, 0.06, 0.04, 0.04, 0.16, 0, 0.4, 0], [box, pale, 0.3, 0, 0.06, 0.04, 0.04, 0.16, 0, -0.4, 0]], mat));
+  // the tail: five segments curling up and forward, the sting on the end
+  const tp = [];
+  // up from the rump, then forward over the back: the classic arch
+  let ty = 0.04, tz = 0, a = 1.2;
+  for (let k = 0; k < 5; k++) { a += 0.48; ty += Math.sin(a) * 0.16; tz -= Math.cos(a) * 0.16; tp.push([ball, k % 2 ? dark : shell, 0, ty, tz, 0.075 - k * 0.006, 0.075 - k * 0.006, 0.09, a - Math.PI / 2, 0, 0]); }
+  tp.push([new THREE.ConeGeometry(0.045, 0.18, 6), '#2a1a10', 0, ty - 0.07, tz + 0.05, 1, 1, 1, 2.6, 0, 0]);
+  const tail = [new THREE.Group()]; tail[0].position.set(0, 0.04, -0.62); body.add(tail[0]);
+  tail[0].add(mergedPart(tp, mat));
+  const legs = [];
+  for (const [z, front] of [[0.18, 1], [0.0, 0], [-0.2, 1]]) for (const s of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(s * 0.24, -0.02, z); body.add(hip);
+    hip.add(mergedPart([[box, dark, s * 0.13, 0.04, 0, 0.26, 0.04, 0.05, 0, 0, s * 0.35]], mat));
+    const knee = new THREE.Group(); knee.position.set(s * 0.25, 0.04, 0); hip.add(knee);
+    knee.add(mergedPart([[box, dark, s * 0.135, -0.16, 0, 0.04, 0.42, 0.04, 0, 0, s * 0.7]], mat));
+    legs.push({ hip, knee, front, side: s });
+  }
+  root.scale.setScalar(scale);
+  return { root, body, neck, head, jaw, tail, legs, phase: Math.random() * 10, crouch: 0, bite: 0, deadT: -1, eyeM, baseY: 0.36, scale,
+    update: quadRigUpdate, weaponPos: quadRigWeaponPos };
+}
+function defineScorpionNests() {
+  defineEncounter('scorpionsWest', 1780, 110, [['scorpion', 0, 0], ['scorpion', 5, 4]]);
+  defineEncounter('scorpionsSouth', 2040, 360, [['scorpion', 0, 0], ['scorpion', -5, 3], ['scorpion', 4, -5]]);
 }

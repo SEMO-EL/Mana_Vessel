@@ -342,10 +342,10 @@ function selfTests() {
   // the wilds: bears, the errands' people and things in place
   check('wilds', () => {
     if (!WILDS.built || WILDS.sheep.length !== 3 || WILDS.petals.length !== 5 || !NPCS.gerd) return false;
-    if (!['bearsNorth', 'bearsWest', 'ashback', 'caravan'].every(id => ENCOUNTERS.some(e => e.id === id))) return false;
-    const p = PL.body.pos, b = new Enemy('bear', p.x + 9, p.z), a = new Enemy('ashback', p.x - 12, p.z); step(5);
-    const ok = !!b.rig && !!a.rig && a.rig.root.scale.x > 1.3 && enemyPurse(b) === 0;
-    b.remove(); a.remove();
+    if (!['bearsNorth', 'bearsWest', 'ashback', 'caravan', 'scorpionsWest', 'scorpionsSouth'].every(id => ENCOUNTERS.some(e => e.id === id))) return false;
+    const p = PL.body.pos, b = new Enemy('bear', p.x + 9, p.z), a = new Enemy('ashback', p.x - 12, p.z), sc = new Enemy('scorpion', p.x, p.z + 10); step(5);
+    const ok = !!b.rig && !!a.rig && !!sc.rig && a.rig.root.scale.x > 1.3 && enemyPurse(b) === 0 && enemyPurse(sc) === 0;
+    b.remove(); a.remove(); sc.remove();
     return ok;
   });
   check('caches', () => {
