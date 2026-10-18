@@ -141,6 +141,13 @@ function buildLandmarks() {
     }
     mergeStone(parts);
     out.hermit = y + top;
+    // the hermit's note, under a stone on the summit
+    INTERACTABLES.push({ pos: new THREE.Vector3(H.x + 1.2, y + top, H.z - 0.8), r: 2.2, label: () => 'Read the note under the stone', enabled: () => !!G,
+      action: () => say([
+        { t: 'A scrap of oilcloth weighted with a stone. The hand is careful and very small:' },
+        { t: '"I came up here to be alone with the sky. Twelve years. Then the jackals had the nerve to learn the ledges, and now I suppose you have too."' },
+        { t: '"Take the blue stone if you must. Leave the view."' },
+      ]) });
   }
   /* a crag over the pass road: a sheer-sided stack with a flat top — one Earth Wall and a jump */
   {
