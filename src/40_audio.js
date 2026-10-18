@@ -428,6 +428,23 @@ const AUDIO_SFX = {
     auNz(d, 4.5 + far, 0.5, 260, 50, 'lowpass', 1, { atk: 0.12 + far * 0.05, at: 0.05 });
     auNz(d, 3.2, 0.32, 140, 40, 'lowpass', 1, { atk: 0.5, at: 0.5 + far * 0.2 });
   },
+  // hooves on the ground: a dull clop, sharper at the gallop
+  hoof: (d, e) => {
+    const g = e && e.gallop;
+    auNz(d, 0.05, g ? 0.12 : 0.08, rnd(700, 1000), 280, 'bandpass', 2, { atk: 0.002 });
+    auTone(d, 'sine', auVar(g ? 120 : 150, 0.12), 60, 0.07, g ? 0.07 : 0.045);
+  },
+  // two-note whistle through the fingers
+  whistle: d => {
+    auTone(d, 'sine', 1900, 2400, 0.16, 0.05, { atk: 0.01 });
+    auTone(d, 'sine', 2300, 1700, 0.28, 0.05, { at: 0.2, atk: 0.01 });
+  },
+  // a whinny: a falling, wobbling cry
+  whinny: d => {
+    auTone(d, 'sawtooth', 820, 520, 0.9, 0.035, { lp: 2200, atk: 0.04, vib: [11, 60] });
+    auTone(d, 'sawtooth', 1240, 760, 0.7, 0.02, { lp: 2600, atk: 0.05, vib: [13, 70] });
+    auNz(d, 0.6, 0.03, 1500, 700, 'bandpass', 1.4, { atk: 0.05 });
+  },
   gate: d => {                                                         // a great bar lifted, two doors swinging on old hinges
     auNz(d, 0.35, 0.3, 300, 120, 'lowpass', 1, { atk: 0.01 });                                   // the bar
     auTone(d, 'sawtooth', 92, 70, 1.6, 0.05, { lp: 500, atk: 0.3, at: 0.4, vib: [5, 6] });      // the creak, low

@@ -45,7 +45,7 @@ function updateCamera(dt, target, opts = {}) {
   CAM.dist = damp(CAM.dist, wantDist, 6, dt);
 
   // pivot: chest height, damped a little so steps and landings don't jolt the frame
-  _cp.set(target.x, target.y + 1.55, target.z);
+  _cp.set(target.x, target.y + 1.55 + (CAM.lift || 0), target.z);
   CAM.pivot.x = damp(CAM.pivot.x, _cp.x, 18, dt);
   CAM.pivot.z = damp(CAM.pivot.z, _cp.z, 18, dt);
   CAM.pivot.y = damp(CAM.pivot.y, _cp.y, 10, dt);

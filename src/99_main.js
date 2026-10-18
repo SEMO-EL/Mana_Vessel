@@ -104,6 +104,7 @@ function startDevPlay() {
   if (QS.has('allspells')) for (const k in G.prof) G.prof[k] = 130;
   if (QS.has('gate')) G.flags.gateOpen = true;                 // dev: the pass gate already open
   if (QS.has('eris')) G.flags.erisWith = true;                 // dev: Eris along
+  if (QS.has('horse')) G.flags.horse = true;                   // dev: Kestrel lent already
   TOD.hour = +(QS.get('hour') || 16.5); TOD.frozen = QS.has('freeze');
   const W = WSTONE.list[0];
   spawnPlayer(W.x + 4, W.z + 6, Math.PI * 0.75);
@@ -136,6 +137,7 @@ function frame(dtReal) {
       updateEnemies(dt);
       updateAllies(dt);
       updateTownsfolk(dt);
+      updateHorse(dt);
       updateMagic(dt);
       updateStory(dt);
       updateBounties();
@@ -185,9 +187,9 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
-  Enemy, damageEnemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
+  Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
   mapDraw(t = performance.now() / 1000) { if (typeof mapDraw === 'function' && MAP.open) mapDraw(t); },   // a map frame without rAF (hidden pane)
   hold(keys, n = 30, dt = 1 / 60) {
@@ -238,6 +240,7 @@ function selfTests() {
   check('golem', () => { const p = PL.body.pos, e = new Enemy('golem', p.x + 9, p.z, { dormant: true }); e.wake(1); step(30); const ok = !e.removed && !!e.rig; e.remove(); return ok; });
   check('scar', () => { const p = PL.body.pos, e = new Enemy('scar', p.x + 8, p.z); step(10); const ok = !!e.rig; e.remove(); return ok; });
   check('eris', () => { if (!ALLY.eris) ALLY.eris = new Companion(ERIS_SPEC, 'Eris', '#e8606f'); ALLY.eris.join(); step(10); const ok = ALLY.eris.active; ALLY.eris.leave(); return ok; });
+  check('horse', () => { G.flags.horse = true; whistleHorse(); step(90); const came = HORSE.mode === 'come' || HORSE.mode === 'idle'; HORSE.body.pos.copy(PL.body.pos).add(new THREE.Vector3(1.5, 0, 0)); HORSE.mode = 'idle'; mountHorse(); const rode = PL.state === 'ride'; step(10); dismountHorse(); const off = PL.state === 'move'; horseStandDown(); return came && rode && off; });
   check('walkers', () => { const w = TOWN.walkers[0], x0 = w.pos.x, z0 = w.pos.z; w.update(1, true, w.pos.clone().setY(w.pos.y + 5)); for (let i = 0; i < 30; i++) w.update(1 / 15, true, w.pos.clone().setY(w.pos.y + 5)); return Math.hypot(w.pos.x - x0, w.pos.z - z0) > 0.5 || w.mode === 'pause'; });
   R.failures = fail; R.ok = fail.length === 0;
   return R;

@@ -12,7 +12,7 @@ const DEFAULT_BINDS = {
   attack: 'Mouse0', cast: 'Mouse2', lock: 'KeyQ', guard: 'KeyF',
   interact: 'KeyE', map: 'KeyM', pause: 'Escape', menu: 'Tab',
   spell1: 'Digit1', spell2: 'Digit2', spell3: 'Digit3', spell4: 'Digit4', spell5: 'Digit5',
-  style: 'KeyX',
+  style: 'KeyX', horse: 'KeyH',
 };
 const BIND_NAMES = {
   forward: 'Move forward', back: 'Move back', left: 'Move left', right: 'Move right',
@@ -20,13 +20,13 @@ const BIND_NAMES = {
   attack: 'Sword', cast: 'Cast (tap: chantless · hold: incant)', lock: 'Lock on', guard: 'Guard / Parry',
   interact: 'Interact', map: 'Map', pause: 'Pause', menu: 'Grimoire',
   spell1: 'Spell 1', spell2: 'Spell 2', spell3: 'Spell 3', spell4: 'Spell 4', spell5: 'Spell 5',
-  style: 'Swap staff / sword stance',
+  style: 'Swap staff / sword stance', horse: 'Whistle for your horse · mount',
 };
 // Xbox layout (standard mapping): buttons[i]
 const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, LS: 10, RS: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 const PAD_BINDS = {
   jump: PAD.A, sprint: PAD.B, interact: PAD.X, attack: PAD.RB, cast: PAD.RT, guard: PAD.LB,
-  lock: PAD.RS, map: PAD.BACK, pause: PAD.START, style: PAD.Y, menu: PAD.LT,
+  lock: PAD.RS, map: PAD.BACK, pause: PAD.START, style: PAD.Y, menu: PAD.LT, horse: PAD.DOWN,
 };
 
 const IN = {

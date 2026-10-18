@@ -93,7 +93,11 @@ function spawnPlayer(x, z, face = 0) {
   CAM.pivot.set(x, PL.body.pos.y + 1.55, z);
 }
 
-function setPlayerState(s) { PL.state = s; PL.stateT = 0; }
+function setPlayerState(s) {
+  // anything that takes you out of the saddle (a scene, a fall, a hit) puts you on your feet first
+  if (PL.state === 'ride' && s !== 'ride' && typeof HORSE !== 'undefined' && HORSE.mode === 'ride') dismountHorse(false);
+  PL.state = s; PL.stateT = 0;
+}
 const canAct = () => !['hit', 'collapse', 'dead', 'talk', 'rest', 'climb', 'interact'].includes(PL.state);
 function spendStamina(n) {
   if (G.stamina <= 0) return false;         // Souls rule: any stamina left lets you act
@@ -128,6 +132,14 @@ function updatePlayer(dt) {
   if (PL.state !== 'collapse') G.mana = Math.min(G.maxMana, G.mana + dt * (1.4 + G.lvl * 0.14));
 
   if (canAct()) readBufferedInput(dt);
+  if (PL.state === 'ride') {
+    stRide(dt);
+    if (PL.state === 'ride') { poseRider(dt); PL.interactTarget = null; G.pos = [b.pos.x, b.pos.y, b.pos.z]; G.hp = Math.min(G.hp, G.maxHp); return; }
+  }
+  // the whistle (or, beside her, up into the saddle)
+  if (IN.pressed('horse') && PL.state === 'move') {
+    if (HORSE.mode !== 'gone' && HORSE.body.pos.distanceTo(b.pos) < 3.2) mountHorse(); else whistleHorse();
+  }
 
   // spell slot selection
   for (let i = 0; i < 5; i++) if (IN.pressed('spell' + (i + 1)) && PLAYER_SPELLS()[i]) { PL.slotIdx = i; BUS.emit('slot'); }
@@ -441,6 +453,7 @@ function breakChant() {
 // Called by combat when something connects with the player.
 function playerHit(dmg, { dir = null, poise = 20, unblockable = false, pure = false, noStagger = false, source = null } = {}) {
   if (PL.state === 'dead') return 'dead';
+  if (PL.state === 'ride' && !pure) horseThrow();
   if (!pure && PL.iframe > 0) return 'dodged';
   // parry: guard pressed just before the blow
   if (!pure && !unblockable && PL.parryT > 0 && dir && facingAway(dir) < 0) {

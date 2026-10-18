@@ -404,6 +404,7 @@ async function fastTravel(id) {
   banner(W.name);
 }
 function placeAtWaystone(W) {
+  horseStandDown();
   const a = Math.atan2(PLACES.village.x - W.x, PLACES.village.z - W.z);
   const x = W.x + Math.sin(a) * 4, z = W.z + Math.cos(a) * 4;
   PL.body.pos.set(x, floorAt(x, z), z); PL.body.vel.set(0, 0, 0);

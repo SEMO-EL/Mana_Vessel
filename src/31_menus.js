@@ -163,6 +163,7 @@ function resetWorldState() {
   if (G.quest === 'stones') spawnRuneStones();
   for (const P of PAGES) P.mesh.visible = !G.pages.includes(P.i);
   resetRoaState();
+  horseStandDown();
   buildSpellBar();
 }
 function enterPlay() {
