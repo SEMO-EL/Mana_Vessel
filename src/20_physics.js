@@ -39,13 +39,15 @@ const addCircle = (x, z, r, y0, y1, tag) => addCollider({ kind: 'circle', x, z, 
 const addBox = (x, z, hx, hz, rot, y0, y1, tag) => addCollider({ kind: 'box', x, z, hx, hz, rot, y0, y1, tag });
 
 const _near = [];
+let _nearQ = 0;
+// (each collider is stamped with the query that found it: no O(n²) de-duplication in dense forest cells)
 function nearColliders(x, z, r) {
-  _near.length = 0;
+  _near.length = 0; _nearQ++;
   const x0 = Math.floor((x - r) / PHYS.CELL), x1 = Math.floor((x + r) / PHYS.CELL);
   const z0 = Math.floor((z - r) / PHYS.CELL), z1 = Math.floor((z + r) / PHYS.CELL);
   for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) {
     const l = PHYS.grid.get(i + ',' + j);
-    if (l) for (const c of l) if (!_near.includes(c)) _near.push(c);
+    if (l) for (const c of l) if (c._q !== _nearQ) { c._q = _nearQ; _near.push(c); }
   }
   return _near;
 }
