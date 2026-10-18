@@ -196,12 +196,14 @@ class Walker {
     this.actor.update(this.acc); this.acc = 0;
   }
   walk(dt) {
+    // in the rain, everyone but the watch hurries and nobody stops to look about
+    const wet = WEATHER.cur.rain > 0.35 && !this.night, spd = this.speed * (wet ? 1.6 : 1);
     const tx = this.next.x, tz = this.next.z;
     let dx = tx - this.pos.x, dz = tz - this.pos.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 0.5) {
       this.prev = this.node; this.node = this.next; this.next = this.pickNext();
-      if (this.R() < 0.2) { this.mode = 'pause'; this.wait = 2 + this.R() * 5; this.idleClip = this.R() < 0.7 ? 'Idle' : 'Interact'; this.face += (this.R() - 0.5) * 2; }
+      if (!wet && this.R() < 0.2) { this.mode = 'pause'; this.wait = 2 + this.R() * 5; this.idleClip = this.R() < 0.7 ? 'Idle' : 'Interact'; this.face += (this.R() - 0.5) * 2; }
       return;
     }
     dx /= dist; dz /= dist;
@@ -211,10 +213,10 @@ class Walker {
     if (inWay) this.blockT += dt; else this.blockT = Math.max(0, this.blockT - dt * 2);
     if (inWay && this.blockT < 1.0) { this.play('Idle'); this.face = dampAngle(this.face, Math.atan2(px, pz), 5, dt); return; }
     if (inWay) { const sx = -dz, sz = dx; dx = dx * 0.5 + sx * 0.9; dz = dz * 0.5 + sz * 0.9; const l = Math.hypot(dx, dz); dx /= l; dz /= l; }
-    this.pos.x += dx * this.speed * dt; this.pos.z += dz * this.speed * dt;
+    this.pos.x += dx * spd * dt; this.pos.z += dz * spd * dt;
     pushOut(this.pos, 0.36, this.pos.y, 1.7);
     this.face = dampAngle(this.face, Math.atan2(dx, dz), 6, dt);
-    this.play(this.clip, this.speed / 2.3 * 1.15);
+    this.play(this.clip, spd / 2.3 * 1.15);
   }
 }
 
@@ -245,7 +247,8 @@ function updateTownsfolk(dt) {
     if (w) {
       TOWN.greetT = 28 + Math.random() * 20;
       const tod = h < 5 || h >= 21.5 ? 'Late to be out.' : h < 12 ? 'Morning.' : h < 17.5 ? 'Afternoon.' : 'Evening.';
-      bark(w.name, pick([tod, tod, 'Good day to you.', 'Mind yourself.', 'Gods keep you.', ...(w.where === 'roa' && G.quest !== 'toRoa' ? ['Tutor.'] : ['Young master.'])]));
+      const wet = WEATHER.cur.rain > 0.35 ? ['Wet enough for you?', 'Get indoors, you will catch your death!', 'Rain, rain, rain...'] : [];
+      bark(w.name, pick([tod, tod, ...wet, ...wet, 'Good day to you.', 'Mind yourself.', 'Gods keep you.', ...(w.where === 'roa' && G.quest !== 'toRoa' ? ['Tutor.'] : ['Young master.'])]));
     }
   }
 }
