@@ -187,6 +187,18 @@ function compassMarks() {
   for (const W of WSTONE.list) if (G.waystones[W.id]) out.push({ ang: Math.atan2(W.x - p.x, W.z - p.z), label: '◈', cls: 'way', d: Math.hypot(W.x - p.x, W.z - p.z) });
   const q = typeof questMarker === 'function' ? questMarker() : null;
   if (q) out.push({ ang: Math.atan2(q.x - p.x, q.z - p.z), label: '◆', cls: 'quest' });
+  // somewhere new not far off: a question mark until you've been there
+  if (!GAME.inCave) for (const [k, pl] of Object.entries(PLACES)) {
+    if (G.discovered[k]) continue;
+    const d = Math.hypot(pl.x - p.x, pl.z - p.z);
+    if (d < 260 && d > pl.r) out.push({ ang: Math.atan2(pl.x - p.x, pl.z - p.z), label: '?', cls: 'poi' });
+  }
+  // a crystal you've seen and not yet reached
+  if (typeof CRYSTALS !== 'undefined' && G.crystalsSeen) for (const c of CRYSTALS.list) {
+    if (!G.crystalsSeen.includes(c.id) || (G.crystals && G.crystals.includes(c.id))) continue;
+    const d = Math.hypot(c.x - p.x, c.z - p.z);
+    if (d < 200) out.push({ ang: Math.atan2(c.x - p.x, c.z - p.z), label: '◇', cls: 'crys' });
+  }
   const bm = typeof bountyMarker === 'function' ? bountyMarker() : null;
   if (bm) out.push({ ang: Math.atan2(bm.x - p.x, bm.z - p.z), label: '✦', cls: 'bounty' });
   for (const e of ENT.enemies) if (e.aggro && !e.dead && e.dist() < 40) out.push({ ang: e.angleToPlayer() + Math.PI, label: '•', cls: 'enemy' });
