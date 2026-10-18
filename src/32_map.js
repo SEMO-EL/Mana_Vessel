@@ -922,6 +922,16 @@ function mapDrawMarkers(ctx, f, t) {
       ctx.restore();
     }
   }
+  // mana crystals you've seen: a small blue shard (hollow once taken)
+  if (G && typeof CRYSTALS !== 'undefined') for (const c of CRYSTALS.list) {
+    const seen = G.crystalsSeen && G.crystalsSeen.includes(c.id), got = G.crystals && G.crystals.includes(c.id);
+    if (!seen && !got) continue;
+    const X = f.ox + c.x * f.s, Y = f.oy + c.z * f.s, r = 5.5 * k;
+    if (!inside(X, Y, 10 * k)) continue;
+    ctx.beginPath(); ctx.moveTo(X, Y - r * 1.3); ctx.lineTo(X + r * 0.7, Y); ctx.lineTo(X, Y + r * 1.3); ctx.lineTo(X - r * 0.7, Y); ctx.closePath();
+    ctx.lineWidth = 1.2 * k; ctx.strokeStyle = got ? 'rgba(42,33,22,.55)' : MAP_COL.ink; ctx.stroke();
+    if (!got) { ctx.fillStyle = MAP_COL.mana; ctx.fill(); }
+  }
   // a tracked bounty: a blood-red star with its name
   const bm = G && typeof bountyMarker === 'function' ? bountyMarker() : null;
   if (bm) {
