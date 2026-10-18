@@ -108,11 +108,34 @@ function townLines(where) {
   return L;
 }
 const ROA_STEPS = ['toRoa', 'findEris', 'ghislaine', 'guild', 'bandits', 'firstWall', 'birthday'];
+// Roa's night watch: out when the townsfolk go in, a lantern each
+const ROA_WATCH = [['Watchman Hale', '#3a2418'], ['Watchwoman Brisa', '#a37a3c'], ['Watchman Odo', '#7a6a5a']];
+function watchLines() {
+  const L = ['Quiet night. Let\'s keep it that way.', 'Lamps lit, gates barred. Off to bed with you.', 'Twelve years on the watch and the worst I\'ve had is a drunk goat.',
+    'Mind the dark lanes. Not that anything happens in Roa.', 'The keep\'s got its own guard. We get the streets. And the goats.'];
+  if (G && G.flags.wagons) L.push('Quieter on the trade road since Wagonbreak. Our thanks, mage.');
+  if (G && G.quest === 'done') L.push('That light over the hills again. The captain says it\'s nothing. The captain says that a lot.');
+  return L;
+}
+let _watchLantern = null;
+function watchLantern(actor) {
+  const L = _watchLantern || (_watchLantern = {
+    geo: new THREE.IcosahedronGeometry(0.1 / CHAR_SCALE, 1),
+    mat: new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc070').multiplyScalar(2.4) }),
+    halo: new THREE.SpriteMaterial({ map: haloTexture(), color: new THREE.Color('#ffb060'), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }),
+  });
+  const g = new THREE.Mesh(L.geo, L.mat), h = new THREE.Sprite(L.halo);
+  h.scale.setScalar(0.9 / CHAR_SCALE); g.add(h);
+  (actor.bones.handslotl || actor.bones.handl || actor.root).add(g);
+  return g;
+}
 
 class Walker {
-  constructor(graph, where, name, R) {
+  constructor(graph, where, name, R, o = {}) {
     this.graph = graph; this.where = where; this.name = name; this.R = R;
-    this.actor = new Actor(townSpec(R));
+    this.night = !!o.night; this.lines = o.lines || null;          // the night watch: out by night, their own words
+    this.actor = new Actor(o.spec || townSpec(R));
+    if (o.lantern) { this.lantern = watchLantern(this.actor); this.lightPos = new THREE.Vector3(); }
     this.actor.root.traverse(o => { if (o.isMesh) o.castShadow = true; });
     scene.add(this.actor.root);
     this.node = graph[(R() * graph.length) | 0]; this.prev = null; this.next = this.pickNext();
@@ -133,7 +156,7 @@ class Walker {
     this.busy = true; this.mode = 'talk';
     this.face = Math.atan2(PL.body.pos.x - this.pos.x, PL.body.pos.z - this.pos.z);
     this.actor.root.rotation.y = this.face; this.play('Idle');
-    try { await npcSay(this, [{ s: this.name, t: pick(townLines(this.where)) }]); }
+    try { await npcSay(this, [{ s: this.name, t: pick(this.lines ? this.lines() : townLines(this.where)) }]); }
     finally { this.busy = false; this.mode = 'pause'; this.wait = 1.5; }
   }
   // put down somewhere out of sight (dawn, or back from being far away)
@@ -166,6 +189,8 @@ class Walker {
     // shadows only up close; the animation at a lower rate far off
     const sh = d < 40;
     if (sh !== this.shadow) { this.shadow = sh; this.actor.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
+    // a lantern lights the street round them (from the shared pool of lights, nearest first)
+    if (this.lantern && d < 70) { this.lantern.getWorldPosition(this.lightPos); requestLight(this.lightPos, '#ffb060', 2.4, 9); }
     this.acc += dt;
     if (d > 55 && this.acc < 0.2) return;
     this.actor.update(this.acc); this.acc = 0;
@@ -203,11 +228,15 @@ function buildTownsfolk() {
     const g = buildTownGraph(key, roadTownNodes(x0, x1, key[0]));
     if (g.length > 2) for (const name of ROAD_NAMES[key]) TOWN.walkers.push(new Walker(g, key, name, R));
   }
+  // last, so everyone above keeps the faces the seed gave them
+  if (roa.length) for (const [name, hair] of ROA_WATCH) TOWN.walkers.push(new Walker(roa, 'roa', name, R, {
+    night: true, lantern: true, lines: watchLines,
+    spec: { base: 'Knight', recolor: { knight: { 1: hair } }, show: ['Knight_Helmet'], hide: ['Knight_Cape'] } }));
 }
 function updateTownsfolk(dt) {
   if (!TOWN.walkers.length || GAME.inCave) return;
   const h = TOD.hour, day = h > 6.3 && h < 20.0, cam = camera.position;
-  for (const w of TOWN.walkers) w.update(dt, day, cam);
+  for (const w of TOWN.walkers) w.update(dt, w.night ? !day : day, cam);
   // a passing word now and then, never mid-fight or mid-talk
   TOWN.greetT -= dt;
   if (G && TOWN.greetT <= 0 && !UI.dlg && PL.state === 'move' && !ENT.enemies.some(e => e.aggro && !e.dead)) {
@@ -215,7 +244,7 @@ function updateTownsfolk(dt) {
     const w = TOWN.walkers.find(w => w.shown && w.mode === 'walk' && Math.hypot(w.pos.x - p.x, w.pos.z - p.z) < 3.2);
     if (w) {
       TOWN.greetT = 28 + Math.random() * 20;
-      const tod = h < 12 ? 'Morning.' : h < 17.5 ? 'Afternoon.' : 'Evening.';
+      const tod = h < 5 || h >= 21.5 ? 'Late to be out.' : h < 12 ? 'Morning.' : h < 17.5 ? 'Afternoon.' : 'Evening.';
       bark(w.name, pick([tod, tod, 'Good day to you.', 'Mind yourself.', 'Gods keep you.', ...(w.where === 'roa' && G.quest !== 'toRoa' ? ['Tutor.'] : ['Young master.'])]));
     }
   }
