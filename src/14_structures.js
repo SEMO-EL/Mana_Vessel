@@ -284,19 +284,23 @@ function buildStructures() {
   /* the bridge: where the road meets the river, laid along the road */
   const [bx, bz] = roadRiverCrossing();
   const [rdx, rdz] = roadDirAt(bx, bz);
-  const bridgeRot = yawAlong(rdx, rdz);
+  // The model is a hex tile whose deck runs corner to corner, 30° off its local +Z:
+  // turn it back by that much so the deck lies along the road, not across it.
+  const roadYaw = yawAlong(rdx, rdz), bridgeRot = roadYaw - Math.PI / 6, BS = 12;
   const bankY = Math.max(heightAt(bx - rdx * 11, bz - rdz * 11), heightAt(bx + rdx * 11, bz + rdz * 11));
-  const bridge = placeProp('building_bridge_A', bx, bz, { s: 11, rot: bridgeRot, y: bankY - 0.35, collide: false });
-  const deck = surfaceUnder(bridge, bx, bz, bankY + 20) ?? bankY;
-  // deck as a walkable slab, and railings so you don't step off the side
-  const bsz = propSize('building_bridge_A');
-  const halfLen = bsz.hz * 11, halfW = bsz.hx * 11;
-  addBox(bx, bz, halfW * 0.8, halfLen, -bridgeRot, deck - 3, deck, 'bridge');
-  for (const s of [-1, 1]) {
-    const px = bx + Math.cos(bridgeRot) * s * halfW * 0.92, pz = bz - Math.sin(bridgeRot) * s * halfW * 0.92;
-    addBox(px, pz, 0.2, halfLen * 0.85, -bridgeRot, deck, deck + 1.1, 'rail');
+  const bridge = placeProp('building_bridge_A', bx, bz, { s: BS, rot: bridgeRot, y: bankY - 0.35, collide: false });
+  // The deck arches: walk it as a run of short slabs that follow its real surface
+  // (each a small step up from the last), with a rail either side over the water.
+  const halfW = 1.5, sideX = Math.cos(roadYaw), sideZ = -Math.sin(roadYaw);
+  let deck = bankY, n = 0;
+  for (let s = -13; s <= 13.01; s += 0.35) {
+    const x = bx + rdx * s, z = bz + rdz * s, top = surfaceUnder(bridge, x, z, bankY + 20);
+    if (top == null) continue;
+    addBox(x, z, halfW, 0.22, -roadYaw, top - 2.5, top, 'bridge');
+    if (top > heightAt(x, z) + 0.6) for (const k of [-1, 1]) addBox(x + sideX * k * (halfW + 0.3), z + sideZ * k * (halfW + 0.3), 0.15, 0.22, -roadYaw, top, top + 1.0, 'rail');
+    deck = Math.max(deck, top); n++;
   }
-  STRUCT.bridge = { x: bx, z: bz, deck };
+  STRUCT.bridge = { x: bx, z: bz, deck, slabs: n };
 
   /* the watchtower on the ridge crest — climb it to see the region */
   let tx = -105, tz = 146, best = -1;

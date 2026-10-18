@@ -403,14 +403,43 @@ async function fastTravel(id) {
   await fadeIn(0.8);
   banner(W.name);
 }
+// Stand beside the stone on open ground, looking out at the most open view
+// (never nose to a wall), with room behind for the camera.
+const _wsO = new THREE.Vector3(), _wsD = new THREE.Vector3();
 function placeAtWaystone(W) {
+  let best = null, bestS = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * TAU, x = W.x + Math.sin(a) * 3.5, z = W.z + Math.cos(a) * 3.5, h = floorAt(x, z);
+    if (!GAME.inCave && waterAt(x, z) > NO_WATER) continue;
+    if (groundAt(x, z, h + 3, 0.6) > h + 0.3) continue;                       // something low stands here
+    _wsO.set(x, h, z); pushOut(_wsO, 0.7, h, 1.7);
+    if (Math.hypot(_wsO.x - x, _wsO.z - z) > 0.05) continue;                  // …or a wall
+    _wsO.set(x, h + 1.4, z);
+    const ahead = raycastWorld(_wsO, _wsD.set(Math.sin(a), 0, Math.cos(a)), 30);
+    const behind = raycastWorld(_wsO, _wsD.set(-Math.sin(a), 0.25, -Math.cos(a)).normalize(), 6);
+    const toPlace = Math.cos(a - Math.atan2(PLACES.village.x - W.x, PLACES.village.z - W.z));
+    const s = Math.min(ahead, 30) + Math.min(behind, 6) * 2 + toPlace * 3;
+    if (s > bestS) { bestS = s; best = { x, z, a }; }
+  }
+  if (!best) { const a = 0; best = { x: W.x + Math.sin(a) * 4, z: W.z + Math.cos(a) * 4, a }; }
+  placePlayerAt(best.x, floorAt(best.x, best.z), best.z, best.a);
+}
+function placePlayerAt(x, y, z, face) {
   horseStandDown();
-  const a = Math.atan2(PLACES.village.x - W.x, PLACES.village.z - W.z);
-  const x = W.x + Math.sin(a) * 4, z = W.z + Math.cos(a) * 4;
-  PL.body.pos.set(x, floorAt(x, z), z); PL.body.vel.set(0, 0, 0);
-  PL.face = a; CAM.yaw = a + Math.PI; CAM.pitch = -0.18; CAM.lockTarget = null;
+  PL.body.pos.set(x, y, z); PL.body.vel.set(0, 0, 0);
+  PL.face = face; CAM.yaw = face + Math.PI; CAM.pitch = -0.18; CAM.lockTarget = null;
   CAM.pivot.copy(PL.body.pos).setY(PL.body.pos.y + 1.55);
   setPlayerState('move'); PL.actor.loop('Idle', { fade: 0 });
+}
+// Where a save left you, if it's somewhere you can stand (else null: the last waystone instead)
+function savedSpot(s) {
+  const p = s.pos;
+  if (s.inCave || !Array.isArray(p) || p.length < 3 || !p.every(Number.isFinite)) return null;
+  const [x, y, z] = p;
+  if (x < WORLD.px0 || x > WORLD.px1 || z < WORLD.pz0 || z > WORLD.pz1) return null;
+  const w = waterAt(x, z), gy = groundAt(x, z, y + 0.6);         // a bridge deck or a floe counts as ground
+  if (w > NO_WATER && w - gy > PHYS.WADE) return null;
+  return { x, y: gy, z, face: Number.isFinite(s.face) ? s.face : 0 };
 }
 
 /* ───────────── death ───────────── */
@@ -619,7 +648,7 @@ function saveGame(quiet) {
   if (!G) return false;
   try {
     G.hour = TOD.hour;
-    G.pos = [PL.body.pos.x, PL.body.pos.y, PL.body.pos.z];
+    G.pos = [PL.body.pos.x, PL.body.pos.y, PL.body.pos.z]; G.face = PL.face;
     G.inCave = !!GAME.inCave;
     G.bossesDown = { warden: !!G.flags.warden, treant: !!G.flags.treant };
     if (typeof mapSerialize === 'function') mapSerialize();

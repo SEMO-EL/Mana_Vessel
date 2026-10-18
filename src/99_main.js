@@ -285,13 +285,28 @@ function selfTests() {
     const got = G.feats.includes('blood'), all = FEATS.every(f => typeof featHeld(f) === 'boolean');
     G.feats = f0; return silent && got && all ? FEATS.length : false;
   });
+  // the Buena bridge: walkable along the road; the village waystone: you rise looking at open ground
+  check('bridge', () => STRUCT.bridge.slabs > 40 && STRUCT.bridge.deck > heightAt(STRUCT.bridge.x, STRUCT.bridge.z) + 4 ? STRUCT.bridge.slabs : false);
+  check('waystoneView', () => {
+    const p0 = PL.body.pos.clone(), f0 = PL.face;
+    placeAtWaystone(WSTONE.list[0]);
+    const o = PL.body.pos.clone().setY(PL.body.pos.y + 1.4), clear = raycastWorld(o, new THREE.Vector3(Math.sin(PL.face), 0, Math.cos(PL.face)), 30);
+    PL.body.pos.copy(p0); PL.face = f0;
+    return clear > 12 ? Math.round(clear) : false;
+  });
+  check('resume', () => {
+    const B = STRUCT.bridge, s = savedSpot({ pos: [B.x, B.deck, B.z], face: 1.5 }), deep = savedSpot({ pos: [ISLAND.x + 30, 0, ISLAND.z], face: 0 });
+    return !!s && Math.abs(s.y - B.deck) < 0.3 && s.face === 1.5 && deep === null;
+  });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;
-    const C = CACHES.list[0], hp0 = G.maxHp, had = G.caches; G.caches = [];
+    // (its xp can level you up, which adds health of its own: count that in, then put everything back)
+    const snap = JSON.parse(JSON.stringify(G)), C = CACHES.list[0], hp0 = G.maxHp, l0 = G.lvl; G.caches = [];
     openCache(C); step(40);
     while (UI.dlg) advanceDialogue();
-    const ok = C.open === 1 && G.maxHp === hp0 + (C.boon.hp || 0) && cachesGot() === 1;
-    G.maxHp = hp0; G.hp = Math.min(G.hp, hp0); G.caches = had || []; resetCaches();
+    const ok = C.open === 1 && G.maxHp === hp0 + (C.boon.hp || 0) + 9 * (G.lvl - l0) && cachesGot() === 1;
+    for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
+    Object.assign(G, snap); resetCaches();
     return ok && C.open === 0 ? CACHES.list.length : false;
   });
   R.failures = fail; R.ok = fail.length === 0;

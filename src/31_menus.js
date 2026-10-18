@@ -153,10 +153,14 @@ function continueJourney() {
   const W = WSTONE.list.find(w => w.id === G.lastWaystone) || WSTONE.list[0];
   closeAllScreens();
   spawnPlayer(W.x + 4, W.z, 0);        // rebuilds the body for the saved race and hair
-  placeAtWaystone(W);
+  // back exactly where you saved (the last waystone only if that spot won't do: a cave, deep water)
+  const at = savedSpot(s);
+  if (at) placePlayerAt(at.x, at.y, at.z, at.face); else placeAtWaystone(W);
   PL.actor.root.visible = true;
   enterPlay();
-  banner(W.name, 'The journey continues');
+  let where = W.name;
+  if (at) { let bd = Infinity; for (const pl of Object.values(PLACES)) { const d = Math.hypot(pl.x - at.x, pl.z - at.z) - pl.r; if (d < bd) { bd = d; where = pl.name; } } }
+  banner(where, 'The journey continues');
 }
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
