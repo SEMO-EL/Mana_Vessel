@@ -16,6 +16,8 @@ const BOUNTIES = [
     text: 'Brigand lookouts on the road at the bend. They signal the camp when a wagon comes. Put out their eyes.' },
   { id: 'gardens', title: 'The Night Gardens', where: 'Roa Market Gardens — after dark', enc: 'jackalsGardens', xp: 60, night: true,
     text: 'Something digs up the gardens by night and takes the hens. Tracks like a dog\'s, but more of them. Wait for dark.' },
+  { id: 'boars', title: 'Boars in the Barley', where: 'The fields past the market gardens', enc: 'boarsFarms', xp: 75,
+    text: 'Two tuskers have been rooting through the south fields. Joss lost a fence and nearly a leg. Mind the charge.' },
   { id: 'pass', title: 'Wolves in the Pass', where: 'The hills north of the pass road', enc: 'passWolves', xp: 130, newEnc: true,
     text: 'A grey pack dens above the pass, and a big one leads it. The post\'s lost a horse. Next it\'ll be a rider.' },
   { id: 'scar', title: 'Old Scar', where: 'The downs south-east of the city', enc: 'oldScar', xp: 260, newEnc: true, named: true,
