@@ -71,6 +71,10 @@ const PLACES = {
   outskirts: { x: 1980, z: 120, r: 190, name: 'Roa Outskirts',        sub: 'The trade road north-east' },
   wagons:    { x: 1985, z: 158, r: 45,  name: 'Wagonbreak Camp' },
   firstWall: { x: 2096, z: -112, r: 60, name: 'The First Wall',       sub: 'Older than Roa' },
+  sunstones: { x: 1900, z: 570, r: 22,  name: 'The Sunstones',        sub: 'Nine stones, one altar' },
+  colossus:  { x: 1424, z: 20,  r: 26,  name: 'The Fallen Colossus',  sub: 'Whoever he was, he was tall' },
+  hermit:    { x: 2230, z: -60, r: 18,  name: 'Hermit\'s Rock' },
+  crag:      { x: 1180, z: 330, r: 14,  name: 'The Watcher\'s Crag' },
 };
 
 // Terrain sculpt features.

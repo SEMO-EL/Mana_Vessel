@@ -27,6 +27,23 @@ const WEATHER_STATES = {
 const DUST = { k: 0, storm: 0, stormT: 0, timer: 150, devils: [], devilT: 30 };
 const DUST_COL = new THREE.Color('#c9ad80'), DUST_STORM = new THREE.Color('#b0875a');
 
+// Lightning: in a heavy downpour the sky splits now and then — a white flicker
+// over everything, then the thunder, later the further away it struck.
+const STORM = { t: 12, flash: 0, flick: 0, lit: new THREE.Color('#dfe8ff') };
+function updateStorm(dt) {
+  const heavy = WEATHER.cur.rain > 0.7 && WEATHER.cur.cloud > 0.85 && !GAME.inCave;
+  STORM.flash = Math.max(0, STORM.flash - dt * 4.5);
+  if (STORM.flick > 0) { STORM.flick -= dt; if (STORM.flick <= 0) STORM.flash = Math.max(STORM.flash, 0.75); }
+  if (!heavy) { STORM.t = Math.max(STORM.t, 6); return; }
+  STORM.t -= dt;
+  if (STORM.t <= 0) {
+    STORM.t = rnd(9, 26);
+    STORM.flash = 1; if (Math.random() < 0.6) STORM.flick = rnd(0.08, 0.18);      // the second stroke
+    const far = rnd(0.4, 3.2);
+    setTimeout(() => BUS.emit('sfx', { id: 'thunder', far }), far * 1000);
+  }
+}
+
 const SUN = new THREE.DirectionalLight('#fff0d8', 2.6);
 SUN.castShadow = true;
 SUN.shadow.bias = -0.0005;
@@ -166,6 +183,12 @@ function updateSky(dt, focus, time) {
   WEATHER.wet = clamp(WEATHER.wet + (WEATHER.cur.rain > 0.3 ? dt / 20 : -dt / 90), 0, 1);
 
   const S = skyState();
+  updateStorm(dt);
+  if (STORM.flash > 0.001) {                     // the whole sky lit white for a heartbeat
+    const k = STORM.flash * STORM.flash;
+    S.zen.lerp(STORM.lit, k * 0.55); S.hor.lerp(STORM.lit, k * 0.7); S.fog.lerp(STORM.lit, k * 0.45);
+    S.hemiI += k * 2.2; S.sky.lerp(STORM.lit, k * 0.6);
+  }
 
   // dust over the badlands: the haze follows where you are, storms come and go
   const inDry = focus && focus.x > 900 && !GAME.inCave ? outskirtsW(focus.x, focus.z) : 0;

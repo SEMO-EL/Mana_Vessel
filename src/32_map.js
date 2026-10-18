@@ -59,6 +59,7 @@ const MAP_LABELS = {
   estate: { hide: true },                         farms: { dz: 72 },
   outskirts: { dx: 170, dz: 190, size: 'mid', spread: 0.3 },
   wagons: { dz: -36 },                            firstWall: { dz: -48 },
+  sunstones: { dz: -24 }, colossus: { dz: -26 }, hermit: { dz: -22 }, crag: { dz: -20 },
 };
 const MAP_LABEL_PX = { big: 15, mid: 12.5, small: 10.5 };   // screen px at 1× (grow with √zoom)
 

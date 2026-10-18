@@ -421,6 +421,13 @@ const AUDIO_SFX = {
     auNz(d, 0.5, 0.12, 200, 120, 'lowpass', 1);
     for (let i = 0; i < 6; i++) auNz(d, 0.025, 0.16, rnd(2000, 5000), 0, 'bandpass', 2.5, { at: rnd(0, 0.55), atk: 0.002 });
   },
+  // thunder: a crack (less of one far away), then the long roll
+  thunder: (d, e) => {
+    const far = (e && e.far) || 1, near = 1 - smooth(0.4, 3.2, far);
+    auNz(d, 0.3, 0.5 * near, 2600, 700, 'lowpass', 0.7, { atk: 0.003 });
+    auNz(d, 4.5 + far, 0.5, 260, 50, 'lowpass', 1, { atk: 0.12 + far * 0.05, at: 0.05 });
+    auNz(d, 3.2, 0.32, 140, 40, 'lowpass', 1, { atk: 0.5, at: 0.5 + far * 0.2 });
+  },
   gate: d => {                                                         // a great bar lifted, two doors swinging on old hinges
     auNz(d, 0.35, 0.3, 300, 120, 'lowpass', 1, { atk: 0.01 });                                   // the bar
     auTone(d, 'sawtooth', 92, 70, 1.6, 0.05, { lp: 500, atk: 0.3, at: 0.4, vib: [5, 6] });      // the creak, low
