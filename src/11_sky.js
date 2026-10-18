@@ -22,6 +22,11 @@ const WEATHER_STATES = {
   mist:     { cloud: 0.45, rain: 0, fog: 1 },
 };
 
+// Dust: the outskirts' own weather. A warm haze that thickens as you walk into
+// the badlands, and now and then a storm blowing through (rain lays it).
+const DUST = { k: 0, storm: 0, stormT: 0, timer: 150, devils: [], devilT: 30 };
+const DUST_COL = new THREE.Color('#c9ad80'), DUST_STORM = new THREE.Color('#b0875a');
+
 const SUN = new THREE.DirectionalLight('#fff0d8', 2.6);
 SUN.castShadow = true;
 SUN.shadow.bias = -0.0005;
@@ -162,6 +167,19 @@ function updateSky(dt, focus, time) {
 
   const S = skyState();
 
+  // dust over the badlands: the haze follows where you are, storms come and go
+  const inDry = focus && focus.x > 900 && !GAME.inCave ? outskirtsW(focus.x, focus.z) : 0;
+  DUST.timer -= dt;
+  if (DUST.timer <= 0) { DUST.stormT = Math.random() < 0.35 ? 1 : 0; DUST.timer = DUST.stormT ? rnd(70, 140) : rnd(150, 320); }
+  DUST.storm = damp(DUST.storm, DUST.stormT * (1 - WEATHER.cur.rain), 0.08, dt);
+  DUST.k = damp(DUST.k, inDry * (0.5 + 0.5 * DUST.storm) * (1 - WEATHER.cur.rain * 0.85), 0.6, dt);
+  if (DUST.k > 0.001) {
+    _c1.copy(DUST_COL).lerp(DUST_STORM, DUST.storm).multiplyScalar(lerp(1, 0.22, S.night));
+    S.fog.lerp(_c1, DUST.k * 0.55);
+    S.hor.lerp(_c1, DUST.k * 0.4);
+    S.zen.lerp(_c1, DUST.k * DUST.storm * 0.45);                   // a storm browns the whole sky
+  }
+
   skyMat.uniforms.uZen.value.copy(S.zen);
   skyMat.uniforms.uHor.value.copy(S.hor);
   skyMat.uniforms.uGnd.value.copy(S.gnd);
@@ -178,7 +196,7 @@ function updateSky(dt, focus, time) {
   WFOG.wfColor.value.copy(S.fog);
   WFOG.wfSunColor.value.copy(S.sun).lerp(S.fog, S.night * 0.8);
   WFOG.wfSunDir.value.copy(S.night > 0.5 ? S.moonDir : S.sunDir);
-  const dens = 0.0021 + WEATHER.cur.fog * 0.009 + WEATHER.cur.rain * 0.003 + S.night * 0.0008;
+  const dens = 0.0021 + WEATHER.cur.fog * 0.009 + WEATHER.cur.rain * 0.003 + S.night * 0.0008 + DUST.k * (0.0022 + DUST.storm * 0.0065);
   WFOG.wfParams.value.set(dens, 0.011 - WEATHER.cur.fog * 0.004, 12, 0.85 * (1 - WEATHER.cur.cloud * 0.6));
   WFOG.wfMisc.value.y = time;
   WFOG.wfMisc.value.w = WEATHER.wet;

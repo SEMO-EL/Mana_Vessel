@@ -7,7 +7,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const VFX = { pools: {}, rings: [], lights: [], lightReq: [], circles: [], pickups: [] };
 
-function makeParticlePool(N, blending) {
+function makeParticlePool(N, blending, alphaK = 0.75, nearFade = 0) {
   const g = new THREE.BufferGeometry();
   const mk = (n) => new THREE.BufferAttribute(new Float32Array(N * n), n).setUsage(THREE.DynamicDrawUsage);
   g.setAttribute('position', mk(3));     // birth position
@@ -35,6 +35,9 @@ function makeParticlePool(N, blending) {
         gl_PointSize = mix(aT.z, aT.w, k) * uScale / max(-mv.z, 0.1);
         vCol = aCol;
         vA = (1.0 - k) * smoothstep(0.0, 0.08, k + 0.02);
+        #ifdef NEAR_FADE
+        vA *= smoothstep(1.5, NEAR_FADE, -mv.z);       // big soft puffs thin out before they fill the lens
+        #endif
       }`,
     fragmentShader: /* glsl */`
       varying vec3 vCol; varying float vA;
@@ -48,9 +51,10 @@ function makeParticlePool(N, blending) {
     transparent: true, depthWrite: false, blending,
   });
   if (blending === THREE.NormalBlending) {
-    m.fragmentShader = m.fragmentShader.replace('gl_FragColor = vec4(vCol * a, a);', 'gl_FragColor = vec4(vCol, a * 0.75);');
+    m.fragmentShader = m.fragmentShader.replace('gl_FragColor = vec4(vCol * a, a);', `gl_FragColor = vec4(vCol, a * ${alphaK.toFixed(3)});`);
     m.blending = THREE.CustomBlending; m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor;
   }
+  if (nearFade) m.defines = { NEAR_FADE: nearFade.toFixed(1) };
   const pts = new THREE.Points(g, m);
   pts.frustumCulled = false;
   pts.renderOrder = 5;
@@ -248,9 +252,50 @@ const _tv = new THREE.Vector3();
 function initVFX() {
   VFX.pools.add = makeParticlePool(9000, THREE.AdditiveBlending);
   VFX.pools.soft = makeParticlePool(4000, THREE.NormalBlending);
+  VFX.pools.haze = makeParticlePool(2500, THREE.NormalBlending, 0.2, 12);      // dust: big, faint, many
   VFX.time = 0;
   initLightPool();
   buildRain();
+}
+
+/* Dust blowing past (runs at the ambient 12 Hz): faint puffs drifting on the
+   wind, a few grains low to the ground, and now and then a dust devil out on
+   the flats, turning as it wanders. */
+const _dv = new THREE.Vector3();
+function dustAround(cp) {
+  const k = DUST.k, st = DUST.storm, night = SKY_NOW.night;
+  const wind = 3 + st * 9, wx = -wind * 0.92, wz = wind * 0.38;          // out of the east-north-east
+  const col = night > 0.5 ? '#4a4038' : '#cdb38a';
+  const puffs = Math.round(k * (1.5 + st * 6));
+  for (let i = 0; i < puffs; i++) {
+    const a = Math.random() * TAU, d = rnd(10, 42), x = cp.x + Math.cos(a) * d - wx * 1.2, z = cp.z + Math.sin(a) * d - wz * 1.2;
+    _dv.set(x, heightAt(x, z) + rnd(0.3, 3.5 + st * 4), z);
+    emit(1, { pool: 'haze', pos: _dv, vel: { x: wx, y: 0.2, z: wz }, velSpread: 0.8, drag: 0.05, col, life: 4.5, size: 3 + st * 3, size2: 6 + st * 5 });
+  }
+  if (Math.random() < k * (0.5 + st)) {
+    const x = cp.x + rnd(-12, 12), z = cp.z + rnd(-12, 12);
+    _dv.set(x, heightAt(x, z) + rnd(0.1, 1.2), z);
+    emit(3, { pool: 'soft', pos: _dv, spread: 1.5, vel: { x: wx * 1.4, y: 0.4, z: wz * 1.4 }, velSpread: 1.2, drag: 0.2, col: col, life: 1.4, size: 0.06, size2: 0.04 });
+  }
+  // dust devils: by day, out on the flats, one at a time
+  DUST.devilT -= 0.08;
+  if (DUST.devilT <= 0 && night < 0.3 && WEATHER.cur.rain < 0.2 && DUST.devils.length < 1) {
+    DUST.devilT = rnd(25, 60);
+    const a = Math.random() * TAU, d = rnd(45, 120), x = cp.x + Math.cos(a) * d, z = cp.z + Math.sin(a) * d;
+    if (outskirtsW(x, z) > 0.6) DUST.devils.push({ x, z, t: 0, life: rnd(10, 16), vx: rnd(-2, 2), vz: rnd(-2, 2), spin: Math.random() * TAU });
+  }
+  for (let i = DUST.devils.length - 1; i >= 0; i--) {
+    const D = DUST.devils[i];
+    D.t += 0.08; D.x += D.vx * 0.08; D.z += D.vz * 0.08; D.spin += 0.08 * 9;
+    const grow = smooth(0, 2, D.t) * (1 - smooth(D.life - 2.5, D.life, D.t));
+    const gy = heightAt(D.x, D.z);
+    for (let j = 0; j < 4; j++) {
+      const h = Math.random() * 14 * grow, r = 0.6 + h * 0.28, a = D.spin + j * 1.57 + h * 0.5;
+      _dv.set(D.x + Math.cos(a) * r, gy + h, D.z + Math.sin(a) * r);
+      emit(1, { pool: 'haze', pos: _dv, vel: { x: -Math.sin(a) * 6 + D.vx, y: 2.5 + h * 0.1, z: Math.cos(a) * 6 + D.vz }, velSpread: 0.6, drag: 0.6, col: '#c4a77c', life: 1.6, size: 1.6 + h * 0.18, size2: 3 + h * 0.3 });
+    }
+    if (D.t > D.life) DUST.devils.splice(i, 1);
+  }
 }
 
 let _ambT = 0;
@@ -284,6 +329,7 @@ function updateVFX(dt) {
       const x = cp.x + rnd(-30, 30), z = cp.z + rnd(-30, 30);
       emit(1, { pos: new THREE.Vector3(x, heightAt(x, z) + rnd(0.4, 2.2), z), col: '#d8ff7a', velSpread: 0.4, drag: 0.5, life: 4, size: 0.1, size2: 0.1, bright: 2.2 });
     }
+    if (DUST.k > 0.05) dustAround(cp);
     const fx = PLACES.falls.x, fz = PLACES.falls.z + 14;
     if (Math.hypot(cp.x - fx, cp.z - fz) < 260) {
       emit(3, { pool: 'soft', pos: new THREE.Vector3(fx - 6, 44, fz), spread: 5, vel: { x: 0, y: 1.2, z: 2 }, velSpread: 1.5, col: '#e8f0f4', life: 2.8, size: 2.2, size2: 5, drag: 0.4 });

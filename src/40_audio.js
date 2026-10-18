@@ -772,7 +772,7 @@ function auAmbience(dt, tick) {
     river = 1 - smooth(4, 60, riverDistAt(cp.x, cp.z));
     falls = 1 - smooth(20, 180, Math.hypot(cp.x - PLACES.falls.x, cp.z - PLACES.falls.z));
   }
-  B.wind.tgt = out * (0.035 + cloud * 0.045 + rain * 0.02 + alt * 0.1) * gust;
+  B.wind.tgt = out * (0.035 + cloud * 0.045 + rain * 0.02 + alt * 0.1 + DUST.k * (0.05 + DUST.storm * 0.09)) * gust;
   B.river.tgt = Math.max(river * 0.11, falls * 0.26);                   // the falls: louder, and lower (below)
   B.rain.tgt = out * rain * 0.13;
   B.crickets.tgt = out * smooth(0.5, 0.8, night) * (1 - smooth(0.2, 0.5, rain)) * 0.014;
