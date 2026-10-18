@@ -106,15 +106,15 @@ function spawnHorse(x, z, heading) {
   HORSE.body.pos.set(x, floorAt(x, z), z); HORSE.body.vel.set(0, 0, 0);
   HORSE.heading = heading; HORSE.speed = 0; HORSE.obj.visible = true;
   HORSE.obj.position.copy(HORSE.body.pos); HORSE.obj.rotation.y = heading;
-  HORSE.mode = 'idle'; HORSE.farT = 0;
+  HORSE.mode = 'idle'; HORSE.farT = 0; HORSE.leaving = false; HORSE.homeIn = false;
 }
 // the whistle: she comes from behind you, out of sight, at a canter
 function whistleHorse() {
-  if (!horseUnlocked()) { hint('You have no horse yet. The Boreas stables might lend you one.', 3); return; }
+  if (!horseUnlocked()) { hint('You have no horse yet. Lord Sauros keeps horses at the Boreas stables, on the estate terrace.', 3.5); return; }
   if (GAME.inCave) { hint('She won\'t come underground.', 3); return; }
   BUS.emit('sfx', { id: 'whistle' });
   const p = PL.body.pos;
-  if (HORSE.mode !== 'gone' && HORSE.body.pos.distanceTo(p) < 70) { HORSE.mode = 'come'; HORSE.stuckT = 0; HORSE.lastD = 1e9; return; }
+  if (HORSE.mode !== 'gone' && HORSE.body.pos.distanceTo(p) < 70) { HORSE.leaving = HORSE.mode === 'stall'; HORSE.mode = 'come'; HORSE.stuckT = 0; HORSE.lastD = 1e9; return; }
   // pick a spot behind the camera, on dry walkable ground
   const back = CAM.yaw, bx = Math.sin(back), bz = Math.cos(back);
   let sx = p.x + bx * 26, sz = p.z + bz * 26;
@@ -165,7 +165,7 @@ function horseStandDown() {
 BUS.on('quest', id => {
   if (id === 'bandits' && G && !G.flags.horse) {
     G.flags.horse = true;
-    later(5, () => { toast('Lord Sauros lends you ' + HORSE_NAME + ', a bay mare from the estate', 'big'); later(0.8, () => hint(IN.label('horse') + ' to whistle for her', 5)); });
+    later(5, () => { toast('Lord Sauros lends you ' + HORSE_NAME + ', a bay mare from the estate stables', 'big'); later(0.8, () => hint(IN.label('horse') + ' to whistle for her — or fetch her from the stables on the terrace', 5)); });
   }
 });
 function horseThrow() { if (PL.state === 'ride') { dismountHorse(true); toast('Thrown from the saddle', 'bad'); } }
@@ -212,13 +212,18 @@ function poseRider(dt) {
 }
 
 function updateHorse(dt) {
+  // not out with you, and you're near the estate: she's in her stall
+  if (HORSE.mode === 'gone' && typeof stableWants === 'function' && stableWants()) { spawnHorse(STABLE.stall.x, STABLE.stall.z, 0); HORSE.mode = 'stall'; }
   if (HORSE.mode === 'gone' || !HORSE.rig) return;
   const hb = HORSE.body, p = PL.body.pos;
   if (GAME.inCave) { HORSE.obj.visible = false; return; }
   HORSE.obj.visible = true;
   if (HORSE.mode === 'come') {
-    const dx = p.x - hb.pos.x, dz = p.z - hb.pos.z, d = Math.hypot(dx, dz);
-    if (d < 2.6) { HORSE.mode = 'idle'; HORSE.speed = 0; }
+    // out of a stall: straight out of its front first, then over to you
+    if (HORSE.leaving && Math.hypot(hb.pos.x - STABLE.stall.x, hb.pos.z - (STABLE.stall.z + 6)) < 1.5) HORSE.leaving = false;
+    const tx = HORSE.leaving ? STABLE.stall.x : p.x, tz = HORSE.leaving ? STABLE.stall.z + 6 : p.z;
+    const dx = tx - hb.pos.x, dz = tz - hb.pos.z, d = Math.hypot(dx, dz);
+    if (!HORSE.leaving && d < 2.6) { HORSE.mode = 'idle'; HORSE.speed = 0; }
     else {
       HORSE.heading = dampAngle(HORSE.heading, Math.atan2(dx, dz), 4, dt);
       HORSE.speed = damp(HORSE.speed, d > 12 ? HORSE.CANTER : 3, 2.5, dt);
@@ -226,6 +231,21 @@ function updateHorse(dt) {
       HORSE.stuckT = d < HORSE.lastD - 0.02 ? 0 : HORSE.stuckT + dt; HORSE.lastD = d;
       if (HORSE.stuckT > 2.5) { const a = CAM.yaw; spawnHorse(p.x + Math.sin(a) * 8, p.z + Math.cos(a) * 8, a + Math.PI); HORSE.mode = 'come'; HORSE.stuckT = 0; HORSE.lastD = 1e9; }
     }
+  } else if (HORSE.mode === 'home') {
+    // led back: round to the front of the stable first, then into the middle stall
+    const S = STABLE.stall, front = !HORSE.homeIn, tx = S.x, tz = front ? S.z + 7 : S.z;
+    const dx = tx - hb.pos.x, dz = tz - hb.pos.z, d = Math.hypot(dx, dz);
+    if (d < (front ? 1.5 : 0.6)) { if (front) { HORSE.homeIn = true; HORSE.lastD = 1e9; } else { HORSE.mode = 'stall'; HORSE.speed = 0; HORSE.homeIn = false; } }
+    else {
+      HORSE.heading = dampAngle(HORSE.heading, Math.atan2(dx, dz), 4, dt);
+      HORSE.speed = damp(HORSE.speed, d > 5 ? 3.2 : 1.3, 2.5, dt);
+      HORSE.stuckT = d < HORSE.lastD - 0.02 ? 0 : HORSE.stuckT + dt; HORSE.lastD = d;
+      if (HORSE.stuckT > 3) { spawnHorse(S.x, S.z, 0); HORSE.mode = 'stall'; HORSE.homeIn = false; }
+    }
+  } else if (HORSE.mode === 'stall') {
+    // turns round to look out over the door; out of sight and mind once you've gone
+    HORSE.speed = 0; HORSE.heading = dampAngle(HORSE.heading, 0, 1.5, dt);
+    if (hb.pos.distanceTo(p) > 130) { HORSE.mode = 'gone'; HORSE.obj.visible = false; return; }
   } else if (HORSE.mode === 'idle') {
     HORSE.speed = damp(HORSE.speed, 0, 3, dt);
     // left far behind long enough, she goes home

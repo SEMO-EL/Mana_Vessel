@@ -114,6 +114,9 @@ function buildRoaPeople() {
   new NPC('eris', ERIS_SPEC, F.x, F.z, { name: 'Eris', face: Math.PI * 0.95, idle: 'Idle', talk: talkEris });
   new NPC('ghislaine', GHIS_SPEC, S.yard.x, S.yard.z + 3, { name: 'Ghislaine', face: Math.PI, idle: '2H_Melee_Idle', talk: talkGhis });
   const gd = S.guildDoor;
+  const sd = STABLE.door;
+  new NPC('stable', { base: 'Barbarian', recolor: { barbarian: { 1: '#8a7a6a', 6: '#5a4a32' } }, hide: ['Barbarian_Hat'] }, sd.x, sd.z,
+    { name: 'Old Bertram, Stablemaster', face: -2.4, idle: 'Idle', talk: talkStable });
   new NPC('clerk', { base: 'Rogue', recolor: { rogue: { 1: '#6a3a2a', 8: '#3a4a6a', 21: '#3a4a6a', 6: '#e6dcc8' } } }, gd.x, gd.z,
     { name: 'Guild Clerk', face: Math.atan2(S.plaza.x - gd.x, S.plaza.z - gd.z), idle: 'Idle', talk: talkClerk });
   new NPC('sauros', { base: 'Knight', show: ['Knight_Cape'], hide: ['Knight_Helmet'], recolor: { knight: { 1: '#ece6dc', 8: '#7a1f2b', 9: '#5a1620' } } },

@@ -199,7 +199,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -264,6 +264,20 @@ function selfTests() {
     }
     horseStandDown();
     return res.every(Boolean);
+  });
+  // the Boreas stables: Kestrel waits in her stall, Bertram leads her out, sends her home
+  check('stable', () => {
+    if (!STABLE.built || !NPCS.stable) return false;
+    G.flags.horse = true; horseStandDown();
+    const p0 = PL.body.pos.clone(), sx = STABLE.x, sz = STABLE.z + 12;
+    PL.body.pos.set(sx, heightAt(sx, sz), sz); step(3);
+    const inStall = HORSE.mode === 'stall';
+    leadOutHorse(); step(150);
+    const out = HORSE.mode === 'idle' && HORSE.body.pos.z > STABLE.z + 3;
+    sendHorseHome(); step(420);
+    const back = HORSE.mode === 'stall' && HORSE.body.pos.distanceTo(STABLE.stall) < 1.2;
+    PL.body.pos.copy(p0); horseStandDown(); step(2);
+    return inStall && out && back;
   });
   check('walkers', () => { const w = TOWN.walkers[0], x0 = w.pos.x, z0 = w.pos.z; w.update(1, true, w.pos.clone().setY(w.pos.y + 5)); for (let i = 0; i < 30; i++) w.update(1 / 15, true, w.pos.clone().setY(w.pos.y + 5)); return Math.hypot(w.pos.x - x0, w.pos.z - z0) > 0.5 || w.mode === 'pause'; });
   check('event', () => {

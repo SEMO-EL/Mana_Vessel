@@ -132,6 +132,7 @@ function buildRoa() {
 
   buildWagonCamp(R);
   buildFirstWall(R);
+  buildStable();                          // before the lawn's trees, so they grow round it
   buildRoaGreenery();
 }
 

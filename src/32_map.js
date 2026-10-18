@@ -948,7 +948,7 @@ function mapDrawMarkers(ctx, f, t) {
     if (inside(X, Y, 14 * k)) mapText(ctx, '!', X, Y, `900 ${26 * k * (1 + Math.sin(t * 5) * 0.08)}px Cinzel, Georgia, serif`, 0, MAP_COL.blood, MAP_COL.halo, 4 * k);
   }
   // Kestrel, waiting where you left her: a horseshoe
-  if (typeof HORSE !== 'undefined' && (HORSE.mode === 'idle' || HORSE.mode === 'come') && HORSE.body) {
+  if (typeof HORSE !== 'undefined' && (HORSE.mode === 'idle' || HORSE.mode === 'come' || HORSE.mode === 'stall' || HORSE.mode === 'home') && HORSE.body) {
     const X = f.ox + HORSE.body.pos.x * f.s, Y = f.oy + HORSE.body.pos.z * f.s, r = 6 * k;
     if (inside(X, Y, 10 * k)) {
       ctx.beginPath(); ctx.arc(X, Y, r, Math.PI * 0.15, Math.PI * 0.85, true);
