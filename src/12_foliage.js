@@ -235,7 +235,9 @@ function treeMaterial() {
       .replace('#include <common>', '#include <common>\nuniform float uTime;')
       .replace('#include <begin_vertex>', /* glsl */`#include <begin_vertex>
         { vec4 ip = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-          float sway = max(transformed.y - 1.5, 0.0) * 0.012;
+          float gust = smoothstep(0.55, 1.0, sin(ip.x * 0.021 + ip.z * 0.013 - uTime * 0.85) * 0.5 + 0.5) * smoothstep(-0.2, 0.6, sin(ip.x * 0.007 - ip.z * 0.009 + uTime * 0.13));
+          float sway = max(transformed.y - 1.5, 0.0) * 0.012 * (1.0 + gust * 1.6);   // the same gusts that roll through the grass
+          transformed.x += gust * max(transformed.y - 1.5, 0.0) * 0.018;
           transformed.x += sin(uTime * 1.3 + ip.x * 0.17 + ip.z * 0.11) * sway;
           transformed.z += cos(uTime * 1.1 + ip.z * 0.13) * sway * 0.6; }`);
   };
