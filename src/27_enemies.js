@@ -598,7 +598,7 @@ function updateEnemies(dt) {
 // heavier things move less. The player counts as weight 1.
 function separateBodies() {
   const list = ENT.enemies.filter(e => !e.dead && e.state !== 'dormant');
-  const all = [...(PL.state !== 'dead' ? [{ body: PL.body, w: 1 }] : []), ...allyBodies().map(body => ({ body, w: 1 })), ...list.map(e => ({ body: e.body, w: e.def.weight || 1 }))];
+  const all = [...(PL.state !== 'dead' ? [{ body: PL.body, w: 1 }] : []), ...allyBodies().map(body => ({ body, w: 1 })), ...townBodies().map(body => ({ body, w: 0.5 })), ...list.map(e => ({ body: e.body, w: e.def.weight || 1 }))];
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
     const a = all[i].body, b = all[j].body;
     if (Math.abs(a.pos.y - b.pos.y) > 1.6) continue;
