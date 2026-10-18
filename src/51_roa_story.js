@@ -282,6 +282,8 @@ async function birthdayScene() {
   $('hud').classList.add('off');
   await fadeOut(1.0);
   TOD.hour = 20.4;
+  // the streets empty for the evening (it's night now; nobody wanders through the party)
+  for (const w of TOWN.walkers) { w.shown = false; w.actor.root.visible = false; }
   // a clear night: the sky is the whole point of what comes next
   Object.assign(WEATHER.cur, WEATHER_STATES.clear); Object.assign(WEATHER.tgt, WEATHER_STATES.clear); WEATHER.timer = 1e9;
   if (ALLY.eris) ALLY.eris.leave();
