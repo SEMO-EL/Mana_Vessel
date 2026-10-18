@@ -206,7 +206,7 @@ function buildTownsfolk() {
 }
 function updateTownsfolk(dt) {
   if (!TOWN.walkers.length || GAME.inCave) return;
-  const h = TOD.hour, day = h > 6.3 && h < 21.2, cam = camera.position;
+  const h = TOD.hour, day = h > 6.3 && h < 20.0, cam = camera.position;
   for (const w of TOWN.walkers) w.update(dt, day, cam);
   // a passing word now and then, never mid-fight or mid-talk
   TOWN.greetT -= dt;
