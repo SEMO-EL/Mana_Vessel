@@ -765,6 +765,7 @@ function mapServices() {
   at(NPCS.clerk && NPCS.clerk.pos, 'Adventurer Guild · bounties');
   if (typeof BOARDS !== 'undefined') at(BOARDS.buena, 'Village notices');
   at(NPCS.gerd && NPCS.gerd.pos, "Hunter Gerd's camp");
+  if (G && G.flags.mud !== 'done') at(NPCS.wenna && NPCS.wenna.pos, 'Magister Wenna');
   return out;
 }
 function mapDrawServices(ctx, f) {
