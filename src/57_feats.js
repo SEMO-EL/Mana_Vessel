@@ -21,9 +21,15 @@ const FEATS = [
   { id: 'board',     name: 'Clean Board',        desc: 'Claim every bounty: the Guild\'s board and Buena\'s.',      test: () => !!G.bounties && BOUNTIES.every(b => G.bounties[b.id] === 'paid') },
   { id: 'scholar',   name: 'The Old Tongue',     desc: 'Read the old stones for Roa\'s scribe.',      test: () => G.flags.scribe === 'done' },
   { id: 'errands',   name: 'Good Neighbour',     desc: 'See all four errands through (Gerard, Lilia, Gerd, Hilde).', test: () => ['flock', 'moon', 'ashback', 'caravan'].every(k => G.flags[k] === 'done') },
+  { id: 'bestiary',  name: 'Bestiary',           desc: 'Fell one of every beast of the wilds: wolf, jackal, boar, bear, scorpion, wisp.', test: () => bestiaryGot() === BESTIARY.length },
+  { id: 'mud',       name: 'Mudslinger',         desc: 'Learn Quagmire from Magister Wenna.',          test: () => !!G.flags.spell_quagmire },
   { id: 'rider',     name: 'Horselord',          desc: 'Ride Kestrel for five kilometres.',           test: () => (G.flags.rideM || 0) >= 5000 },
   { id: 'chapter2',  name: 'The Boreas Girl',    desc: 'See Chapter II through.',                     test: () => G.quest === 'done' },
 ];
+// the wilds' beasts, one of each, for the bestiary (kill counts kept by kind)
+const BESTIARY = [['wolf', 'Wolf'], ['jackal', 'Dust Jackal'], ['boar', 'Tusked Boar'], ['bear', 'Forest Bear'], ['scorpion', 'Sand Scorpion'], ['wisp', 'Marsh Wisp']];
+BUS.on('enemyKilled', e => { if (!G) return; const kc = G.flags.kc || (G.flags.kc = {}); kc[e.key] = (kc[e.key] || 0) + 1; });
+const bestiaryGot = () => BESTIARY.filter(([k]) => G.flags.kc && G.flags.kc[k]).length;
 const FEATS_T = { t: 1 };
 BUS.on('parry', () => { if (G) G.flags.parries = (G.flags.parries || 0) + 1; });
 

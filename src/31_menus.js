@@ -293,6 +293,7 @@ function openJournal() {
   const down = JOURNAL_FOES.filter(([k]) => G.flags[k]);
   html += '<h4>Great foes felled</h4>';
   html += down.length ? down.map(([, n]) => row(n, '✓')).join('') : '<p class="flavor">None yet.</p>';
+  if (typeof BESTIARY !== 'undefined') html += row('Bestiary', bestiaryGot() + ' / ' + BESTIARY.length + (bestiaryGot() ? ' · ' + BESTIARY.filter(([k]) => G.flags.kc && G.flags.kc[k]).map(([k, n]) => n + ' ×' + G.flags.kc[k]).join(', ') : ''));
   html += row('Kills', G.kills) + row('Times the vessel broke', G.breaks) + row('Deaths', G.deaths) + row('Silver', G.coin || 0);
   // feats: the ones still ahead are listed too, dimmed
   const fr = typeof featRows === 'function' ? featRows() : [];
