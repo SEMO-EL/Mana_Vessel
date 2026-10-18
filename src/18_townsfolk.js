@@ -90,7 +90,12 @@ function townLines(where) {
       : [G && G.flags.gateOpen ? "The pass gate's open again. Roa's three hours' walk, if your legs are young." : "The gate to Roa's barred, last I heard. Something about bandits."])];
   if (where === 'buena') {
     const L = ['Fine weather for the harvest.', 'Mind the cart ruts, they\'ll turn your ankle.', 'Your father was up before dawn swinging that sword again.',
-      'Lady Zenith brought soup round when my Henri was ill. A saint, that woman.', 'Wolves on the forest road. Don\'t go alone.'];
+      'Lady Zenith brought soup round when my Henri was ill. A saint, that woman.', 'Wolves on the forest road. Don\'t go alone.',
+      'Gerard\'s lost three sheep in the storm. Go and ask him — he\'s by the well, wringing his hat.',
+      'The Elders have pinned notices up by the waystone. Wolves, bears, brigands. They pay, if you come back alive.',
+      'Hunter Gerd\'s camped at the forest\'s edge, east of the ridge. Talks about nothing but some grey bear. Says it took his brother\'s arm.',
+      'Your Lilia was asking after moonpetals. Pale flowers, open only at night, out in the meadows. Don\'t ask me what for.',
+      'There are bears in the north woods now, past the old chapel road. Big ones. The woodcutters won\'t go.'];
     if (q === 'road' || q === 'done' || ROA_STEPS.includes(q)) L.push('Off to Roa, are you? Bring back something nice.', 'Roa! Big place. Bigger than Buena, anyway.');
     return L;
   }

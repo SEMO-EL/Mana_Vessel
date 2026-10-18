@@ -142,4 +142,11 @@ const ROA_RUMOURS = [
   'There\'s a crag over the pass road the hawks sit on. Nothing up there but sky and whatever the hawks leave. And, my cousin says, a blue light.',
   'They say the old golem guarded something, out at the First Wall. Whatever it was, it\'s still there. Golems don\'t take things with them.',
   'Saw a blue glint behind the windmill in the gardens, coming home late. Probably the miller\'s lamp. Probably.',
+  // where the work and the help are (so you hear of them without a quest to send you)
+  'Hilde by the fountain\'s lost a whole caravan to the brigands. She\'d pay well to see her strongbox again, I\'d wager.',
+  'There\'s an old Guild magister who sits by the Guild door, Wenna. Teaches the odd thing to mages she thinks are worth it. Most aren\'t, she says.',
+  'Marga at the Red Hearth rents rooms for ten silver. Clean sheets, too, which is more than the last inn could say.',
+  'Old Bertram keeps the Boreas horses in the stable on the terrace. If you\'re the Lady\'s tutor, you\'ll want one. Everyone else walks.',
+  'Lights on the Sunstones after dark, my brother says — not the stones themselves, little ones, drifting. He went home quick.',
+  'Scorpions in the outskirts gullies big as dogs. Don\'t let the tail come over. If the tail comes over, run.',
 ];
