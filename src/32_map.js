@@ -932,9 +932,18 @@ function mapDrawMarkers(ctx, f, t) {
     ctx.lineWidth = 1.2 * k; ctx.strokeStyle = got ? 'rgba(42,33,22,.55)' : MAP_COL.ink; ctx.stroke();
     if (!got) { ctx.fillStyle = MAP_COL.mana; ctx.fill(); }
   }
-  // hidden chests you've opened: a small inked box (a record, never a hint)
-  if (G && G.caches && typeof CACHES !== 'undefined') for (const C of CACHES.list) {
-    if (!G.caches.includes(C.id)) continue;
+  // hidden chests you've opened: a small inked box (a record, never a hint — unless you bought the smuggler's chart:
+  // then the ones still shut are crossed in red)
+  if (G && typeof CACHES !== 'undefined') for (const C of CACHES.list) {
+    const opened = !!G.caches && G.caches.includes(C.id);
+    if (!opened && !(G.gear && G.gear.chart)) continue;
+    if (!opened) {
+      const X = f.ox + C.x * f.s, Y = f.oy + C.z * f.s, r = 5.5 * k;
+      if (!inside(X, Y, 10 * k)) continue;
+      ctx.beginPath(); ctx.moveTo(X - r, Y - r); ctx.lineTo(X + r, Y + r); ctx.moveTo(X + r, Y - r); ctx.lineTo(X - r, Y + r);
+      ctx.lineCap = 'round'; ctx.lineWidth = 3.2 * k; ctx.strokeStyle = MAP_COL.halo; ctx.stroke(); ctx.lineWidth = 1.8 * k; ctx.strokeStyle = MAP_COL.blood; ctx.stroke();
+      continue;
+    }
     const X = f.ox + C.x * f.s, Y = f.oy + C.z * f.s, w = 6 * k, h = 4.3 * k;
     if (!inside(X, Y, 10 * k)) continue;
     ctx.beginPath(); ctx.rect(X - w, Y - h * 0.4, w * 2, h * 1.4);

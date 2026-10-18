@@ -83,6 +83,7 @@ async function boot() {
   buildBountyBoard();
   buildCrystals(); lap('buildCrystals');
   buildSideQuests(); lap('buildSideQuests');
+  buildMarket();
   buildPages(); lap('buildPages');
   buildCaches(); lap('buildCaches');
   batchStaticProps(); lap('batchStaticProps');
@@ -323,6 +324,18 @@ function selfTests() {
   check('resume', () => {
     const B = STRUCT.bridge, s = savedSpot({ pos: [B.x, B.deck, B.z], face: 1.5 }), deep = savedSpot({ pos: [ISLAND.x + 30, 0, ISLAND.z], face: 0 });
     return !!s && Math.abs(s.y - B.deck) < 0.3 && s.face === 1.5 && deep === null;
+  });
+  // the market: buy (and be refused), a sharper sword, a draught drunk
+  check('market', () => {
+    const snap = JSON.parse(JSON.stringify(G));
+    G.coin = 200; G.draughts = 0; G.gear = {};
+    const bought = buyWare('draught') && buyWare('edge') && G.coin === 50 && G.draughts === 1 && swordGearMul() > 1.1 && !buyWare('blade');
+    G.hp = Math.round(G.maxHp * 0.3); const hp0 = G.hp;
+    setPlayerState('move'); const began = startDrink(); step(40);
+    const drank = began && G.hp > hp0 && G.draughts === 0 && PL.state === 'move';
+    for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
+    Object.assign(G, snap);
+    return bought && drank;
   });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;

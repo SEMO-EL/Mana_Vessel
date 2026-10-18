@@ -27,7 +27,7 @@ function playerSwingHits(move) {
     const ang = Math.acos(clamp((dx * fx + dz * fz) / Math.max(d, 1e-4), -1, 1));
     if (d > e.r + 0.4 && ang > move.arc) continue;
     PL.attackHits.add(e);
-    const base = 16 * S.dmg * R.sword * (1 + G.lvl * 0.12) * move.dmg;
+    const base = 16 * S.dmg * R.sword * (1 + G.lvl * 0.12) * move.dmg * swordGearMul();
     const crit = e.staggerT > 0 || e.riposte;
     _hv.set(dx, 0, dz).normalize();
     damageEnemy(e, base * (crit ? 2.2 : 1), {

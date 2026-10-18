@@ -95,7 +95,7 @@ function castPlayerSpell(sp, incanted) {
   const cost = Math.round(sp.cost * (incanted ? CHANT.incantCost : CHANT.chantlessCost));
   const spent = Math.min(cost, G.mana);
   const eff = cost > 0 ? spent / cost : 1;         // an empty vessel still gives what it has
-  const power = (incanted ? CHANT.incantPower : 1) * RACES[G.race].magic * (1 + G.lvl * 0.05) * (1 + schoolRank(sp.school) * 0.12) * eff;
+  const power = (incanted ? CHANT.incantPower : 1) * RACES[G.race].magic * (1 + G.lvl * 0.05) * (1 + schoolRank(sp.school) * 0.12) * eff * staffGearMul();
   G.cds[sp.id] = sp.cd * (incanted ? 1.15 : 1);
   const before = learnedIds();
   G.prof[sp.school] = (G.prof[sp.school] || 0) + (incanted ? 1.4 : 1.0);

@@ -319,6 +319,7 @@ function updateHUD(dt, time) {
   document.querySelector('.bar.hp').style.width = (200 + G.maxHp * 0.6) + 'px';
   document.querySelector('.bar.st').style.width = (170 + G.maxStamina * 0.5) + 'px';
   drawVessel(time);
+  updateMarketHUD();
   const spells = unlockedSpells(), slots = $('spellBar').children;
   if (slots.length !== spells.length) buildSpellBar();
   for (let i = 0; i < slots.length; i++) {

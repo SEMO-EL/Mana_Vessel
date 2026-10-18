@@ -129,6 +129,7 @@ function openCache(C) {
     gain = SCHOOLS[b.prof].name + ' understanding deepens';
   }
   gainXp(25);
+  G.coin = (G.coin || 0) + 35; gain += '  ·  35 silver';
   say([{ s: C.who, t: C.t + '   (' + G.caches.length + ' / ' + CACHES.list.length + ')' }]).then(() => { toast(gain, 'good'); BUS.emit('sfx', { id: 'pickup' }); });
   autosave();
 }

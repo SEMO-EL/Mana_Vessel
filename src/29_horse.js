@@ -178,7 +178,7 @@ function stRide(dt) {
   const wantGallop = has && IN.down('sprint') && G.stamina > 1;
   let target = has ? (PL.walkToggle ? HORSE.WALK : wantGallop ? HORSE.GALLOP : HORSE.CANTER) : 0;
   if (IN.pressed('walk')) PL.walkToggle = !PL.walkToggle;
-  if (wantGallop) { G.stamina -= dt * 11; PL.staminaDelay = 0.6; }
+  if (wantGallop) { G.stamina -= dt * 11 * (G.gear && G.gear.oats ? 0.7 : 1); PL.staminaDelay = 0.6; }
   if (hb.inWater > 0.5) target = Math.min(target, HORSE.WALK);
   HORSE.speed = damp(HORSE.speed, target, target > HORSE.speed ? 1.6 : 3.2, dt);
   if (has) {

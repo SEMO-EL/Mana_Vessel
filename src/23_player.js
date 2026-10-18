@@ -98,7 +98,7 @@ function setPlayerState(s) {
   if (PL.state === 'ride' && s !== 'ride' && typeof HORSE !== 'undefined' && HORSE.mode === 'ride') dismountHorse(false);
   PL.state = s; PL.stateT = 0;
 }
-const canAct = () => !['hit', 'collapse', 'dead', 'talk', 'rest', 'climb', 'interact'].includes(PL.state);
+const canAct = () => !['hit', 'collapse', 'dead', 'talk', 'rest', 'climb', 'interact', 'drink'].includes(PL.state);
 function spendStamina(n) {
   if (G.stamina <= 0) return false;         // Souls rule: any stamina left lets you act
   G.stamina -= n; PL.staminaDelay = 0.75;
@@ -160,6 +160,7 @@ function updatePlayer(dt) {
     case 'dead':      b.vel.x = b.vel.z = 0; break;
     case 'rest': case 'talk': case 'climb': b.vel.x = b.vel.z = 0; break;
     case 'interact':  b.vel.x = b.vel.z = 0; if (PL.stateT > 0.9) setPlayerState('move'); break;
+    case 'drink':     stDrink(dt); break;
   }
 
   moveBody(b, dt);
@@ -226,6 +227,7 @@ function readBufferedInput(dt) {
 /* ───────────── move (grounded) ───────────── */
 function stMove(dt) {
   const b = PL.body, A = PL.actor;
+  if (IN.pressed('drink') && !PL.chanting && startDrink()) return;
   inputDir(_mv);
   const has = _mv.lengthSq() > 0.01;
   if (IN.pressed('walk')) PL.walkToggle = !PL.walkToggle;

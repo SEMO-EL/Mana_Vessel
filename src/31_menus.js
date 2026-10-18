@@ -6,7 +6,7 @@
    pointer is captured, so "the pointer was released during play" is the
    only pause signal that works everywhere.
    ═══════════════════════════════════════════════════════════════════════ */
-const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard', 'bounties', 'journal'];
+const SCREENS = ['title', 'creator', 'pause', 'grimoire', 'settingsScreen', 'death', 'rest', 'endcard', 'bounties', 'journal', 'shop'];
 let _settingsFrom = 'title';
 function openScreen(id) {
   for (const s of SCREENS) $(s).classList.toggle('on', s === id);
@@ -291,7 +291,7 @@ function openJournal() {
   const down = JOURNAL_FOES.filter(([k]) => G.flags[k]);
   html += '<h4>Great foes felled</h4>';
   html += down.length ? down.map(([, n]) => row(n, '✓')).join('') : '<p class="flavor">None yet.</p>';
-  html += row('Kills', G.kills) + row('Times the vessel broke', G.breaks) + row('Deaths', G.deaths);
+  html += row('Kills', G.kills) + row('Times the vessel broke', G.breaks) + row('Deaths', G.deaths) + row('Silver', G.coin || 0);
   // feats: the ones still ahead are listed too, dimmed
   const fr = typeof featRows === 'function' ? featRows() : [];
   if (fr.length) {
@@ -465,6 +465,7 @@ function initMenus() {
     else if (GAME.state === 'paused' && is('pause')) resumeGame();
     else if (GAME.state === 'grimoire' && (is('menu') || is('pause'))) resumeGame();
     else if (GAME.state === 'bounties' && (is('pause') || is('interact'))) resumeGame();
+    else if (GAME.state === 'shop' && (is('pause') || is('interact'))) resumeGame();
     else if (GAME.state === 'journal' && is('pause')) { GAME.state = 'paused'; openScreen('pause'); }
     else if (GAME.state === 'settings' && is('pause')) closeSettings();
   });

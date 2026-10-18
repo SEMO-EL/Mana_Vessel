@@ -101,7 +101,7 @@ function openBounties() {
     const btn = !registered ? '' : st === 'open' ? `<button data-take="${b.id}">Take the job</button>`
       : st === 'taken' ? (tracked ? '<span class="tag">On your compass</span>' : `<button data-track="${b.id}">Track</button>`)
       : st === 'done' ? `<button class="hot" data-claim="${b.id}">Claim the reward</button>` : '<span class="tag">Paid</span>';
-    html += `<div class="bounty ${st}"><div class="bh"><b>${b.title}</b><span>${b.named ? 'Named' : 'Hunt'} · ${b.xp} xp${boon}</span></div>
+    html += `<div class="bounty ${st}"><div class="bh"><b>${b.title}</b><span>${b.named ? 'Named' : 'Hunt'} · ${b.xp} xp · ${b.xp} silver${boon}</span></div>
       <div class="bw">${b.where}</div><p>${b.text}</p><div class="bb">${btn}</div></div>`;
   }
   body.innerHTML = html;
@@ -125,6 +125,7 @@ function claimBounty(id) {
   const b = BOUNTY[id]; if (!b || G.bounties[id] !== 'done') return;
   G.bounties[id] = 'paid';
   gainXp(b.xp);
+  gainCoin(b.xp);                                  // the Guild pays in silver, xp for xp
   if (b.boon && b.boon.hp) { G.maxHp += b.boon.hp; G.hp = G.maxHp; toast('Max health +' + b.boon.hp, 'good'); }
   if (b.boon && b.boon.mana) { G.maxMana += b.boon.mana; G.mana = G.maxMana; toast('Max mana +' + b.boon.mana, 'good'); }
   if (G.trackBounty === id) G.trackBounty = null;
