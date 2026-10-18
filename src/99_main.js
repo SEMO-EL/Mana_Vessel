@@ -224,6 +224,20 @@ function selfTests() {
   check('save', () => { G.quest = 'wolves'; saveGame(true); const s = loadGame(); localStorage.removeItem(SAVE_KEY); return !!s && s.quest === 'wolves' && Array.isArray(s.pos); });
   check('map', () => typeof MAP !== 'undefined' && !!MAP.canvas ? MAP.buildMs : false);
   check('batched', () => STRUCT.batched || false);
+  // Chapter II and the open world around it
+  check('roa', () => ROA.houses > 20 && ROA_GREEN.trees > 10 && ROA.spots.board ? ROA.houses : false);
+  check('town', () => TOWN.walkers.length >= 15 && !TOWN.dropped.length ? TOWN.walkers.length : false);
+  check('crystals', () => CRYSTALS.list.length === 8 && LANDMARKS.colossus ? 8 : false);
+  check('trunks', () => FOL.trunkColliders > 1000 ? FOL.trunkColliders : false);
+  check('bounty', () => {
+    G.flags.guildF = true; G.bounties = {}; takeBounty('scar');
+    const ok = G.bounties.scar === 'taken' && !!G.flags.bt_scar && !!bountyMarker();
+    G.bounties = {}; G.flags.bt_scar = false; G.trackBounty = null; return ok;
+  });
+  check('golem', () => { const p = PL.body.pos, e = new Enemy('golem', p.x + 9, p.z, { dormant: true }); e.wake(1); step(30); const ok = !e.removed && !!e.rig; e.remove(); return ok; });
+  check('scar', () => { const p = PL.body.pos, e = new Enemy('scar', p.x + 8, p.z); step(10); const ok = !!e.rig; e.remove(); return ok; });
+  check('eris', () => { if (!ALLY.eris) ALLY.eris = new Companion(ERIS_SPEC, 'Eris', '#e8606f'); ALLY.eris.join(); step(10); const ok = ALLY.eris.active; ALLY.eris.leave(); return ok; });
+  check('walkers', () => { const w = TOWN.walkers[0], x0 = w.pos.x, z0 = w.pos.z; w.update(1, true, w.pos.clone().setY(w.pos.y + 5)); for (let i = 0; i < 30; i++) w.update(1 / 15, true, w.pos.clone().setY(w.pos.y + 5)); return Math.hypot(w.pos.x - x0, w.pos.z - z0) > 0.5 || w.mode === 'pause'; });
   R.failures = fail; R.ok = fail.length === 0;
   return R;
 }
