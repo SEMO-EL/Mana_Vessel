@@ -94,54 +94,50 @@ const ENEMY_DEFS = {
 };
 
 /* ───────────── procedural wolf ───────────── */
+let WOLF_MAT = null;
 function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
-  const dark = toonMat({ color: tint, rim: true }), light = toonMat({ color: new THREE.Color(tint).lerp(new THREE.Color('#c9c3b8'), 0.55), rim: true });
+  // every rigid part one vertex-coloured mesh (half the draws of the old build); the eyes keep their own glowing material
+  const mat = WOLF_MAT || (WOLF_MAT = toonMat({ vertexColors: true, rim: true }));
+  const dark = tint, light = '#' + new THREE.Color(tint).lerp(new THREE.Color('#c9c3b8'), 0.55).getHexString(), nose = '#1a1a1c';
   const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd24a').multiplyScalar(2.2) });
-  const nose = toonMat({ color: '#1a1a1c' });
-  const S = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
-  const ball = new THREE.IcosahedronGeometry(1, 2);
+  const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1);
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.set(0, 0.74, 0); root.add(body);
-  body.add(S(ball, dark, 0, 0, -0.05, 0.3, 0.29, 0.66));                 // torso
-  body.add(S(ball, light, 0, -0.1, 0.1, 0.24, 0.2, 0.5));                // belly
-  const chest = S(ball, dark, 0, 0.06, 0.42, 0.33, 0.36, 0.34); body.add(chest);
-  body.add(S(ball, light, 0, -0.04, 0.55, 0.22, 0.26, 0.2));             // ruff
+  body.add(mergedPart([[ball, dark, 0, 0, -0.05, 0.3, 0.29, 0.66], [ball, light, 0, -0.1, 0.1, 0.24, 0.2, 0.5], [ball, dark, 0, 0.06, 0.42, 0.33, 0.36, 0.34],
+    [ball, light, 0, -0.04, 0.55, 0.22, 0.26, 0.2], [ball, dark, 0, 0.17, 0.62, 0.2, 0.22, 0.2]], mat));
   const neck = new THREE.Group(); neck.position.set(0, 0.16, 0.6); body.add(neck);
-  body.add(S(ball, dark, 0, 0.17, 0.62, 0.2, 0.22, 0.2));                // neck mass under the ruff
   const head = new THREE.Group(); head.position.set(0, 0.16, 0.14); neck.add(head);
   // a long skull and a wedge muzzle (four-sided, wide at the cheeks, narrow at the nose)
-  head.add(S(ball, dark, 0, 0.01, -0.02, 0.17, 0.165, 0.21));
   const muzzle = new THREE.CylinderGeometry(0.045, 0.1, 0.3, 4, 1); muzzle.rotateY(Math.PI / 4); muzzle.rotateX(Math.PI / 2);
-  head.add(S(muzzle, light, 0, -0.05, 0.22, 1, 0.72, 1));
-  head.add(S(ball, nose, 0, -0.03, 0.37, 0.04, 0.034, 0.034));
-  const jaw = new THREE.Group(); jaw.position.set(0, -0.09, 0.08); head.add(jaw);
-  jaw.add(S(new THREE.BoxGeometry(1, 1, 1), light, 0, -0.02, 0.13, 0.085, 0.035, 0.22));
-  const earS = o.bigEars ? 1.45 : 1;
+  const hp = [[ball, dark, 0, 0.01, -0.02, 0.17, 0.165, 0.21], [muzzle, light, 0, -0.05, 0.22, 1, 0.72, 1], [ball, nose, 0, -0.03, 0.37, 0.04, 0.034, 0.034]];
+  const earS = o.bigEars ? 1.45 : 1, eyes = [];
   for (const s of [-1, 1]) {
-    // tall, pointed, set back and pricked up
-    const ear = S(new THREE.ConeGeometry(0.066 * earS, 0.22 * earS, 4), dark, s * 0.095, 0.17 + 0.03 * (earS - 1), -0.07);
-    ear.rotation.set(-0.18, Math.PI / 4, -s * 0.2); head.add(ear);
-    const inner = S(new THREE.ConeGeometry(0.035 * earS, 0.13 * earS, 4), light, 0, -0.02, 0.025); ear.add(inner);
+    // tall, pointed, set back and pricked up, the inner ear inside it
+    const ex = s * 0.095, ey = 0.17 + 0.03 * (earS - 1), ez = -0.07, er = [-0.18, Math.PI / 4, -s * 0.2];
+    hp.push([new THREE.ConeGeometry(0.066 * earS, 0.22 * earS, 4), dark, ex, ey, ez, 1, 1, 1, ...er]);
+    hp.push([new THREE.ConeGeometry(0.035 * earS, 0.13 * earS, 4).translate(0, -0.02, 0.025), light, ex, ey, ez, 1, 1, 1, ...er]);
     // cheek ruffs: the face reads wider than the skull
-    const ruff = S(new THREE.ConeGeometry(0.06, 0.13, 4), light, s * 0.12, -0.06, -0.08);
-    ruff.rotation.set(-2.0, 0, s * 0.55); head.add(ruff);
-    head.add(S(ball, eyeM, s * 0.08, 0.045, 0.15, 0.028, 0.02, 0.02));
+    hp.push([new THREE.ConeGeometry(0.06, 0.13, 4), light, s * 0.12, -0.06, -0.08, 1, 1, 1, -2.0, 0, s * 0.55]);
+    eyes.push([ball, '#ffffff', s * 0.08, 0.045, 0.15, 0.028, 0.02, 0.02]);
   }
+  head.add(mergedPart(hp, mat));
+  head.add(mergedPart(eyes, eyeM));
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.09, 0.08); head.add(jaw);
+  jaw.add(mergedPart([[box, light, 0, -0.02, 0.13, 0.085, 0.035, 0.22]], mat));
   const tail = []; let parent = body; let tz = -0.68;
   for (let i = 0; i < 3; i++) {
     // bushy: thickest in the middle, a pale tip
     const g = new THREE.Group(); g.position.set(0, i === 0 ? 0.08 : 0, i === 0 ? tz : -0.21);
     const r = [0.075, 0.095, 0.075][i];
-    g.add(S(ball, i === 2 ? light : dark, 0, 0, -0.11, r, r, 0.16));
+    g.add(mergedPart([[ball, i === 2 ? light : dark, 0, 0, -0.11, r, r, 0.16]], mat));
     parent.add(g); tail.push(g); parent = g;
   }
   const legs = [];
   for (const [x, z, front] of [[-0.16, 0.44, 1], [0.16, 0.44, 1], [-0.17, -0.4, 0], [0.17, -0.4, 0]]) {
     const hip = new THREE.Group(); hip.position.set(x, -0.04, z); body.add(hip);
-    hip.add(S(ball, dark, 0, -0.16, 0, 0.085, 0.2, 0.1));
+    hip.add(mergedPart([[ball, dark, 0, -0.16, 0, 0.085, 0.2, 0.1]], mat));
     const knee = new THREE.Group(); knee.position.set(0, -0.33, 0); hip.add(knee);
-    knee.add(S(ball, dark, 0, -0.17, 0, 0.055, 0.19, 0.06));
-    knee.add(S(ball, light, 0, -0.36, 0.04, 0.06, 0.035, 0.09));   // paw
+    knee.add(mergedPart([[ball, dark, 0, -0.17, 0, 0.055, 0.19, 0.06], [ball, light, 0, -0.36, 0.04, 0.06, 0.035, 0.09]], mat));   // + paw
     legs.push({ hip, knee, front, side: Math.sign(x) });
   }
   root.scale.setScalar(scale);
