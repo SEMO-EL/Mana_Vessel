@@ -79,8 +79,21 @@ function updateAftermath() {
     if (n.pos.distanceTo(camera.position) > 40 || behindCamera(n.pos)) n.setVisible(on);
   }
 }
+// Words cut into Roa's stone, for whoever stops to read them.
+const ROA_PLAQUES = [
+  { at: () => ({ x: ROA_PLAZA.x, z: ROA_PLAZA.z + 7.6 }), label: 'Read the plinth', t: 'Cut into the plinth below the stone knight: "To the first of House Boreas, who held the north road when no one else would. Roa stands where he stood."' },
+  { at: () => ({ x: ROA_CITY.x - ROA_CITY.hw + 7, z: ROA_CITY.z + 9 }), label: 'Read the gate stone', t: 'A worn stone by the west gate: "ROA · seat of House Boreas Greyrat · Fittoa Region of the Asura Kingdom." Someone has scratched underneath, smaller: "no fireballs in the market".' },
+  { at: () => ({ x: ROA.spots.keepDoor.x - 3, z: ROA.spots.keepDoor.z + 1.5 }), label: 'Read the lintel', t: 'Over the keep door, in letters taller than you: "BOREAS GREYRAT — WE HOLD." It does not say what. It does not need to.' },
+];
+function buildPlaques() {
+  for (const P of ROA_PLAQUES) {
+    const a = P.at();
+    INTERACTABLES.push({ pos: new THREE.Vector3(a.x, heightAt(a.x, a.z), a.z), r: 2.6, label: () => P.label, enabled: () => !!G, action: () => say([{ t: P.t }]) });
+  }
+}
 function buildSideQuests() {
   buildBoutRack();
+  buildPlaques();
   buildAftermath();
   for (const [k, I] of Object.entries(INSCRIPTIONS)) {
     const a = I.at(), pos = new THREE.Vector3(a.x, heightAt(a.x, a.z), a.z);
