@@ -78,6 +78,9 @@ function buildGrass() {
         float w = mix(0.065, 0.012, t * t) * step(0.001, hgt);
         vec3 p = vec3(wxz.x + dir.y * position.x * w, gy + t * hgt, wxz.y - dir.x * position.x * w);
         float wv = sin(uTime * 1.8 + wxz.x * 0.33 + wxz.y * 0.21) * 0.55 + sin(uTime * 3.3 + wxz.x * 1.4 + wxz.y * 0.9) * 0.2;
+        // gusts: long waves rolling across the field, bowing the blades as they pass
+        float gust = smoothstep(0.55, 1.0, sin(wxz.x * 0.021 + wxz.y * 0.013 - uTime * 0.85) * 0.5 + 0.5) * smoothstep(-0.2, 0.6, sin(wxz.x * 0.007 - wxz.y * 0.009 + uTime * 0.13));
+        wv += gust * 1.25 * uWind;
         vec2 bend = vec2(0.94, 0.34) * wv * uWind * 0.55 + dir * 0.18;
         vec2 away = wxz - uPlayer.xz; float pd = length(away);
         bend += away / max(pd, 0.001) * (1.0 - smoothstep(0.15, 1.3, pd)) * 1.3 * step(abs(uPlayer.y - gy), 2.5);
@@ -89,6 +92,7 @@ function buildGrass() {
         float flower = step(0.985, gH(wc + 41.0)) * step(0.6, dens);
         vec3 fcol = mix(vec3(0.95, 0.9, 0.55), vec3(0.85, 0.45, 0.6), gH(wc + 5.0));
         vGrassCol = mix(gc * mix(0.85, 1.2, gH(wc + 5.5)), fcol, flower * smoothstep(0.7, 1.0, t));
+        vGrassCol *= 1.0 + gust * 0.22 * t;                               // a bowed blade shows its paler side
         vGrassT = t;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vGrassCol; varying float vGrassT;')
