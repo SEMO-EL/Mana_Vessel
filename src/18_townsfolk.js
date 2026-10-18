@@ -36,6 +36,16 @@ function buenaTownNodes() {
   return { nodes: pts.map((p, i) => ['v' + i, p[0], p[1]]), edges: pts.slice(1).map((p, i) => ['v' + i, 'v' + (i + 1)]) };
 }
 
+// the long road: every other point of the smoothed road between two x's, kept to its right-hand side
+function roadTownNodes(x0, x1, key) {
+  const pts = TER.roadPath.filter(p => p[0] >= x0 && p[0] <= x1), sel = pts.filter((_, i) => i % 2 === 0);
+  if (pts.length && sel[sel.length - 1] !== pts[pts.length - 1]) sel.push(pts[pts.length - 1]);
+  const nodes = sel.map((p, i) => {
+    const q = sel[Math.min(i + 1, sel.length - 1)], o = sel[Math.max(i - 1, 0)], dx = q[0] - o[0], dz = q[1] - o[1], l = Math.hypot(dx, dz) || 1;
+    return [key + i, p[0] - dz / l * 1.3, p[1] + dx / l * 1.3];
+  });
+  return { nodes, edges: sel.slice(1).map((p, i) => [key + i, key + (i + 1)]) };
+}
 function buildTownGraph(key, def) {
   const N = new Map();
   for (const [k, x, z] of def.nodes) N.set(k, { k, x, z, nb: [] });
@@ -69,10 +79,15 @@ function townSpec(R) {
 
 const ROA_TOWNS_NAMES = ['Baker Wendel', 'Washerwoman Ilse', 'Carter Bram', 'Apprentice Nils', 'Old Hanne', 'Clerk Petra', 'Fishmonger Jory',
   'Seamstress Odile', 'Porter Gunt', 'Milkmaid Rosa', 'Tanner Hal', 'Young Pim', 'Widow Abel', 'Mason Krell'];
+const ROAD_NAMES = { west: ['A Pilgrim', 'Pedlar Ostrik'], east: ['A Courier', 'Old Wanderer', 'Tinker Wenna'] };
 const BUENA_TOWNS_NAMES = ['Shepherd Alain', 'Goodwife Marthe', 'Woodcutter Oskar', 'Nell, who keeps the hens', 'The Miller\'s Boy'];
 // what they say depends on how far the story has come
 function townLines(where) {
   const q = G ? G.quest : '';
+  if (where === 'west' || where === 'east') return ['Long road to Roa. Longer back.', 'Mind the wolves where the forest comes down to the road.',
+    "I've walked this road thirty years. It hasn't got any shorter.", "Buena's got the best cider in Fittoa. Don't tell Roa I said so.",
+    ...(where === 'east' ? ["They've opened the pass gate again. About time.", "Roa's just over the rise. You'll smell the bakeries first."]
+      : [G && G.flags.gateOpen ? "The pass gate's open again. Roa's three hours' walk, if your legs are young." : "The gate to Roa's barred, last I heard. Something about bandits."])];
   if (where === 'buena') {
     const L = ['Fine weather for the harvest.', 'Mind the cart ruts, they\'ll turn your ankle.', 'Your father was up before dawn swinging that sword again.',
       'Lady Zenith brought soup round when my Henri was ill. A saint, that woman.', 'Wolves on the forest road. Don\'t go alone.'];
@@ -182,6 +197,11 @@ function buildTownsfolk() {
   const roa = buildTownGraph('roa', roaTownNodes()), buena = buildTownGraph('buena', buenaTownNodes());
   if (roa.length) for (const name of ROA_TOWNS_NAMES) TOWN.walkers.push(new Walker(roa, 'roa', name, R));
   if (buena.length) for (const name of BUENA_TOWNS_NAMES) TOWN.walkers.push(new Walker(buena, 'buena', name, R));
+  // travellers on the long road, either side of the pass gate
+  for (const [key, x0, x1] of [['west', -300, 770], ['east', 805, 1440]]) {
+    const g = buildTownGraph(key, roadTownNodes(x0, x1, key[0]));
+    if (g.length > 2) for (const name of ROAD_NAMES[key]) TOWN.walkers.push(new Walker(g, key, name, R));
+  }
 }
 function updateTownsfolk(dt) {
   if (!TOWN.walkers.length || GAME.inCave) return;
