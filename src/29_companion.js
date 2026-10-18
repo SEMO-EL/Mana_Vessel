@@ -18,6 +18,8 @@ const ERIS_BARKS = {
   idle: ['I\'m bored. Find something to hit.', 'Ghislaine says I\'m getting faster. I AM getting faster.', 'Grandfather says a lady doesn\'t run. I run.', 'You walk like a scholar.'],
   steel: ['My sword just BOUNCES off it! Use your magic!'],
   vessel: ['{name}?! ...Show-off.'],
+  mount: ['Move over. I\'m riding too.', 'Budge up, tutor.', 'Don\'t you dare leave without me!'],
+  ride: ['FASTER!', 'Hah! Kestrel likes me better.', 'If you fall off, I\'m not stopping.', 'Grandfather says I ride like a bandit. Good!'],
 };
 
 class Companion {
@@ -63,8 +65,27 @@ class Companion {
     }
     return best;
   }
+  // up behind you on Kestrel: same seat, half a saddle further back
+  ridePillion(dt) {
+    const A = this.actor, R = HORSE.rig;
+    if (!this.riding) { this.riding = true; this.target = null; this.set('follow'); this.bark('mount', true); this.rideBarkT = 20 + Math.random() * 20; }
+    R.body.updateMatrixWorld(true);
+    _pv.set(0, 0.36, -0.4).applyMatrix4(R.body.matrixWorld);
+    A.root.position.set(_pv.x, _pv.y - 0.06, _pv.z); A.root.rotation.y = HORSE.heading;
+    this.pos.copy(HORSE.body.pos); this.face = HORSE.heading;
+    A.loop('Idle', { fade: 0.2 });
+    A.update(dt);
+    for (const [s, side] of [[1, 'l'], [-1, 'r']]) {
+      A.bones['upperleg' + side].quaternion.multiply(_pq.setFromEuler(_pe.set(-1.0, 0, -0.55 * s)));
+      A.bones['lowerleg' + side].quaternion.multiply(_pq.setFromEuler(_pe.set(1.15, 0, 0)));
+    }
+    this.rideBarkT -= dt; this.barkCd -= dt;
+    if (this.rideBarkT < 0 && HORSE.speed > 10) { this.rideBarkT = 30 + Math.random() * 30; this.bark('ride', true); }
+  }
   update(dt) {
     if (!this.active) return;
+    if (typeof HORSE !== 'undefined' && HORSE.mode === 'ride') { this.ridePillion(dt); return; }
+    if (this.riding) { this.riding = false; this.placeBehind(); this.set('follow'); }
     const A = this.actor, b = this.body, P = PL.body.pos;
     this.stateT += dt; this.cd -= dt; this.barkCd -= dt; this.idleT -= dt;
     const dP = Math.hypot(P.x - this.pos.x, P.z - this.pos.z);
@@ -131,6 +152,7 @@ class Companion {
     A.update(dt);
   }
 }
+const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler();
 function updateAllies(dt) { if (ALLY.eris) ALLY.eris.update(dt); }
-function allyBodies() { return ALLY.eris && ALLY.eris.active ? [ALLY.eris.body] : []; }
+function allyBodies() { return ALLY.eris && ALLY.eris.active && !ALLY.eris.riding ? [ALLY.eris.body] : []; }
 BUS.on('vesselBreak', () => { if (ALLY.eris && ALLY.eris.active) later(1.2, () => ALLY.eris.bark('vessel', true)); });

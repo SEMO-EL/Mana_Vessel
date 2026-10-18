@@ -97,6 +97,18 @@ const ROA_FOLK = [
   ['Barbarian', { barbarian: { 1: '#6a5034', 6: '#6a5a3a' } }, 1520, 596, 'PickUp', 'Farmer Joss', 'Jackals came down from the dry hills last night. Took two hens. Bold as you like.', ['Barbarian_Hat']],
   ['Knight', { knight: { 1: '#3a2a1c' } }, 806, 372, 'Idle', 'Gate Sergeant', 'Roa is that way. Follow the road and don\'t stop for anyone who asks you to.', ['Knight_Helmet'], Math.PI],
 ];
+// the traders and the street kid go home at night (the guards, the scribe and the innkeeper keep their posts)
+const ROA_DAY_ONLY = ['roa2', 'roa3', 'roa5'];
+function updateRoaSchedules() {
+  const night = TOD.hour < 6.3 || TOD.hour > 20.2;
+  for (const id of ROA_DAY_ONLY) {
+    const n = NPCS[id]; if (!n) continue;
+    if (n.visible === !night) continue;
+    // only change while you can't see it happen
+    const d = n.pos.distanceTo(camera.position);
+    if (d > 35 || behindCamera(n.pos)) n.setVisible(!night);
+  }
+}
 function buildRoaPeople() {
   const S = ROA.spots, F = S.forecourt;
   new NPC('eris', ERIS_SPEC, F.x, F.z, { name: 'Eris', face: Math.PI * 0.95, idle: 'Idle', talk: talkEris });
@@ -258,6 +270,7 @@ function updateRoaStory(dt) {
   if (GAME.inCave) return;
   const p = PL.body.pos;
   if (G.quest === 'toRoa' && rectDist(p.x, p.z, ROA_CITY) < 2) setQuest('findEris');
+  updateRoaSchedules();
   // the First Golem stands when you step into its ring
   if (Math.hypot(p.x - FIRST_WALL.x, p.z - FIRST_WALL.z) < FIRST_WALL.r - 3) {
     const g = ENT.enemies.find(e => e.key === 'golem' && e.state === 'dormant' && !e.dead);
