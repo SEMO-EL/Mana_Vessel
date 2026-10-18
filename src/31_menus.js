@@ -268,6 +268,11 @@ function openJournal() {
   html += row('Waystones awakened', woke + ' / ' + ways);
   html += row('Roxy\'s pages', G.pages.length + ' / 5');
   if (typeof CRYSTALS !== 'undefined' && CRYSTALS.list.length) html += row('Mana crystals', crystalsGot() + ' / ' + CRYSTALS.list.length);
+  // Roxy's pages, to read again
+  if (G.pages.length) {
+    html += '<h4>Roxy\'s Textbook</h4>';
+    for (const i of [...G.pages].sort()) html += `<p class="jp"><b>${['I', 'II', 'III', 'IV', 'V'][i]}.</b> ${SCRIPT.pages[i]}</p>`;
+  }
   // foes
   const down = JOURNAL_FOES.filter(([k]) => G.flags[k]);
   html += '<h4>Great foes felled</h4>';
