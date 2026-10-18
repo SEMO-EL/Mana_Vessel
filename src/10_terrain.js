@@ -246,6 +246,7 @@ async function buildTerrain() {
         g *= 1 - 0.62 * outskirtsW(x, z);                                   // the outskirts: dry and patchy
         const inCity = 1 - smooth(2, 18, rectDist(x, z, ROA_CITY));
         g *= 1 - inCity * (0.45 + 0.55 * roaPaved(x, z, TER.ROADD[i]));    // yards keep a thin lawn; stone keeps none
+        g *= smooth(0, 3, rectDist(x, z, ROA_YARD));                         // the training ground is beaten bare
       }
       TER.GRASS[i] = Math.round(clamp(g, 0, 1) * 255);
     }
@@ -482,6 +483,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
    walls (a paler square round the plaza), tilled soil in the market gardens. */
 const ROA_PLAZA = { x: 1560, z: 386, r: 26 };
 const ROA_FORECOURT = { x: 1560, z: 325, hw: 26, hd: 9 };             // stone court before the keep
+const ROA_YARD = { x: 1600, z: 321, hw: 14, hd: 10 };                  // Ghislaine's training ground: trodden earth
 // 0..1: how much of this spot is laid stone (streets, the plaza, the forecourt) — inside the walls only
 function roaPaved(x, z, ro) {
   if (x < 1430 || x > 1690 || z < 265 || z > 505) return 0;
@@ -507,6 +509,7 @@ function roaGroundColor(x, z, h, v1, v2, out) {
     const pv = roaPaved(x, z, TER.ROADD[Math.round((z - WORLD.z0) / WORLD.cell) * TER.NX + Math.round((x - WORLD.x0) / WORLD.cell)]);
     out.lerp(_tc.copy(TCOL.pave).lerp(TCOL.paveDark, smooth(-0.2, 0.8, v2) * 0.55), pv * 0.92);
     out.lerp(TCOL.plaza, (1 - smooth(ROA_PLAZA.r - 4, ROA_PLAZA.r + 2, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z))) * 0.45);
+    out.lerp(_tc.copy(TCOL.dirt).lerp(TCOL.bank, smooth(-0.3, 0.7, v2) * 0.5), (1 - smooth(0, 3, rectDist(x, z, ROA_YARD))) * 0.9);
   }
   // market gardens: strips of tilled soil south of the walls
   const gardens = (1 - smooth(0, 14, rectDist(x, z, { x: 1545, z: 600, hw: 95, hd: 70 }))) * (Math.sin(z * 0.35 + Math.sin(x * 0.02) * 2) > 0.2 ? 1 : 0.35);

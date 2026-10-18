@@ -97,11 +97,11 @@ function buildRoaGreenery() {
     const p = g.attributes.position, n = Noise.make(WORLD.seed + 406 + ROA_GREEN.hedges);
     for (let i = 0; i < p.count; i++) {
       const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
-      const k = 1 + n(vx * 1.3 + ax, vy * 1.7 + vz) * 0.18;      // clipped, but by hand
+      const k = 1 + n(vx * 1.3 + ax, vy * 1.7 + vz) * 0.3;       // clipped, but by hand
       p.setXYZ(i, vx, vy > 0 ? vy * k : vy, vz * (vy > 0.3 ? 0.92 * k : k));
     }
     g.computeVertexNormals();
-    paint(g, (x, yy, z, col) => col.set('#2f5a2a').lerp(_hedgeLit, clamp((yy + 0.6) / 1.4, 0, 1)));
+    paint(g, (x, yy, z, col) => col.set('#284f25').lerp(_hedgeLit, clamp((yy + 0.6) / 1.4, 0, 1) * (0.75 + 0.25 * n(x * 2.1, z * 2.1 + yy))));
     g.translate(0, 0.6, 0); g.rotateY(-rot); g.translate(mx, y, mz);
     hedgeGeos.push(g);
     addBox(mx, mz, len / 2, 0.55, rot, y - 0.5, y + 1.3, 'hedge');
@@ -114,7 +114,7 @@ function buildRoaGreenery() {
   hedge(wx + 6, 331.5, wx + 28, 331.5);
   // either side of the keep's court: a bed each, and low hedges marking the court's corners
   bed(ROA_FORECOURT.x - ROA_FORECOURT.hw - 4.5, 318, 2.6, 8);
-  for (const s of [-1, 1]) hedge(ROA_FORECOURT.x + s * (ROA_FORECOURT.hw + 1.5), 330.5, ROA_FORECOURT.x + s * (ROA_FORECOURT.hw + 1.5), 323);
+  for (const s of [-1, 1]) hedge(ROA_FORECOURT.x + s * (ROA_FORECOURT.hw + 1.5), 331, ROA_FORECOURT.x + s * (ROA_FORECOURT.hw + 1.5), 327.5);
   // behind Ghislaine's yard, against the north wall of the terrace
   bed(1604, 296, 10, 2.6);
   // the plaza: four round-cornered planters on the inner ring, between the stalls and the streets

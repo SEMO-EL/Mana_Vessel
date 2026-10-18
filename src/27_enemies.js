@@ -94,7 +94,7 @@ const ENEMY_DEFS = {
 };
 
 /* ───────────── procedural wolf ───────────── */
-function buildWolfRig(scale = 1, tint = '#6e737b') {
+function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
   const dark = toonMat({ color: tint, rim: true }), light = toonMat({ color: new THREE.Color(tint).lerp(new THREE.Color('#c9c3b8'), 0.55), rim: true });
   const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd24a').multiplyScalar(2.2) });
   const nose = toonMat({ color: '#1a1a1c' });
@@ -107,21 +107,32 @@ function buildWolfRig(scale = 1, tint = '#6e737b') {
   const chest = S(ball, dark, 0, 0.06, 0.42, 0.33, 0.36, 0.34); body.add(chest);
   body.add(S(ball, light, 0, -0.04, 0.55, 0.22, 0.26, 0.2));             // ruff
   const neck = new THREE.Group(); neck.position.set(0, 0.16, 0.6); body.add(neck);
+  body.add(S(ball, dark, 0, 0.17, 0.62, 0.2, 0.22, 0.2));                // neck mass under the ruff
   const head = new THREE.Group(); head.position.set(0, 0.16, 0.14); neck.add(head);
-  head.add(S(ball, dark, 0, 0, 0, 0.19, 0.18, 0.22));
-  head.add(S(new THREE.BoxGeometry(1, 1, 1), light, 0, -0.04, 0.2, 0.12, 0.1, 0.24));  // snout
-  head.add(S(ball, nose, 0, -0.01, 0.33, 0.045, 0.04, 0.04));
-  const jaw = new THREE.Group(); jaw.position.set(0, -0.08, 0.08); head.add(jaw);
-  jaw.add(S(new THREE.BoxGeometry(1, 1, 1), light, 0, -0.02, 0.12, 0.1, 0.04, 0.2));
+  // a long skull and a wedge muzzle (four-sided, wide at the cheeks, narrow at the nose)
+  head.add(S(ball, dark, 0, 0.01, -0.02, 0.17, 0.165, 0.21));
+  const muzzle = new THREE.CylinderGeometry(0.045, 0.1, 0.3, 4, 1); muzzle.rotateY(Math.PI / 4); muzzle.rotateX(Math.PI / 2);
+  head.add(S(muzzle, light, 0, -0.05, 0.22, 1, 0.72, 1));
+  head.add(S(ball, nose, 0, -0.03, 0.37, 0.04, 0.034, 0.034));
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.09, 0.08); head.add(jaw);
+  jaw.add(S(new THREE.BoxGeometry(1, 1, 1), light, 0, -0.02, 0.13, 0.085, 0.035, 0.22));
+  const earS = o.bigEars ? 1.45 : 1;
   for (const s of [-1, 1]) {
-    const ear = S(new THREE.ConeGeometry(0.06, 0.16, 4), dark, s * 0.1, 0.18, -0.04);
-    ear.rotation.z = -s * 0.25; head.add(ear);
-    head.add(S(ball, eyeM, s * 0.085, 0.05, 0.14, 0.028, 0.022, 0.02));
+    // tall, pointed, set back and pricked up
+    const ear = S(new THREE.ConeGeometry(0.066 * earS, 0.22 * earS, 4), dark, s * 0.095, 0.17 + 0.03 * (earS - 1), -0.07);
+    ear.rotation.set(-0.18, Math.PI / 4, -s * 0.2); head.add(ear);
+    const inner = S(new THREE.ConeGeometry(0.035 * earS, 0.13 * earS, 4), light, 0, -0.02, 0.025); ear.add(inner);
+    // cheek ruffs: the face reads wider than the skull
+    const ruff = S(new THREE.ConeGeometry(0.06, 0.13, 4), light, s * 0.12, -0.06, -0.08);
+    ruff.rotation.set(-2.0, 0, s * 0.55); head.add(ruff);
+    head.add(S(ball, eyeM, s * 0.08, 0.045, 0.15, 0.028, 0.02, 0.02));
   }
   const tail = []; let parent = body; let tz = -0.68;
   for (let i = 0; i < 3; i++) {
-    const g = new THREE.Group(); g.position.set(0, i === 0 ? 0.08 : 0, i === 0 ? tz : -0.2);
-    g.add(S(ball, i === 2 ? light : dark, 0, 0, -0.1, 0.07 - i * 0.012, 0.07 - i * 0.012, 0.14));
+    // bushy: thickest in the middle, a pale tip
+    const g = new THREE.Group(); g.position.set(0, i === 0 ? 0.08 : 0, i === 0 ? tz : -0.21);
+    const r = [0.075, 0.095, 0.075][i];
+    g.add(S(ball, i === 2 ? light : dark, 0, 0, -0.11, r, r, 0.16));
     parent.add(g); tail.push(g); parent = g;
   }
   const legs = [];
@@ -195,7 +206,7 @@ class Enemy {
     this.burn = 0; this.burnT = 0; this.slow = 0; this.slowT = 0; this.rootT = 0; this.staggerT = 0; this.hurtT = 0;
     this.fade = 1;
     if (d.rig === 'wolf') {
-      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])));
+      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars });
       this.root = this.rig.root;
     } else if (d.rig === 'golem') {
       this.rig = buildGolemRig();

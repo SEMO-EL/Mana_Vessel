@@ -127,7 +127,7 @@ function buildTreantRig() {
 /* ═══════════════ Roa ═══════════════ */
 // Dust jackals: the outskirts' wolves — sandy, lighter, quicker, in packs.
 ENEMY_DEFS.jackal = {
-  name: 'Dust Jackal', rig: 'wolf', scale: 0.82, tint: '#9c8458', hp: 44, poise: 16, r: 0.48, h: 0.8, walk: 2.6, run: 9.8, sight: 26, hear: 16,
+  name: 'Dust Jackal', rig: 'wolf', scale: 0.82, tint: '#9c8458', bigEars: true, hp: 44, poise: 16, r: 0.48, h: 0.8, walk: 2.6, run: 9.8, sight: 26, hear: 16,
   xp: 14, weight: 1, pack: true, flinchAt: 9, knockRes: 0,
   attacks: [
     { name: 'bite',   range: [0, 2.1], windup: 0.36, active: 0.12, recover: 0.5, reach: 1.8, arc: 0.8, dmg: 10, poise: 14, lunge: 3.5 },
@@ -166,12 +166,21 @@ const catEars = a => {
     ear.castShadow = true; head.add(ear);
   }
 };
+// her left eye under a black patch, its strap running back over the temple
+const eyePatch = a => {
+  const head = a.bones.head; if (!head) return;
+  const m = toonMat({ color: '#141210' });
+  const patch = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12), m);
+  patch.rotation.x = Math.PI / 2; patch.position.set(0.21, 0.4, 0.46); head.add(patch);
+  const strap = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.5), m);
+  strap.position.set(0.38, 0.5, 0.25); strap.rotation.set(0.3, -0.75, 0); head.add(strap);
+};
 const swordInHand = a => { if (borrowMesh(a, 'Knight', '1H_Sword', 'handslotr')) a.show('1H_Sword', true); };
 const ERIS_SPEC = { base: 'Rogue', recolor: { rogue: { 1: '#b8262f', 8: '#7a1f2b', 21: '#7a1f2b', 9: '#3a2228', 6: '#efe4d2' } }, extra: [swordInHand] };
 // (the Rogue's body, not the Barbarian's: his beard is baked into the head)
 const GHIS_SPEC = { base: 'Rogue', scale: 1.1,
   recolor: { rogue: { 1: '#dcd6cc', 0: '#5e3c28', 23: '#5e3c28', 8: '#2c2622', 21: '#2c2622', 9: '#3d342c', 6: '#4a3a30' } },
-  extra: [catEars, swordInHand] };
+  extra: [catEars, eyePatch, swordInHand] };
 // Sparring, she guards almost everything from the front, swings fast and
 // commits, and yields at half — she is teaching, not fighting.
 ENEMY_DEFS.ghisSpar = {
