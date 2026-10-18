@@ -84,6 +84,7 @@ async function boot() {
   buildCrystals(); lap('buildCrystals');
   buildSideQuests(); lap('buildSideQuests');
   buildMarket();
+  buildWilds();
   buildPages(); lap('buildPages');
   buildCaches(); lap('buildCaches');
   batchStaticProps(); lap('batchStaticProps');
@@ -154,6 +155,7 @@ function frame(dtReal) {
       updateEvents(dt);
       updateCaches(dt);
       updateFeats(dt);
+      updateWilds(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -200,7 +202,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -336,6 +338,15 @@ function selfTests() {
     for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
     Object.assign(G, snap);
     return bought && drank;
+  });
+  // the wilds: bears, the errands' people and things in place
+  check('wilds', () => {
+    if (!WILDS.built || WILDS.sheep.length !== 3 || WILDS.petals.length !== 5 || !NPCS.gerd) return false;
+    if (!['bearsNorth', 'bearsWest', 'ashback', 'caravan'].every(id => ENCOUNTERS.some(e => e.id === id))) return false;
+    const p = PL.body.pos, b = new Enemy('bear', p.x + 9, p.z), a = new Enemy('ashback', p.x - 12, p.z); step(5);
+    const ok = !!b.rig && !!a.rig && a.rig.root.scale.x > 1.3 && enemyPurse(b) === 0;
+    b.remove(); a.remove();
+    return ok;
   });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;

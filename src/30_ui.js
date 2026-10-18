@@ -203,6 +203,7 @@ function compassMarks() {
   if (bm) out.push({ ang: Math.atan2(bm.x - p.x, bm.z - p.z), label: '✦', cls: 'bounty' });
   const ev = typeof eventMarker === 'function' ? eventMarker() : null;
   if (ev) out.push({ ang: Math.atan2(ev.x - p.x, ev.z - p.z), label: '!', cls: 'event' });
+  if (typeof errandMarks === 'function') for (const m of errandMarks()) out.push({ ang: Math.atan2(m.x - p.x, m.z - p.z), label: '◆', cls: 'side' });
   for (const e of ENT.enemies) if (e.aggro && !e.dead && e.dist() < 40) out.push({ ang: e.angleToPlayer() + Math.PI, label: '•', cls: 'enemy' });
   return out;
 }

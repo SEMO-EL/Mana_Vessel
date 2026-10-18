@@ -20,6 +20,7 @@ const FEATS = [
   { id: 'samaritan', name: 'Good Samaritan',     desc: 'Save five travellers on the road.',           test: () => (G.flags.helped || 0) >= 5 },
   { id: 'board',     name: 'Clean Board',        desc: 'Claim every bounty on the Guild board.',      test: () => !!G.bounties && BOUNTIES.every(b => G.bounties[b.id] === 'paid') },
   { id: 'scholar',   name: 'The Old Tongue',     desc: 'Read the old stones for Roa\'s scribe.',      test: () => G.flags.scribe === 'done' },
+  { id: 'errands',   name: 'Good Neighbour',     desc: 'See all four errands through (Gerard, Lilia, Gerd, Hilde).', test: () => ['flock', 'moon', 'ashback', 'caravan'].every(k => G.flags[k] === 'done') },
   { id: 'rider',     name: 'Horselord',          desc: 'Ride Kestrel for five kilometres.',           test: () => (G.flags.rideM || 0) >= 5000 },
   { id: 'chapter2',  name: 'The Boreas Girl',    desc: 'See Chapter II through.',                     test: () => G.quest === 'done' },
 ];

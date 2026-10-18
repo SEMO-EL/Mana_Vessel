@@ -20,9 +20,8 @@ function gainCoin(n, at) {
 // what a fallen foe had on them: people carry purses, beasts don't; the great ones carry more
 function enemyPurse(e) {
   const d = e.def;
-  if (d.spar) return 0;
+  if (d.spar || d.magicOnly || ['wolf', 'stone', 'golem', 'treant'].includes(d.rig)) return 0;   // beasts, stone and wood
   if (d.boss) return 60 + (d.xp || 0) * 0.5;
-  if (d.rig === 'wolf' || d.rig === 'stone' || d.magicOnly) return 0;
   return (d.xp || 10) * 0.35 * rnd(0.7, 1.3);
 }
 BUS.on('enemyKilled', e => { const c = enemyPurse(e); if (c >= 1) gainCoin(c, e.pos.clone().setY(e.pos.y + (e.h || 1.7) + 0.6)); });
@@ -51,10 +50,10 @@ function openShop() {
   const body = $('shopBody');
   let html = `<p class="flavor" style="margin:0 auto 12px;text-align:center">Your purse: <b class="silver">${G.coin || 0} silver</b> · Healing draughts ${(G.draughts || 0)} / ${draughtCap()}</p>`;
   for (const w of WARES) {
-    const sold = w.sold(), locked = w.needs && !w.needs(), poor = (G.coin || 0) < w.price;
+    const price = hildePrice(w.price), sold = w.sold(), locked = w.needs && !w.needs(), poor = (G.coin || 0) < price;
     const btn = sold ? `<span class="tag">${w.soldTag ? w.soldTag() : 'Bought'}</span>` : locked ? `<span class="tag">${w.needsTag}</span>`
       : `<button data-buy="${w.id}"${poor ? ' disabled' : ''}>${poor ? 'Not enough silver' : 'Buy'}</button>`;
-    html += `<div class="bounty ware ${sold ? 'paid' : ''}"><div class="bh"><b>${w.name}</b><span>${w.price} silver${w.have ? ' · ' + w.have() : ''}</span></div>
+    html += `<div class="bounty ware ${sold ? 'paid' : ''}"><div class="bh"><b>${w.name}</b><span>${price} silver${price < w.price ? ' (a friend\'s price)' : ''}${w.have ? ' · ' + w.have() : ''}</span></div>
       <p>${w.desc()}</p><div class="bb">${btn}</div></div>`;
   }
   body.innerHTML = html;
@@ -64,8 +63,9 @@ function openShop() {
 }
 function buyWare(id) {
   const w = WARES.find(x => x.id === id);
-  if (!w || w.sold() || (w.needs && !w.needs()) || (G.coin || 0) < w.price) return false;
-  G.coin -= w.price; w.buy();
+  const price = hildePrice(w.price);
+  if (!w || w.sold() || (w.needs && !w.needs()) || (G.coin || 0) < price) return false;
+  G.coin -= price; w.buy();
   BUS.emit('sfx', { id: 'pickup' });
   if (id === 'draught' && !G.flags.toldDrink) { G.flags.toldDrink = true; later(0.3, () => hint(IN.label('drink') + ' to drink a healing draught', 4)); }
   autosave();

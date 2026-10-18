@@ -102,6 +102,7 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
   const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd24a').multiplyScalar(2.2) });
   const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1);
   if (o.boar) return buildBoarRig(scale, tint, mat, eyeM, ball, box);
+  if (o.bear) return buildBearRig(scale, tint, mat, eyeM, ball, box);
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.set(0, 0.74, 0); root.add(body);
   body.add(mergedPart([[ball, dark, 0, 0, -0.05, 0.3, 0.29, 0.66], [ball, light, 0, -0.1, 0.1, 0.24, 0.2, 0.5], [ball, dark, 0, 0.06, 0.42, 0.33, 0.36, 0.34],
@@ -242,7 +243,7 @@ class Enemy {
     this.burn = 0; this.burnT = 0; this.slow = 0; this.slowT = 0; this.rootT = 0; this.staggerT = 0; this.hurtT = 0;
     this.fade = 1;
     if (d.rig === 'wolf') {
-      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars, boar: d.boar });
+      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars, boar: d.boar, bear: d.bear });
       this.root = this.rig.root;
     } else if (d.rig === 'golem') {
       this.rig = buildGolemRig();
@@ -575,7 +576,7 @@ function alertEnemy(e, fromDamage) {
   e.aggro = true;
   e.set(fromDamage ? 'chase' : 'alert');
   BUS.emit('alert', e);
-  if (e.def.rig === 'wolf') BUS.emit('sfx', { id: e.def.boar ? 'snarl' : 'howl', pos: e.pos });
+  if (e.def.rig === 'wolf') BUS.emit('sfx', { id: e.def.boar || e.def.bear ? 'snarl' : 'howl', pos: e.pos });
   // the pack hears it
   for (const o of ENT.enemies) {
     if (o === e || o.dead || o.aggro || o.state === 'dormant') continue;

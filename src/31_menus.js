@@ -176,6 +176,7 @@ function resetWorldState() {
   resetRoaState();
   horseStandDown();
   if (typeof resetCaches === 'function') resetCaches();
+  if (typeof resetWilds === 'function') resetWilds();
   buildSpellBar();
 }
 function enterPlay() {
@@ -270,7 +271,7 @@ function openJournal() {
     const st = G.bounties[x.id];
     html += row(x.title + (G.trackBounty === x.id ? ' ✦' : ''), st === 'taken' ? x.where : st === 'done' ? 'Done — claim at the board' : 'Paid');
   }
-  const reqs = typeof sideQuestRows === 'function' ? sideQuestRows() : [];
+  const reqs = [...(typeof sideQuestRows === 'function' ? sideQuestRows() : []), ...(typeof errandRows === 'function' ? errandRows() : [])];
   if (reqs.length) { html += '<h4>Requests</h4>'; for (const [k, v] of reqs) html += row(k, v); }
   // what's left to find
   const places = Object.keys(PLACES), found = places.filter(k => G.discovered[k]).length;
