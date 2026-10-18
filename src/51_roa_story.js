@@ -271,6 +271,7 @@ function updateRoaStory(dt) {
   const p = PL.body.pos;
   if (G.quest === 'toRoa' && rectDist(p.x, p.z, ROA_CITY) < 2) setQuest('findEris');
   updateRoaSchedules();
+  updateAftermath();
   // the First Golem stands when you step into its ring
   if (Math.hypot(p.x - FIRST_WALL.x, p.z - FIRST_WALL.z) < FIRST_WALL.r - 3) {
     const g = ENT.enemies.find(e => e.key === 'golem' && e.state === 'dormant' && !e.dead);

@@ -52,8 +52,36 @@ function buildBoutRack() {
       });
     } });
 }
+// The world answers what you did: a merchant back at Wagonbreak once the brigands are gone,
+// a scholar at the First Wall once the golem's down (by day), the dead in its ring by night.
+function buildAftermath() {
+  const W = WAGON_CAMP, F = FIRST_WALL;
+  new NPC('oswin', { base: 'Barbarian', recolor: { barbarian: { 1: '#6a4a2a', 6: '#4a5a6a' } }, hide: ['Barbarian_Hat'] }, W.x - 3, W.z + 5,
+    { name: 'Oswin, Merchant', face: 2.4, idle: 'Use_Item', talk: n => npcSay(n, [{ s: 'Oswin, Merchant', t: pick([
+      'You\'re the one who cleared them out? The road\'s moving again. Three wagons through this week, and not one robbed.',
+      'Brannoc took my best cart. I\'m told you took Brannoc. Seems fair.',
+      'If you\'re headed east, mind the jackals. If you\'re headed west, mind the prices in Roa.']) }]) });
+  new NPC('scholar', { base: 'Mage', recolor: { mage: { 1: '#3a2418', 8: '#5a4a3a', 9: '#4a3a2a' } }, hide: ['Mage_Hat'] }, F.x + 14, F.z + 30,
+    { name: 'Marit, Tomas\'s apprentice', face: Math.PI, idle: 'Interact', talk: n => npcSay(n, [{ s: 'Marit, Tomas\'s apprentice', t: pick([
+      'The masonry\'s older than the Asura Kingdom. Older than anything with a name. And you broke its guardian. Tomas is furious. Also thrilled.',
+      'There are marks on the stones — the same hand as the Sunstones. Somebody built both. Somebody tall.',
+      'I come by day. By night the old dead walk the ring. I take notes from a very long way off.']) }]) });
+  NPCS.oswin.setVisible(false); NPCS.scholar.setVisible(false);
+  defineEncounter('firstWallNight', F.x, F.z, [['knight', 0, 4], ['thrall', 7, 0], ['thrall', -7, 2], ['archer', 2, -14]], { night: true, flag: 'firstWall' });
+}
+function updateAftermath() {
+  if (!G || !NPCS.oswin) return;
+  const day = TOD.hour > 6.5 && TOD.hour < 19.5;
+  const want = { oswin: !!G.flags.wagons, scholar: !!G.flags.firstWall && day };
+  for (const [id, on] of Object.entries(want)) {
+    const n = NPCS[id];
+    if (n.visible === on) continue;
+    if (n.pos.distanceTo(camera.position) > 40 || behindCamera(n.pos)) n.setVisible(on);
+  }
+}
 function buildSideQuests() {
   buildBoutRack();
+  buildAftermath();
   for (const [k, I] of Object.entries(INSCRIPTIONS)) {
     const a = I.at(), pos = new THREE.Vector3(a.x, heightAt(a.x, a.z), a.z);
     INTERACTABLES.push({ pos, r: 3.2, label: () => I.label,
