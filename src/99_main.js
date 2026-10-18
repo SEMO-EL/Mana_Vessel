@@ -185,7 +185,8 @@ function frame(dtReal) {
   assignLights();
   flushPools();
   renderer.info.reset();
-  composer.render(dtReal);
+  // (the self-tests' logic runs skip drawing: under software rendering a frame of Roa takes seconds)
+  if (GAME.skipRender) scene.updateMatrixWorld(); else composer.render(dtReal);
   endInputFrame();
 }
 function loop(now) {
@@ -233,6 +234,7 @@ function selfTests() {
     for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2];
     const v = Math.round(s / (32 * 18 * 3)); return v > 20 ? v : false;
   });
+  GAME.skipRender = true;             // from here on the checks are logic: no need to draw every step
   check('spells', () => { const out = []; for (const sp of unlockedSpells()) { G.cds = {}; G.mana = G.maxMana; castPlayerSpell(sp, false); step(8); out.push(sp.id); } return out.join(','); });
   check('kill', () => {
     const p = PL.body.pos, e = new Enemy('wolf', p.x + 4, p.z), k0 = G.kills;
@@ -379,6 +381,7 @@ function selfTests() {
     Object.assign(G, snap); resetCaches();
     return ok && C.open === 0 ? CACHES.list.length : false;
   });
+  GAME.skipRender = false;
   R.failures = fail; R.ok = fail.length === 0;
   return R;
 }
