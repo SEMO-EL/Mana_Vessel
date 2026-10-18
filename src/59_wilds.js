@@ -318,6 +318,7 @@ function errandMarks() {
   if (f.moon === 'asked' && moonOpen()) for (const P of WILDS.petals) if (!(f.moonGot || []).includes(P.i) && near(P.x, P.z, 90)) out.push(P);
   if (f.ashback === 'asked' && near(WILD_SPOTS.ashback.x, WILD_SPOTS.ashback.z, 300)) out.push(WILD_SPOTS.ashback);
   if (f.caravan === 'asked' && WILDS.wreck && near(WILDS.wreck.x, WILDS.wreck.z, 300)) out.push(WILDS.wreck);
+  if (typeof townMarks === 'function') out.push(...townMarks());
   return out;
 }
 function errandRows() {
@@ -332,6 +333,7 @@ function errandRows() {
   if (f.caravan === 'asked') out.push(['Hilde\'s Caravan', 'The wreck north of Roa\'s walls, off the trade road']);
   if (f.caravan === 'found') out.push(['Hilde\'s Caravan', 'Back to Hilde by the plaza']);
   if (f.caravan === 'done') out.push(['Hilde\'s Caravan', 'Done — a friend\'s price at her stall']);
+  if (typeof townRows === 'function') out.push(...townRows());
   return out;
 }
 

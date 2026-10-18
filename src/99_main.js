@@ -204,7 +204,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, TOWN_ERRAND, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -369,6 +369,20 @@ function selfTests() {
     for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
     Object.assign(G, snap);
     return stew && kid;
+  });
+  // Magister Wenna's lesson: Quagmire is taught (a flag), not studied; cast, it mires what stands in it
+  check('quagmire', () => {
+    if (!NPCS.wenna || TOWN_ERRAND.clay.length !== 3) return false;
+    const snap = JSON.parse(JSON.stringify(G)), q = SPELL.quagmire;
+    const before = isLearned(q);
+    G.flags.spell_quagmire = true; G.mana = G.maxMana; G.cds = {};
+    const p = PL.body.pos, e = new Enemy('bandit', p.x + 7, p.z, { override: { static: true } }), lock = CAM.lockTarget;
+    CAM.lockTarget = e; castPlayerSpell(q, false); step(10);
+    const mired = e.slow >= 0.75 && e.hp < e.maxHp;
+    CAM.lockTarget = lock; e.remove();
+    for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
+    Object.assign(G, snap);
+    return !before && mired;
   });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;

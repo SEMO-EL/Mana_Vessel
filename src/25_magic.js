@@ -16,7 +16,7 @@ function schoolRank(sc) {
   for (let i = RANK_NEED.length - 1; i >= 0; i--) if (p >= RANK_NEED[i]) return i;
   return 0;
 }
-function isLearned(s) { return (G.prof[s.school] || 0) >= (RANK_NEED[s.rank] ?? 999); }
+function isLearned(s) { return s.gift ? !!(G && G.flags && G.flags['spell_' + s.gift]) : (G.prof[s.school] || 0) >= (RANK_NEED[s.rank] ?? 999); }
 function learnedIds() { return SPELLS.filter(isLearned).map(s => s.id); }
 // One slot per school. It holds the spell you attuned in the Grimoire, or, if
 // you never chose, the strongest you know. (Lower spells keep their uses: the
@@ -127,7 +127,7 @@ function castPlayerSpell(sp, incanted) {
     case 'nova':   addEffect({ kind: 'nova', pos: groundPoint(target), t: 0, life: sp.life, r: sp.area, dmg: sp.dmg * power, school: sp.school, slow: sp.slow, burn: sp.burn, hits: new Set() }); shake(0.25); break;
     case 'burst':  addEffect({ kind: 'nova', pos: PL.body.pos.clone(), t: 0, life: sp.life, r: sp.area, dmg: sp.dmg * power, school: sp.school, knock: sp.knock, hits: new Set(), self: true }); shake(0.2); break;
     case 'meteor': addEffect({ kind: 'meteor', pos: groundPoint(target), t: 0, delay: sp.delay, r: sp.area, dmg: sp.dmg * power, burn: sp.burn }); break;
-    case 'field':  addEffect({ kind: 'field', pos: groundPoint(target), t: 0, life: sp.life, r: sp.area, dmg: sp.dmg * power, slow: sp.slow, tick: 0, school: 'water' }); freezeWaterNear(groundPoint(target), sp.area); break;
+    case 'field':  addEffect({ kind: 'field', pos: groundPoint(target), t: 0, life: sp.life, r: sp.area, dmg: sp.dmg * power, slow: sp.slow, tick: 0, school: sp.school }); if (sp.school === 'water') freezeWaterNear(groundPoint(target), sp.area); break;
     case 'prison': addEffect({ kind: 'prison', pos: groundPoint(target), t: 0, life: sp.life, r: sp.area, dmg: sp.dmg * power, root: sp.root, applied: false }); shake(0.3); break;
     case 'wall':   raisePillar(groundPoint(target), sp.life); break;
     case 'self': {
@@ -257,7 +257,7 @@ function addEffect(e) {
     BUS.emit('sfx', { id: 'meteorFall' });
   }
   if (e.kind === 'field' || e.kind === 'prison' || e.kind === 'aura') {
-    e.circle = runeCircle(e.kind === 'field' ? SCHOOLS.water.col : e.kind === 'prison' ? SCHOOLS.earth.col : SCHOOLS.heal.col);
+    e.circle = runeCircle(e.kind === 'field' ? SCHOOLS[e.school || 'water'].col : e.kind === 'prison' ? SCHOOLS.earth.col : SCHOOLS.heal.col);
     e.circle.scale.setScalar(e.r * 2);
   }
   MAGIC.effects.push(e);
@@ -331,14 +331,15 @@ function updateEffects(dt) {
         e.circle.position.copy(e.pos).setY(e.pos.y + 0.12);
         e.circle.material.opacity = 0.7 * (1 - e.t / e.life);
         e.circle.rotation.y -= dt * 0.5;
-        if (Math.random() < 0.6) emit(2, { pos: e.pos.clone().add(new THREE.Vector3(rnd(-e.r, e.r), 0.2, rnd(-e.r, e.r))), col: '#cdefff', vel: { x: 0, y: 0.6, z: 0 }, velSpread: 0.3, life: 1.4, size: 0.18, bright: 1.6 });
+        const mud = e.school === 'earth';             // Quagmire: the ground turned to sucking mud, bubbling brown
+        if (Math.random() < 0.6) emit(2, { pos: e.pos.clone().add(new THREE.Vector3(rnd(-e.r, e.r), mud ? 0.05 : 0.2, rnd(-e.r, e.r))), col: mud ? '#6e5434' : '#cdefff', vel: { x: 0, y: mud ? 0.3 : 0.6, z: 0 }, velSpread: 0.3, life: mud ? 1.0 : 1.4, size: mud ? 0.26 : 0.18, bright: mud ? 0.6 : 1.6, pool: mud ? 'soft' : undefined });
         e.tick -= dt;
         if (e.tick <= 0) {
           e.tick = 0.4;
           for (const en of ENT.enemies) {
             if (en.dead || en.inactive) continue;
             if (Math.hypot(en.pos.x - e.pos.x, en.pos.z - e.pos.z) > e.r + en.r) continue;
-            damageEnemy(en, e.dmg, { slow: e.slow, poise: 4, kind: 'magicAoE', school: 'water' });
+            damageEnemy(en, e.dmg, { slow: e.slow, poise: 4, kind: 'magicAoE', school: e.school || 'water' });
           }
         }
         done = e.t > e.life;

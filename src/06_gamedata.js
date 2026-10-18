@@ -79,6 +79,8 @@ const SPELLS = [
   { id: 'wall',      school: 'earth', rank: 1, name: 'Earth Wall',    kind: 'wall',  cost: 18, dmg: 0,  cd: 1.6, life: 20, range: 14 },
   { id: 'barrage',   school: 'earth', rank: 2, name: 'Rock Barrage',  kind: 'bolt',  cost: 44, dmg: 26, spd: 40, radius: 0.3, cd: 0.8, life: 1.8, shots: 5, spread: 0.22, knock: 3, gravity: 4 },
   { id: 'prison',    school: 'earth', rank: 3, name: 'Stone Prison',  kind: 'prison',cost: 70, dmg: 55, area: 6, cd: 3.6, life: 3.0, root: 2.8, range: 30 },
+  // taught, not studied: Magister Wenna's lesson in Roa (gift: learned by her flag, not by rank)
+  { id: 'quagmire',  school: 'earth', rank: 1, name: 'Quagmire',      kind: 'field', cost: 30, dmg: 7,  area: 5.5, cd: 2.4, life: 5.0, slow: 0.8, range: 26, gift: 'quagmire' },
 
   { id: 'healing',   school: 'heal',  rank: 0, name: 'Healing',       kind: 'self',  cost: 20, heal: 34, cd: 1.5 },
   { id: 'greatheal', school: 'heal',  rank: 1, name: 'Great Healing', kind: 'self',  cost: 38, heal: 80, cd: 2.6, cleanse: true },

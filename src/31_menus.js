@@ -177,6 +177,7 @@ function resetWorldState() {
   horseStandDown();
   if (typeof resetCaches === 'function') resetCaches();
   if (typeof resetWilds === 'function') resetWilds();
+  if (typeof resetTownErrands === 'function') resetTownErrands();
   buildSpellBar();
 }
 function enterPlay() {
@@ -212,8 +213,8 @@ function openGrimoire() {
     html += `<div class="prog"><i style="width:${pct * 100}%;background:${s.col}"></i></div>`;
     const slotted = unlockedSpells().find(x => x.school === k);
     for (const sp of SPELLS.filter(x => x.school === k)) {
-      const has = p >= RANK_NEED[sp.rank], on = slotted && slotted.id === sp.id;
-      html += `<div class="sp ${has ? 'can' : 'lock'} ${on ? 'attuned' : ''}" ${has ? `data-attune="${sp.id}"` : ''}><b>${sp.name}</b> — ${RANKS[sp.rank]} · ${sp.cost} mana${has ? (on ? ' · <i>attuned</i>' : '') : ' · locked'}</div>`;
+      const has = isLearned(sp), on = slotted && slotted.id === sp.id;
+      html += `<div class="sp ${has ? 'can' : 'lock'} ${on ? 'attuned' : ''}" ${has ? `data-attune="${sp.id}"` : ''}><b>${sp.name}</b> — ${RANKS[sp.rank]} · ${sp.cost} mana${has ? (on ? ' · <i>attuned</i>' : '') : sp.gift ? ' · taught, not studied' : ' · locked'}</div>`;
     }
     html += `</div>`;
   }
