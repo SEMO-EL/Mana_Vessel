@@ -218,6 +218,30 @@ function openGrimoire() {
   openScreen('grimoire');
 }
 
+/* ───────────── photo mode ─────────────
+   The world holds still; the camera is yours (mouse to look, WASD to move,
+   Space/C up and down, Shift faster), within 40 m of where you stand.
+   P or Esc to go back. */
+const PHOTO = { saved: null };
+function enterPhoto() {
+  if (GAME.state !== 'play' || UI.dlg || PL.state === 'dead') return;
+  PHOTO.saved = { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov };
+  const d = camera.getWorldDirection(new THREE.Vector3());
+  DEVCAM.yaw = Math.atan2(-d.x, -d.z); DEVCAM.pitch = Math.asin(clamp(d.y, -1, 1)); DEVCAM.speed = 8;
+  camera.rotation.set(DEVCAM.pitch, DEVCAM.yaw, 0, 'YXZ');
+  GAME.state = 'photo';
+  $('hud').classList.add('off'); $('toasts').style.opacity = 0;
+  lockPointer();
+  toast('Photo mode — ' + IN.label('photo') + ' to return');
+}
+function exitPhoto() {
+  if (GAME.state !== 'photo') return;
+  GAME._suppressPause = true; setTimeout(() => GAME._suppressPause = false, 150);   // Esc also frees the mouse: that's not a pause
+  GAME.state = 'play';
+  $('hud').classList.remove('off'); $('toasts').style.opacity = '';
+  if (PHOTO.saved) { camera.fov = PHOTO.saved.fov; camera.updateProjectionMatrix(); }
+}
+
 /* ───────────── journal ─────────────
    Where you are in the story, the jobs you've taken, and what's left to find. */
 const JOURNAL_FOES = [['warden', 'The Barrow Warden'], ['treant', 'The Elder Treant'], ['alpha', 'The Grey Alpha'], ['wagons', 'Brannoc, Brigand Captain'],
@@ -409,7 +433,9 @@ function initMenus() {
       if (is('map') && typeof mapOpen === 'function') { GAME._suppressPause = true; GAME.state = 'map'; mapOpen(); setTimeout(() => GAME._suppressPause = false, 50); }
       else if (is('menu')) { GAME._suppressPause = true; openGrimoire(); setTimeout(() => GAME._suppressPause = false, 50); }
       else if (is('pause')) pauseGame();
-    } else if (GAME.state === 'map' && (is('map') || is('pause'))) { mapClose(); GAME.state = 'play'; lockPointer(); }
+      else if (is('photo')) enterPhoto();
+    } else if (GAME.state === 'photo' && (is('photo') || is('pause'))) exitPhoto();
+    else if (GAME.state === 'map' && (is('map') || is('pause'))) { mapClose(); GAME.state = 'play'; lockPointer(); }
     else if (GAME.state === 'paused' && is('pause')) resumeGame();
     else if (GAME.state === 'grimoire' && (is('menu') || is('pause'))) resumeGame();
     else if (GAME.state === 'bounties' && (is('pause') || is('interact'))) resumeGame();

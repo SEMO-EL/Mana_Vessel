@@ -119,7 +119,7 @@ function spawnHorse(x, z, heading) {
 }
 // the whistle: she comes from behind you, out of sight, at a canter
 function whistleHorse() {
-  if (!horseUnlocked()) return;
+  if (!horseUnlocked()) { hint('You have no horse yet. The Boreas stables might lend you one.', 3); return; }
   if (GAME.inCave) { hint('She won\'t come underground.', 3); return; }
   BUS.emit('sfx', { id: 'whistle' });
   const p = PL.body.pos;

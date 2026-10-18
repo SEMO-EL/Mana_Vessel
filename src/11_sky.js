@@ -30,6 +30,40 @@ const DUST_COL = new THREE.Color('#c9ad80'), DUST_STORM = new THREE.Color('#b087
 // Lightning: in a heavy downpour the sky splits now and then — a white flicker
 // over everything, then the thunder, later the further away it struck.
 const STORM = { t: 12, flash: 0, flick: 0, lit: new THREE.Color('#dfe8ff') };
+// Shooting stars: on a clear night, now and then, a streak across the dark
+const METEOR = { t: 25, line: null, life: 0, a: new THREE.Vector3(), b: new THREE.Vector3() };
+function updateMeteors(dt, S) {
+  if (!METEOR.line) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array([2.6, 2.6, 3.0, 0, 0, 0]), 3));
+    METEOR.line = new THREE.Line(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    METEOR.line.frustumCulled = false; METEOR.line.renderOrder = -5; METEOR.line.visible = false;
+    scene.add(METEOR.line);
+  }
+  const clear = S.night > 0.7 && WEATHER.cur.cloud < 0.55 && WEATHER.cur.rain < 0.1 && !GAME.inCave;
+  if (METEOR.life > 0) {
+    METEOR.life -= dt;
+    const k = 1 - Math.max(0, METEOR.life) / 0.8;
+    const head = _c1v.copy(METEOR.a).lerp(METEOR.b, k).normalize(), tail = _c2v.copy(METEOR.a).lerp(METEOR.b, Math.max(0, k - 0.22)).normalize();
+    const p = METEOR.line.geometry.attributes.position, c = camera.position, D = camera.far * 0.75;   // inside the far plane on every quality
+    p.setXYZ(0, c.x + head.x * D, c.y + head.y * D, c.z + head.z * D);
+    p.setXYZ(1, c.x + tail.x * D, c.y + tail.y * D, c.z + tail.z * D);
+    p.needsUpdate = true;
+    METEOR.line.material.opacity = Math.sin(k * Math.PI);
+    if (METEOR.life <= 0) METEOR.line.visible = false;
+    return;
+  }
+  if (!clear) return;
+  METEOR.t -= dt;
+  if (METEOR.t > 0) return;
+  METEOR.t = rnd(18, 55);
+  const az = Math.random() * TAU, el = rnd(0.35, 0.9), turn = (Math.random() < 0.5 ? -1 : 1) * rnd(0.25, 0.45);
+  METEOR.a.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));
+  METEOR.b.set(Math.cos(az + turn) * Math.cos(el - 0.18), Math.sin(el - 0.18), Math.sin(az + turn) * Math.cos(el - 0.18));
+  METEOR.life = 0.8; METEOR.line.visible = true;
+}
+const _c1v = new THREE.Vector3(), _c2v = new THREE.Vector3();
 function updateStorm(dt) {
   const heavy = WEATHER.cur.rain > 0.7 && WEATHER.cur.cloud > 0.85 && !GAME.inCave;
   STORM.flash = Math.max(0, STORM.flash - dt * 4.5);
@@ -185,6 +219,7 @@ function updateSky(dt, focus, time) {
 
   const S = skyState();
   updateStorm(dt);
+  updateMeteors(dt, S);
   if (STORM.flash > 0.001) {                     // the whole sky lit white for a heartbeat
     const k = STORM.flash * STORM.flash;
     S.zen.lerp(STORM.lit, k * 0.55); S.hor.lerp(STORM.lit, k * 0.7); S.fog.lerp(STORM.lit, k * 0.45);

@@ -352,7 +352,7 @@ function updateHUD(dt, time) {
   const obj = typeof currentObjective === 'function' ? currentObjective() : null;
   if (obj) { $('objTitle').textContent = obj.title; $('objText').textContent = obj.text; $('objective').style.opacity = UI.calmT > 12 ? 0.35 : 0.9; }
   else $('objective').style.opacity = 0;
-  $('keyHints').innerHTML = IN.usingPad ? '' : `${IN.label('lock')} lock · ${IN.label('map')} map · ${IN.label('pause')} pause`;
+  $('keyHints').innerHTML = IN.usingPad ? '' : `${IN.label('lock')} lock · ${IN.label('map')} map${typeof horseUnlocked === 'function' && horseUnlocked() ? ' · ' + IN.label('horse') + ' horse' : ''} · ${IN.label('pause')} pause`;
 }
 
 /* screen flash (vessel break, meteor): pushes a colour through the grade pass */
