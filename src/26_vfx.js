@@ -301,6 +301,7 @@ function dustAround(cp) {
 /* Feet on the ground: dust off dry earth when you run, water thrown up when
    you wade, a ring of dust where you land hard. */
 const STEPS = { x: 0, z: 0, acc: 0, init: false };
+const _staffL = new THREE.Vector3();
 const _fv = new THREE.Vector3();
 function dryGround(x, z) {
   if (GAME.inCave) return 0;
@@ -355,6 +356,8 @@ function updateVFX(dt) {
   }
   updatePickups(dt);
   updateSteps();
+  // at night, outdoors, your staff glows a little: enough to see the path, not enough to hide the stars
+  if (G && PL.actor && !GAME.inCave && SKY_NOW.night > 0.45 && PL.actor.root.visible) requestLight(PL.actor.bonePos('handslotr', _staffL).setY(_staffL.y + 0.6), '#ffd9a8', 3.2 * smooth(0.45, 0.8, SKY_NOW.night), 9);
   // rain follows weather
   if (VFX.rain) {
     const u = VFX.rain.material.uniforms;
