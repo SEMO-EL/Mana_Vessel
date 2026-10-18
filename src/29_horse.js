@@ -130,6 +130,7 @@ const _hn = new THREE.Vector3();
 
 function mountHorse() {
   if (HORSE.mode === 'gone' || PL.state !== 'move') return;
+  if (GAME.time < (HORSE.noMountUntil || 0)) return;          // the press that got you down mustn't put you straight back up
   HORSE.mode = 'ride'; HORSE.speed = 0;
   setPlayerState('ride');
   PL.chanting = null; PL.guarding = false; PL.actor.setUpper(null);
@@ -142,6 +143,7 @@ function mountHorse() {
 function dismountHorse(thrown = false) {
   if (HORSE.mode !== 'ride') return;
   HORSE.mode = 'idle';
+  HORSE.noMountUntil = GAME.time + 0.4;
   const hx = Math.cos(HORSE.heading), hz = -Math.sin(HORSE.heading);                 // her left side
   const x = HORSE.body.pos.x + hx * 1.3, z = HORSE.body.pos.z + hz * 1.3;
   const b = PL.body;

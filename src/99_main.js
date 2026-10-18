@@ -253,6 +253,18 @@ function selfTests() {
   check('scar', () => { const p = PL.body.pos, e = new Enemy('scar', p.x + 8, p.z); step(10); const ok = !!e.rig; e.remove(); return ok; });
   check('eris', () => { if (!ALLY.eris) ALLY.eris = new Companion(ERIS_SPEC, 'Eris', '#e8606f'); ALLY.eris.join(); step(10); const ok = ALLY.eris.active; ALLY.eris.leave(); return ok; });
   check('horse', () => { G.flags.horse = true; whistleHorse(); step(90); const came = HORSE.mode === 'come' || HORSE.mode === 'idle'; HORSE.body.pos.copy(PL.body.pos).add(new THREE.Vector3(1.5, 0, 0)); HORSE.mode = 'idle'; mountHorse(); const rode = PL.state === 'ride'; step(10); dismountHorse(); const off = PL.state === 'move'; horseStandDown(); return came && rode && off; });
+  // getting down stays down: the key that dismounts must not remount in the same frame (H and E both)
+  check('dismount', () => {
+    G.flags.horse = true; const keys = [SETTINGS.binds.horse, SETTINGS.binds.interact], res = [];
+    for (const k of keys) {
+      whistleHorse(); HORSE.body.pos.copy(PL.body.pos).add(new THREE.Vector3(1.5, 0, 0)); HORSE.mode = 'idle'; GAME.time += 1;
+      mountHorse(); step(3);
+      IN.keys.add(k); IN.edgesDown.add(k); frame(1 / 30); IN.keys.delete(k); IN.edgesUp.add(k); step(10);
+      res.push(PL.state === 'move' && HORSE.mode === 'idle');
+    }
+    horseStandDown();
+    return res.every(Boolean);
+  });
   check('walkers', () => { const w = TOWN.walkers[0], x0 = w.pos.x, z0 = w.pos.z; w.update(1, true, w.pos.clone().setY(w.pos.y + 5)); for (let i = 0; i < 30; i++) w.update(1 / 15, true, w.pos.clone().setY(w.pos.y + 5)); return Math.hypot(w.pos.x - x0, w.pos.z - z0) > 0.5 || w.mode === 'pause'; });
   check('event', () => {
     const q0 = G.quest; G.quest = 'wolves';
