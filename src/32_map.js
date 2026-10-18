@@ -932,6 +932,15 @@ function mapDrawMarkers(ctx, f, t) {
     ctx.lineWidth = 1.2 * k; ctx.strokeStyle = got ? 'rgba(42,33,22,.55)' : MAP_COL.ink; ctx.stroke();
     if (!got) { ctx.fillStyle = MAP_COL.mana; ctx.fill(); }
   }
+  // Kestrel, waiting where you left her: a horseshoe
+  if (typeof HORSE !== 'undefined' && (HORSE.mode === 'idle' || HORSE.mode === 'come') && HORSE.body) {
+    const X = f.ox + HORSE.body.pos.x * f.s, Y = f.oy + HORSE.body.pos.z * f.s, r = 6 * k;
+    if (inside(X, Y, 10 * k)) {
+      ctx.beginPath(); ctx.arc(X, Y, r, Math.PI * 0.15, Math.PI * 0.85, true);
+      ctx.lineWidth = 3 * k; ctx.strokeStyle = MAP_COL.ink; ctx.stroke();
+      ctx.lineWidth = 1.6 * k; ctx.strokeStyle = '#b08a5a'; ctx.stroke();
+    }
+  }
   // a tracked bounty: a blood-red star with its name
   const bm = G && typeof bountyMarker === 'function' ? bountyMarker() : null;
   if (bm) {

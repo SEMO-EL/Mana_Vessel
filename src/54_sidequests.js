@@ -27,7 +27,33 @@ const SCRIBE_LINES = {
   after: [{ s: 'Old Tomas, Scribe', t: 'Chapter four, "The Keeper of the Wall." Chapter five is going to be your fault, I can feel it.' }],
 };
 
+// Ghislaine, once she's tested you, will go again whenever you take a blade from her rack
+const GHIS_BOUT = {
+  ask: ['Again? Good. Take a blade.', 'Shoulders, not the sword. Begin.', 'Eris is watching. Don\'t embarrass me.'],
+  win: ['Better. Your feet listened this time.', 'Hm. You hit me. Remember how.', 'Good. Again tomorrow.'],
+  lose: ['Dead. Twice. Breathe, then come back.', 'You watched the blade. Watch the shoulders.', 'Too slow. Faster costs nothing.'],
+};
+const pastFirstSpar = () => !!G && (G.quest === 'done' || ROA_STEPS.indexOf(G.quest) > ROA_STEPS.indexOf('ghislaine'));
+function buildBoutRack() {
+  const Y = ROA.spots.yard, x = Y.x + 11.5, z = Y.z + 1;
+  INTERACTABLES.push({ pos: new THREE.Vector3(x, heightAt(x, z), z), r: 3, label: () => 'Take a practice blade — spar with Ghislaine',
+    enabled: () => pastFirstSpar() && !UI.spar && NPCS.ghislaine && NPCS.ghislaine.visible && G.quest !== 'birthday',
+    action: async () => {
+      const n = NPCS.ghislaine;
+      await npcSay(n, [{ p: 'ghislaine', s: 'Ghislaine Dedoldia', t: pick(GHIS_BOUT.ask) }]);
+      startSpar('ghislaine', 'ghisSpar', {
+        yieldAt: 0.5,
+        onWin: () => {
+          G.flags.ghisBouts = (G.flags.ghisBouts || 0) + 1;
+          gainXp(Math.max(15, 45 - G.flags.ghisBouts * 5));
+          npcSay(NPCS.ghislaine, [{ p: 'ghislaine', s: 'Ghislaine Dedoldia', t: pick(GHIS_BOUT.win) }]);
+        },
+        onLose: () => npcSay(NPCS.ghislaine, [{ p: 'ghislaine', s: 'Ghislaine Dedoldia', t: pick(GHIS_BOUT.lose) }]),
+      });
+    } });
+}
 function buildSideQuests() {
+  buildBoutRack();
   for (const [k, I] of Object.entries(INSCRIPTIONS)) {
     const a = I.at(), pos = new THREE.Vector3(a.x, heightAt(a.x, a.z), a.z);
     INTERACTABLES.push({ pos, r: 3.2, label: () => I.label,

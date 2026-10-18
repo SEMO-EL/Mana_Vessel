@@ -223,6 +223,7 @@ function updateCrystals(dt) {
     if (d2 < 70 * 70 && !(G.crystalsSeen || (G.crystalsSeen = [])).includes(c.id)) G.crystalsSeen.push(c.id);   // marked on the map from now on
     c.m.rotation.y = t * 0.6; c.m.position.y = 0.12 + Math.sin(t * 1.7 + c.x) * 0.08;
     c.beam.material.opacity = 0.14 * smooth(6, 40, Math.sqrt(d2));
+    if (d2 < 35 * 35 && !G.flags.crystalHint) { G.flags.crystalHint = true; hint('A mana crystal. Reach it, and it deepens your vessel.', 5); }
     if (d2 < 30 * 30) requestLight(_crV.copy(c.pos).setY(c.y + 0.8), '#7fc8ff', 2.4, 7);
     if (d2 < 1.6 * 1.6 && Math.abs(p.y - c.y) < 1.6 && PL.state !== 'dead') takeCrystal(c);
   }
