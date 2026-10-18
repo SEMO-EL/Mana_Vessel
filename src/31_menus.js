@@ -160,6 +160,7 @@ function continueJourney() {
 }
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
+  if (typeof EVENTS !== 'undefined' && EVENTS.cur) endRoadEvent(EVENTS.cur);
   for (const e of [...ENT.enemies]) e.remove();
   UI.spar = null; UI.sparInfo = null; CAM.lockTarget = null; LATER.length = 0;
   if (SHOT.fn) { SHOT.fn = null; CAM.override = null; letterbox(false); }

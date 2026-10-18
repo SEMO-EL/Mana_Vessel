@@ -268,7 +268,12 @@ function selfTests() {
     step(3);
     const saved = E.phase === 'saved' && G.flags.helped === h0 + 1 && !!eventMarker() === false;
     endRoadEvent(E); G.flags.helped = h0; G.quest = q0; PL.body.pos.copy(p0);
-    return ring && saved && !EVENTS.cur && !INTERACTABLES.includes(E.interact) ? E.foes.length : false;
+    // swept away (a death, a fast travel) is not a rescue
+    const E2 = startRoadEvent({ x: E.x, z: E.z, roadAng: 0 });
+    for (const e of [...E2.foes]) e.remove();
+    step(2);
+    const swept = !EVENTS.cur && (G.flags.helped || 0) === h0;
+    return ring && saved && swept && !INTERACTABLES.includes(E.interact) && !INTERACTABLES.includes(E2.interact) ? E.foes.length : false;
   });
   R.failures = fail; R.ok = fail.length === 0;
   return R;

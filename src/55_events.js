@@ -152,6 +152,8 @@ function endRoadEvent(E) {
 function updateRoadEvent(E, dt) {
   E.t += dt;
   const p = PL.body.pos, d = Math.hypot(p.x - E.x, p.z - E.z);
+  // cleared away rather than killed (you died, travelled, loaded): the moment's gone, nobody was saved
+  if (E.phase === 'beset' && E.foes.some(e => e.removed && !e.dead)) { endRoadEvent(E); return; }
   const live = E.foes.filter(e => !e.dead && !e.removed);
   let want = E.face;
   if (E.phase === 'beset') {
