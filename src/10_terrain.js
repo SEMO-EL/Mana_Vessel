@@ -139,7 +139,10 @@ async function buildTerrain() {
   TER.streets = STREETS.map(s => s.length > 2 ? catmull(s, 6) : s);
   for (const s of TER.streets) rasterPolyline(s, null, TER.ROADD, null, ROAD_WIDTH / 2 + 20);
 
-  /* --- heights --- */
+  /* --- heights ---
+     Every layer below is weighted, and most weights are exactly 0 over most of
+     the map (no forest roughness on the meadows, no peaks in the basin); those
+     layers' noise is skipped, which leaves the sums bit-for-bit the same. */
   const n1 = Noise.make(WORLD.seed + 1), n2 = Noise.make(WORLD.seed + 2), n3 = Noise.make(WORLD.seed + 3);
   const n4 = Noise.make(WORLD.seed + 4), n5 = Noise.make(WORLD.seed + 5), n6 = Noise.make(WORLD.seed + 6);
   const hw = RIVER_WIDTH / 2;
@@ -154,13 +157,14 @@ async function buildTerrain() {
 
       // forest hills — rougher inside the forest zone
       const fw = smooth(FOREST_ZONE.x0 - 60, FOREST_ZONE.x0 + 60, x) * (1 - smooth(FOREST_ZONE.z1 - 60, FOREST_ZONE.z1 + 60, z)) * forestEast(x);
-      h += fw * fbm(n4, x / 170, z / 170, 3) * 12;
+      if (fw > 0) h += fw * fbm(n4, x / 170, z / 170, 3) * 12;
 
       // watchtower ridge: capsule falloff along its spine, crest roughened
       const rt = clamp(((x - RIDGE.ax) * rdx + (z - RIDGE.az) * rdz) / rlen2, 0, 1);
       const rd = Math.hypot(x - (RIDGE.ax + rdx * rt), z - (RIDGE.az + rdz * rt));
       const rTaper = Math.sin(rt * Math.PI) * 0.55 + 0.45;
-      h += RIDGE.h * rTaper * Math.exp(-Math.pow(rd / (RIDGE.w * 0.5), 2)) * (0.9 + 0.2 * n6(x / 50, z / 50));
+      const rFall = Math.exp(-Math.pow(rd / (RIDGE.w * 0.5), 2));
+      if (rFall > 0) h += RIDGE.h * rTaper * rFall * (0.9 + 0.2 * n6(x / 50, z / 50));
 
       // the tutor's hill
       const dh = Math.hypot(x - ROXY_HILL.x, z - ROXY_HILL.z);
@@ -173,7 +177,7 @@ async function buildTerrain() {
       // northern escarpment — wobbly line, steep middle, rough top
       const cz = z + n6(x / 70, 3.1) * 14;
       let ct = smooth(CLIFF.z0, CLIFF.z1, cz); ct = ct * ct * (3 - 2 * ct);
-      h += ct * (CLIFF.h + ridged(n5, x / 90, z / 90, 3) * 22) + smooth(CLIFF.z1, CLIFF.z1 - 200, cz) * 40;
+      h += (ct > 0 ? ct * (CLIFF.h + ridged(n5, x / 90, z / 90, 3) * 22) : 0) + smooth(CLIFF.z1, CLIFF.z1 - 200, cz) * 40;
 
       // mountain ring (rounded square), with a pass for the Roa road
       const ringE = Math.pow(Math.pow(Math.abs(x), 4) + Math.pow(Math.abs(z), 4), 0.25);
@@ -188,14 +192,14 @@ async function buildTerrain() {
         const pass = 1 - (1 - smooth(EAST_PASS.w, EAST_PASS.w + 100, Math.abs(z - EAST_PASS.z))) * smooth(560, 760, x);
         m *= pass; m2 *= pass;
       }
-      h += m * (45 + fbm(n4, x / 140, z / 140, 3) * 30) + m2 * (80 + ridged(n5, x / 240, z / 240, 5) * 170);
+      if (m > 0 || m2 > 0) h += (m > 0 ? m * (45 + fbm(n4, x / 140, z / 140, 3) * 30) : 0) + (m2 > 0 ? m2 * (80 + ridged(n5, x / 240, z / 240, 5) * 170) : 0);
 
       if (x > 900) h = sculptRoa(h, x, z, i, n2, n5);
 
       // village basin
       const dv = Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z);
       const vb = 1 - smooth(VILLAGE_BASIN.r * 0.5, VILLAGE_BASIN.r, dv);
-      h = lerp(h, VILLAGE_BASIN.h + n2(x / 60, z / 60) * 1.3, vb);
+      if (vb > 0) h = lerp(h, VILLAGE_BASIN.h + n2(x / 60, z / 60) * 1.3, vb);
 
       // lake: bowl below the water, rim guaranteed above it
       const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
@@ -422,6 +426,31 @@ function buildTerrainChunks(nA, nB) {
   }
 }
 
+// The triangle list depends only on the grid size, so every chunk of a size
+// shares one index buffer (on the GPU too): ~820 chunks, two distinct lists.
+const CHUNK_INDEX = {};
+function chunkIndex(S) {
+  if (CHUNK_INDEX[S]) return CHUNK_INDEX[S];
+  const V = S + 1, idx = [];
+  for (let j = 0; j < S; j++) for (let k = 0; k < S; k++) {
+    const a = j * V + k, b = a + 1, d = a + V, f = d + 1;
+    if ((j + k) & 1) idx.push(a, d, b, b, d, f); else idx.push(a, d, f, a, f, b);
+  }
+  const edge = [];
+  for (let k = 0; k < V; k++) edge.push(k);                       // north
+  for (let j = 1; j < V; j++) edge.push(j * V + S);               // east
+  for (let k = S - 1; k >= 0; k--) edge.push(S * V + k);          // south
+  for (let j = S - 1; j >= 1; j--) edge.push(j * V);              // west
+  edge.push(0);
+  const n = edge.length - 1, sk0 = V * V;                         // skirt vertex s sits at sk0 + s
+  for (let s = 0; s < n; s++) {
+    // wound to face OUT of the chunk: a seam is seen from the neighbour's side
+    const a = edge[s], b = edge[s + 1], sa = sk0 + s, sb = sk0 + (s + 1) % n;
+    idx.push(a, b, sa, b, sb, sa);
+  }
+  return (CHUNK_INDEX[S] = { edge, index: new THREE.BufferAttribute(new Uint16Array(idx), 1) });
+}
+
 function chunkGeometry(x0, z0, size, step, nA, nB) {
   const S = Math.round(size / step), V = S + 1;
   const skirt = 4 * S;                 // one skirt vertex per edge vertex (4 edges)
@@ -447,39 +476,23 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
     const gi = clamp(iz, 0, TER.NZ - 1) * N + clamp(ix, 0, N - 1);
     put(x, TER.H[gi], z, gi);
   }
-  const idx = [];
-  for (let j = 0; j < S; j++) for (let k = 0; k < S; k++) {
-    const a = j * V + k, b = a + 1, d = a + V, f = d + 1;
-    if ((j + k) & 1) idx.push(a, d, b, b, d, f); else idx.push(a, d, f, a, f, b);
-  }
   // skirts: hang each border edge down 6 m so LOD seams never show sky
   let sk = V * V;
-  const edge = [];
-  for (let k = 0; k < V; k++) edge.push(k);                       // north
-  for (let j = 1; j < V; j++) edge.push(j * V + S);               // east
-  for (let k = S - 1; k >= 0; k--) edge.push(S * V + k);          // south
-  for (let j = S - 1; j >= 1; j--) edge.push(j * V);              // west
-  edge.push(0);
-  const skirtIdx = [];
+  const { edge, index } = chunkIndex(S);
   for (let s = 0; s < edge.length - 1; s++) {
     const src = edge[s] * 3;
     pos[sk * 3] = pos[src]; pos[sk * 3 + 1] = pos[src + 1] - 6; pos[sk * 3 + 2] = pos[src + 2];
     nor[sk * 3] = nor[src]; nor[sk * 3 + 1] = nor[src + 1]; nor[sk * 3 + 2] = nor[src + 2];
     col[sk * 3] = col[src]; col[sk * 3 + 1] = col[src + 1]; col[sk * 3 + 2] = col[src + 2];
     pav[sk] = pav[edge[s]];
-    skirtIdx.push(sk); sk++;
-  }
-  for (let s = 0; s < edge.length - 1; s++) {
-    // wound to face OUT of the chunk: a seam is seen from the neighbour's side
-    const a = edge[s], b = edge[s + 1], sa = skirtIdx[s], sb = skirtIdx[(s + 1) % skirtIdx.length];
-    idx.push(a, b, sa, b, sb, sa);
+    sk++;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, sk * 3), 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nor.subarray(0, sk * 3), 3));
   g.setAttribute('color', new THREE.BufferAttribute(col.subarray(0, sk * 3), 3));
   g.setAttribute('paved', new THREE.BufferAttribute(pav.subarray(0, sk), 1));
-  g.setIndex(idx);
+  g.setIndex(index);
   g.computeBoundingSphere();
   g.computeBoundingBox();
   return g;

@@ -50,7 +50,8 @@ function mulberry32(a) {
 
 /* ───────────── 2D simplex noise (Gustavson), seeded ───────────── */
 const Noise = (() => {
-  const grad = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+  // gradients as two flat tables (same eight directions): no array-of-arrays hop per corner
+  const GX = new Int8Array([1, -1, 1, -1, 1, -1, 0, 0]), GY = new Int8Array([1, 1, -1, -1, 0, 0, 1, -1]);
   const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
   function make(seed) {
     const r = mulberry32(seed);
@@ -71,11 +72,11 @@ const Noise = (() => {
       const ii = i & 255, jj = j & 255;
       let n = 0, tt;
       tt = 0.5 - x0 * x0 - y0 * y0;
-      if (tt > 0) { const g = grad[perm[ii + perm[jj]] & 7]; tt *= tt; n += tt * tt * (g[0] * x0 + g[1] * y0); }
+      if (tt > 0) { const g = perm[ii + perm[jj]] & 7; tt *= tt; n += tt * tt * (GX[g] * x0 + GY[g] * y0); }
       tt = 0.5 - x1 * x1 - y1 * y1;
-      if (tt > 0) { const g = grad[perm[ii + i1 + perm[jj + j1]] & 7]; tt *= tt; n += tt * tt * (g[0] * x1 + g[1] * y1); }
+      if (tt > 0) { const g = perm[ii + i1 + perm[jj + j1]] & 7; tt *= tt; n += tt * tt * (GX[g] * x1 + GY[g] * y1); }
       tt = 0.5 - x2 * x2 - y2 * y2;
-      if (tt > 0) { const g = grad[perm[ii + 1 + perm[jj + 1]] & 7]; tt *= tt; n += tt * tt * (g[0] * x2 + g[1] * y2); }
+      if (tt > 0) { const g = perm[ii + 1 + perm[jj + 1]] & 7; tt *= tt; n += tt * tt * (GX[g] * x2 + GY[g] * y2); }
       return 70 * n;
     };
   }
