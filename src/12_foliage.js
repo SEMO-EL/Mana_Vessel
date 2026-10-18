@@ -273,6 +273,7 @@ function roaTreeDensity(x, z, h, n) {
   if (rectDist(x, z, { x: 1545, z: 600, hw: 100, hd: 75 }) < 4) return 0;           // the market gardens
   if (Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 46) return 0;
   if (Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r + 24) return 0;
+  if (nearLandmark(x, z, 6)) return 0;
   const orchard = rectDist(x, z, ROA_ORCHARD) < 1 && Math.abs(((x - ROA_ORCHARD.x) % 11 + 11) % 11 - 5.5) > 3.6 ? 0.9 : 0;
   const patchy = smooth(0, 0.55, n(x / 80, z / 80)), dry = outskirtsW(x, z);
   const slopes = smooth(48, 90, h) * 0.22;                                           // pines up toward the ring
@@ -385,7 +386,7 @@ function scatterRocks() {
     const p = steep * 2.2 + bank * 0.5 + smooth(0.4, 0.9, n(x / 60, z / 60)) * 0.12 + (roa ? outskirtsW(x, z) * 0.1 : 0);
     if (r() > p) continue;
     if (Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z) < 90) continue;
-    if (roa && (rectDist(x, z, ROA_CITY) < 12 || Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r || Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 30)) continue;
+    if (roa && (rectDist(x, z, ROA_CITY) < 12 || nearLandmark(x, z, 3) || Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r || Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 30)) continue;
     const s = (0.8 + r() * 1.6) * (1 + steep * 2);
     const k = (r() * names.length) | 0, rot = r() * TAU, y = heightAt(x, z) - 0.3 * s;   // (same draws, same order as ever)
     lists[k].push([x, y, z, rot, s]);

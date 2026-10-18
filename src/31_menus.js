@@ -189,7 +189,7 @@ BUS.on('pointerlock', locked => {
 
 function openGrimoire() {
   const b = $('grimBody');
-  let html = `<p class="flavor" style="margin:0 auto 10px;text-align:center">${G.name} · Level ${G.lvl} · Rank ${guildRank(G.lvl)} · ${G.breaks} breaks · ${G.kills} kills · Max mana ${Math.round(G.maxMana)} · Pages ${G.pages.length}/5</p>`;
+  let html = `<p class="flavor" style="margin:0 auto 10px;text-align:center">${G.name} · Level ${G.lvl} · Rank ${guildRank(G.lvl)} · ${G.breaks} breaks · ${G.kills} kills · Max mana ${Math.round(G.maxMana)} · Pages ${G.pages.length}/5 · Crystals ${crystalsGot()}/${CRYSTALS.list.length}</p>`;
   for (const [k, s] of Object.entries(SCHOOLS)) {
     const p = G.prof[k] || 0, r = schoolRank(k);
     const next = RANK_NEED[r + 1], prev = RANK_NEED[r];

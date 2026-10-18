@@ -78,6 +78,7 @@ async function boot() {
   defineRoaEncounters();
   defineBountyEncounters();
   buildBountyBoard();
+  buildCrystals();
   buildPages();
   batchStaticProps();
   initVFX();
@@ -137,6 +138,7 @@ function frame(dtReal) {
       updateMagic(dt);
       updateStory(dt);
       updateBounties();
+      updateCrystals(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -181,8 +183,8 @@ function reportFatal(e) {
 
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
-  THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD,
+  THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
