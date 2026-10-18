@@ -342,6 +342,19 @@ async function buildTrees() {
   }
 }
 
+// Trunks are solid (bushes aren't): one circle each, roots to crown. Called once
+// every tree is planted (the forest, then Roa's yards).
+function addTreeColliders() {
+  let n = 0;
+  for (const t of FOL.trees) {
+    if (!(t.r > 0.05)) continue;
+    const y = heightAt(t.x, t.z);
+    addCircle(t.x, t.z, t.r * 0.85, y - 1, y + Math.max(3, t.h * 0.7), 'tree').thin = true;
+    n++;
+  }
+  FOL.trunkColliders = n;
+}
+
 function updateTrees(time) {
   FOL.windTime.value = time;
   if (FOL.hidden) { for (const c of FOL.cells) for (const p of c.parts) p.hi.visible = p.lo.visible = false; return; }
@@ -374,8 +387,15 @@ function scatterRocks() {
     if (Math.hypot(x - VILLAGE_BASIN.x, z - VILLAGE_BASIN.z) < 90) continue;
     if (roa && (rectDist(x, z, ROA_CITY) < 12 || Math.hypot(x - FIRST_WALL.x, z - FIRST_WALL.z) < FIRST_WALL.r || Math.hypot(x - WAGON_CAMP.x, z - WAGON_CAMP.z) < 30)) continue;
     const s = (0.8 + r() * 1.6) * (1 + steep * 2);
-    lists[(r() * names.length) | 0].push([x, heightAt(x, z) - 0.3 * s, z, r() * TAU, s]);
+    const k = (r() * names.length) | 0, rot = r() * TAU, y = heightAt(x, z) - 0.3 * s;   // (same draws, same order as ever)
+    lists[k].push([x, y, z, rot, s]);
     FOL.rocks.push({ x, z, r: 0.9 * s });
+    // solid: a low one is a step you walk over, a big one a boulder you go round (or jump onto)
+    if (PROPS_LIB.has(names[k])) {
+      const sz = propSize(names[k]), S = s * 1.6;
+      const rr = Math.max(sz.hx, sz.hz) * S * 0.72;
+      addCircle(x, z, rr, y - 1, y + sz.maxY * S * 0.92, 'rock').thin = rr < 1.5;
+    }
   }
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   names.forEach((nm, k) => {

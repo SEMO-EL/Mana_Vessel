@@ -132,6 +132,7 @@ function buildRoa() {
 
   buildWagonCamp(R);
   buildFirstWall(R);
+  buildRoaGreenery();
 }
 
 /* The founder of House Boreas, in stone, over a round basin of water. */

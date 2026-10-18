@@ -59,7 +59,7 @@ function updateCamera(dt, target, opts = {}) {
   _cd.copy(_cf).negate();
   // clip the arm against the world (terrain + buildings), keep a margin
   let arm = CAM.dist;
-  const hit = raycastWorld(start, _cd, CAM.dist + 0.4);
+  const hit = raycastWorld(start, _cd, CAM.dist + 0.4, true);
   if (hit < arm + 0.4) arm = Math.max(0.5, hit - 0.4);
   CAM.arm = arm < CAM.arm ? arm : damp(CAM.arm, arm, 5, dt);   // snap in, ease out
   camera.position.copy(start).addScaledVector(_cd, CAM.arm);

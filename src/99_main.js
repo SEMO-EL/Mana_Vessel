@@ -65,6 +65,7 @@ async function boot() {
   await loadCharacters();
   buildStructures();
   buildRoa();
+  addTreeColliders();
   bootStatus('Hollowing the cave');
   await nextFrame();
   buildCave();

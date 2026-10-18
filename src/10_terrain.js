@@ -244,7 +244,8 @@ async function buildTerrain() {
       g *= 0.55 + 0.45 * smooth(-0.2, 0.4, n3(x / 25, z / 25));
       if (x > 900) {
         g *= 1 - 0.62 * outskirtsW(x, z);                                   // the outskirts: dry and patchy
-        g *= 0.03 + 0.97 * smooth(2, 18, rectDist(x, z, ROA_CITY));         // trodden flat inside the walls
+        const inCity = 1 - smooth(2, 18, rectDist(x, z, ROA_CITY));
+        g *= 1 - inCity * (0.45 + 0.55 * roaPaved(x, z, TER.ROADD[i]));    // yards keep a thin lawn; stone keeps none
       }
       TER.GRASS[i] = Math.round(clamp(g, 0, 1) * 255);
     }
@@ -301,6 +302,7 @@ const TCOL = (() => {
     snow: C('#e9e7e1'), field: C('#c0a24c'),
     dust: C('#ad9a68'), dustPale: C('#c2b184'), badRock: C('#9b8467'),
     cobble: C('#8a7e6c'), cobbleDark: C('#6e6456'), plaza: C('#a59882'), soil: C('#6c5639'),
+    pave: C('#ab9c82'), paveDark: C('#8e7f68'), yard: C('#7d9246'), yardWorn: C('#94895a'),
   };
 })();
 const _tc = new THREE.Color(), _tc2 = new THREE.Color();
@@ -341,12 +343,13 @@ function terrainColor(x, z, h, slope, i, nA, nB, out) {
 function terrainMaterial() {
   const onShader = shader => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vTerN;')
-      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvTerN = objectNormal;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTerN;\nattribute float paved;\nvarying float vPaved;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvTerN = objectNormal; vPaved = paved;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-        varying vec3 vTerN;
+        varying vec3 vTerN; varying float vPaved;
         float tHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float pHash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float tNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
           return mix(mix(tHash(i), tHash(i+vec2(1,0)), f.x), mix(tHash(i+vec2(0,1)), tHash(i+vec2(1,1)), f.x), f.y); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -365,6 +368,23 @@ function terrainMaterial() {
             rc *= 1.0 - crack * 0.45;
             rc = mix(rc, rc * vec3(1.05, 0.98, 0.92), band);
             diffuseColor.rgb = mix(diffuseColor.rgb, rc, steep);
+          }
+          // laid stone: cobbles (voronoi cells, mortar in the seams), faded out with distance
+          if (vPaved > 0.02) {
+            float near = 1.0 - smoothstep(30.0, 70.0, length(vWFPos - cameraPosition));
+            vec2 q = vWFPos.xz * 2.3, iq = floor(q), fq = fract(q);
+            float d1 = 8.0, d2 = 8.0, sid = 0.0;
+            for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+              vec2 g = vec2(float(i), float(j)), cell = iq + g;
+              vec2 r = g + vec2(pHash(cell), pHash(cell + 19.7)) * 0.75 + 0.125 - fq;
+              float d = dot(r, r);
+              if (d < d1) { d2 = d1; d1 = d; sid = pHash(cell + 7.3); } else if (d < d2) d2 = d;
+            }
+            float edge = sqrt(d2) - sqrt(d1);
+            float mortar = 1.0 - smoothstep(0.05, 0.17, edge);
+            vec3 st = diffuseColor.rgb * (0.86 + 0.28 * sid) * (0.93 + 0.1 * smoothstep(0.15, 0.55, edge));
+            st = mix(st, diffuseColor.rgb * 0.55, mortar);
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.95, st, near), vPaved);
           }
           // rain darkens the ground
           diffuseColor.rgb *= 1.0 - wfMisc.w * 0.28; }`);
@@ -401,6 +421,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
   const pos = new Float32Array((V * V + skirt + 4) * 3);
   const nor = new Float32Array(pos.length);
   const col = new Float32Array(pos.length);
+  const pav = new Float32Array(pos.length / 3);
   const N = TER.NX, c = WORLD.cell;
   const n = new THREE.Vector3(), cl = new THREE.Color();
   let p = 0;
@@ -410,6 +431,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
     const slope = Math.sqrt(1 - n.y * n.y) / Math.max(n.y, 0.05);
     terrainColor(x, z, y, slope, i, nA, nB, cl);
     col[p] = cl.r; col[p + 1] = cl.g; col[p + 2] = cl.b;
+    pav[p / 3] = x > 1400 ? roaPaved(x, z, TER.ROADD[i]) : 0;
     p += 3;
   };
   for (let j = 0; j < V; j++) for (let k = 0; k < V; k++) {
@@ -437,6 +459,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
     pos[sk * 3] = pos[src]; pos[sk * 3 + 1] = pos[src + 1] - 6; pos[sk * 3 + 2] = pos[src + 2];
     nor[sk * 3] = nor[src]; nor[sk * 3 + 1] = nor[src + 1]; nor[sk * 3 + 2] = nor[src + 2];
     col[sk * 3] = col[src]; col[sk * 3 + 1] = col[src + 1]; col[sk * 3 + 2] = col[src + 2];
+    pav[sk] = pav[edge[s]];
     skirtIdx.push(sk); sk++;
   }
   for (let s = 0; s < edge.length - 1; s++) {
@@ -448,6 +471,7 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
   g.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, sk * 3), 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nor.subarray(0, sk * 3), 3));
   g.setAttribute('color', new THREE.BufferAttribute(col.subarray(0, sk * 3), 3));
+  g.setAttribute('paved', new THREE.BufferAttribute(pav.subarray(0, sk), 1));
   g.setIndex(idx);
   g.computeBoundingSphere();
   g.computeBoundingBox();
@@ -457,6 +481,17 @@ function chunkGeometry(x0, z0, size, step, nA, nB) {
 /* Roa's ground: dust and pale rock in the outskirts, worn cobbles inside the
    walls (a paler square round the plaza), tilled soil in the market gardens. */
 const ROA_PLAZA = { x: 1560, z: 386, r: 26 };
+const ROA_FORECOURT = { x: 1560, z: 325, hw: 26, hd: 9 };             // stone court before the keep
+// 0..1: how much of this spot is laid stone (streets, the plaza, the forecourt) — inside the walls only
+function roaPaved(x, z, ro) {
+  if (x < 1430 || x > 1690 || z < 265 || z > 505) return 0;
+  const inside = 1 - smooth(-2, 3, rectDist(x, z, ROA_CITY));
+  if (inside <= 0) return 0;
+  const street = 1 - smooth(ROAD_WIDTH * 0.5 - 0.5, ROAD_WIDTH * 0.5 + 1.2, ro);
+  const plaza = 1 - smooth(ROA_PLAZA.r - 3, ROA_PLAZA.r + 1, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z));
+  const court = 1 - smooth(0, 2, rectDist(x, z, ROA_FORECOURT));
+  return Math.max(street, plaza, court) * inside;
+}
 function roaGroundColor(x, z, h, v1, v2, out) {
   const ok = outskirtsW(x, z);
   if (ok > 0) {
@@ -465,9 +500,13 @@ function roaGroundColor(x, z, h, v1, v2, out) {
   }
   const inside = 1 - smooth(0, 6, rectDist(x, z, ROA_CITY));
   if (inside > 0) {
-    const tile = Math.abs(Math.sin(x * 0.9) * Math.sin(z * 0.9));          // a hint of laid stone at close range
-    out.lerp(_tc.copy(TCOL.cobble).lerp(TCOL.cobbleDark, smooth(0.2, 0.9, v2) * 0.6 + tile * 0.15), inside * 0.82);
-    out.lerp(TCOL.plaza, (1 - smooth(ROA_PLAZA.r - 4, ROA_PLAZA.r + 2, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z))) * 0.9);
+    // yards and lawns between the streets (worn to earth in patches); the estate's lawn kept greener
+    const estate = 1 - smooth(0, 4, rectDist(x, z, ROA_ESTATE));
+    out.lerp(_tc.copy(TCOL.yard).lerp(TCOL.yardWorn, smooth(0.1, 0.8, v2) * (0.7 - estate * 0.5)), inside * 0.75);
+    // laid stone (the shader cuts it into cobbles up close)
+    const pv = roaPaved(x, z, TER.ROADD[Math.round((z - WORLD.z0) / WORLD.cell) * TER.NX + Math.round((x - WORLD.x0) / WORLD.cell)]);
+    out.lerp(_tc.copy(TCOL.pave).lerp(TCOL.paveDark, smooth(-0.2, 0.8, v2) * 0.55), pv * 0.92);
+    out.lerp(TCOL.plaza, (1 - smooth(ROA_PLAZA.r - 4, ROA_PLAZA.r + 2, Math.hypot(x - ROA_PLAZA.x, z - ROA_PLAZA.z))) * 0.45);
   }
   // market gardens: strips of tilled soil south of the walls
   const gardens = (1 - smooth(0, 14, rectDist(x, z, { x: 1545, z: 600, hw: 95, hd: 70 }))) * (Math.sin(z * 0.35 + Math.sin(x * 0.02) * 2) > 0.2 ? 1 : 0.35);

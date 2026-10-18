@@ -189,7 +189,7 @@ function rayTerrain(o, d, maxDist) {
   return Infinity;
 }
 // Ray vs static colliders (treated as vertical prisms). Returns distance or Infinity.
-function rayColliders(o, d, maxDist) {
+function rayColliders(o, d, maxDist, skipThin) {
   let best = Infinity;
   const steps = Math.ceil(maxDist / PHYS.CELL) + 1;
   const seen = new Set();
@@ -197,6 +197,7 @@ function rayColliders(o, d, maxDist) {
     const t = Math.min(s * PHYS.CELL, maxDist);
     for (const c of nearColliders(o.x + d.x * t, o.z + d.z * t, PHYS.CELL)) {
       if (seen.has(c)) continue; seen.add(c);
+      if (skipThin && c.thin) continue;
       const hit = rayVsCollider(o, d, c);
       if (hit < best && hit <= maxDist) best = hit;
     }
@@ -240,6 +241,7 @@ function rayVsCollider(o, d, c) {
   }
   return Infinity;
 }
-function raycastWorld(o, d, maxDist) {
-  return Math.min(rayTerrain(o, d, maxDist), rayColliders(o, d, maxDist));
+// skipThin: trunks and small boulders don't count (the camera arm passes them instead of snapping in)
+function raycastWorld(o, d, maxDist, skipThin = false) {
+  return Math.min(rayTerrain(o, d, maxDist), rayColliders(o, d, maxDist, skipThin));
 }
