@@ -24,6 +24,13 @@ const ERIS_BARKS = {
   saved: ['See? Heroes. Obviously.', 'You\'re welcome! ...We\'re welcome.', 'Hmph. They should carry a sword.'],
   chest: ['A chest! Open it, open it!', 'There\'d better be a sword in that.', 'Finders keepers. That\'s a rule.'],
 };
+const ERIS_FIRSTS = {
+  bear: 'A BEAR! Finally, something with some meat on it!',
+  ashback: 'That one\'s MINE, {name}. Don\'t you dare steal it!',
+  scorpion: 'Ugh, it\'s got too many legs. Hit the tail, {name}, the TAIL!',
+  wisp: 'Ghost-lights? Hah! Can you even cut a light? I\'m going to find out.',
+  boar: 'Pig! Big pig! Grandfather says the tusks are the dangerous part. Grandfather says a lot.',
+};
 // her say on what happens about you (road events, chests): only when she's with you
 function erisSays(kind, delay = 0) {
   const E = ALLY.eris;
@@ -124,7 +131,13 @@ class Companion {
       if (this.stateT > 0.25) this.set('follow');
     } else {
       const T = this.pickTarget();
-      if (T && T !== this.target) { this.target = T; this.bark('engage'); }
+      if (T && T !== this.target) {
+        this.target = T;
+        // the first of a kind gets a line of its own
+        const first = ERIS_FIRSTS[T.key];
+        if (first && G && !G.flags['erisSaw_' + T.key]) { G.flags['erisSaw_' + T.key] = true; bark(this.name, first.replace('{name}', G.name), this.col); this.barkCd = 8; }
+        else this.bark('engage');
+      }
       if (!T) { this.target = null; this.combo = 0; }
       if (this.target) {
         const T2 = this.target, dx = T2.pos.x - this.pos.x, dz = T2.pos.z - this.pos.z, d = Math.hypot(dx, dz);
