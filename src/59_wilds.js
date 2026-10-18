@@ -192,6 +192,7 @@ function buildWilds() {
   defineEncounter('caravan', S.wreck.x, S.wreck.z, [['bandit', 4, 3], ['bandit', -5, 2], ['marksman', 2, -9]], { flag: 'sq_caravan' });
   JOURNAL_FOES.push(['ashbackDown', 'The Ashback']);
   defineScorpionNests();
+  defineWispHaunts();
 
   // the sheep, where they strayed (a few wolves have found the eastern one), and the fold by Gerard
   const pen = wildSpot(S.pen);
@@ -386,4 +387,43 @@ function buildScorpionRig(scale, tint, mat, eyeM, ball, box) {
 function defineScorpionNests() {
   defineEncounter('scorpionsWest', 1780, 110, [['scorpion', 0, 0], ['scorpion', 5, 4]]);
   defineEncounter('scorpionsSouth', 2040, 360, [['scorpion', 0, 0], ['scorpion', -5, 3], ['scorpion', 4, -5]]);
+}
+
+/* ───────────── marsh wisps: lights on the water's edge after dark ───────────── */
+ENEMY_DEFS.wisp = {
+  name: 'Marsh Wisp', rig: 'wisp', hp: 44, poise: 10, r: 0.42, h: 2.0, walk: 1.8, run: 4.2, sight: 24, hear: 14,
+  xp: 24, weight: 0.6, flinchAt: 6, keepDist: 10, caster: true, deathSfx: 'chantBreak',
+  attacks: [{ windup: 1.0, range: [3, 20], chant: true, ranged: { spd: 15, dmg: 14, r: 0.24, col: '#8fe8ff', homing: 1.6, life: 2.6 } }],
+};
+let _wispMat = null;
+function buildWispRig() {
+  const m = _wispMat || (_wispMat = {
+    orb: new THREE.MeshBasicMaterial({ color: new THREE.Color('#7fdcff').multiplyScalar(1.8), transparent: true, opacity: 0.85 }),
+    core: new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(2.4) }),
+    halo: new THREE.SpriteMaterial({ map: haloTexture(), color: new THREE.Color('#7fdcff'), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }),
+  });
+  const root = new THREE.Group(), orb = new THREE.Group(); orb.position.y = 1.3; root.add(orb);
+  const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 2), m.orb), core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 1), m.core);
+  const halo = new THREE.Sprite(m.halo.clone()); halo.scale.setScalar(1.6);
+  orb.add(shell, core, halo);
+  const light = new THREE.Vector3();
+  return {
+    root, orb, halo, t: Math.random() * 10, deadT: -1,
+    update(dt, e) {
+      this.t += dt;
+      const charge = e.state === 'windup' ? Math.min(1, e.stateT / (e.windup || 1)) : 0;
+      this.orb.position.y = 1.3 + Math.sin(this.t * 2.1) * 0.22 + charge * 0.2;
+      this.orb.position.x = Math.sin(this.t * 1.3) * 0.12;
+      const s = 1 + charge * 0.45 + Math.sin(this.t * 9) * 0.05;
+      this.orb.scale.setScalar(s);
+      if (e.dead) { this.deadT = this.deadT < 0 ? 0 : this.deadT + dt; this.orb.scale.setScalar(Math.max(0.01, 1 - this.deadT * 1.6)); this.halo.material.opacity = Math.max(0, 0.7 - this.deadT); return; }
+      if (Math.random() < 0.3) emit(1, { pos: this.orb.getWorldPosition(light), col: '#a8ecff', velSpread: 0.25, upBias: 0.2, life: 0.9, size: 0.12, size2: 0, bright: 2, gravity: -0.2 });
+      if (e.dist() < 50) requestLight(this.orb.getWorldPosition(light), '#7fdcff', 1.4 + charge, 6);
+    },
+    weaponPos(out) { return this.orb.getWorldPosition(out); },
+  };
+}
+function defineWispHaunts() {
+  defineEncounter('lakeWisps', -470, 548, [['wisp', 0, 0], ['wisp', 6, 4], ['wisp', -5, 5]], { night: true });
+  defineEncounter('stoneWisps', 1900, 548, [['wisp', 0, 0], ['wisp', -6, 3], ['wisp', 5, 5]], { night: true });
 }

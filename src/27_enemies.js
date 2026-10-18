@@ -252,6 +252,9 @@ class Enemy {
     } else if (d.rig === 'treant') {
       this.rig = buildTreantRig();
       this.root = this.rig.root;
+    } else if (d.rig === 'wisp') {
+      this.rig = buildWispRig();
+      this.root = this.rig.root;
     } else if (d.rig === 'stone') {
       this.rig = buildStoneRig();
       this.root = this.rig.root;
@@ -304,7 +307,7 @@ class Enemy {
     this.releaseToken();
     this.set('dead');
     if (this.actor) this.actor.once(this.def.deathClip || 'Death_A', { speed: 1, fade: 0.1 });
-    BUS.emit('sfx', { id: this.def.undead ? 'boneDeath' : this.def.rig === 'wolf' ? 'wolfDeath' : 'death', pos: this.pos });
+    BUS.emit('sfx', { id: this.def.deathSfx || (this.def.undead ? 'boneDeath' : this.def.rig === 'wolf' ? 'wolfDeath' : 'death'), pos: this.pos });
     if (this.encounter) this.encounter.killed++;
   }
 

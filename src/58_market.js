@@ -20,7 +20,7 @@ function gainCoin(n, at) {
 // what a fallen foe had on them: people carry purses, beasts don't; the great ones carry more
 function enemyPurse(e) {
   const d = e.def;
-  if (d.spar || d.magicOnly || ['wolf', 'stone', 'golem', 'treant'].includes(d.rig)) return 0;   // beasts, stone and wood
+  if (d.spar || d.magicOnly || ['wolf', 'stone', 'golem', 'treant', 'wisp'].includes(d.rig)) return 0;   // beasts, stone and wood
   if (d.boss) return 60 + (d.xp || 0) * 0.5;
   return (d.xp || 10) * 0.35 * rnd(0.7, 1.3);
 }
