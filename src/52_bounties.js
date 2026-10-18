@@ -25,7 +25,19 @@ const BOUNTIES = [
   { id: 'edric', title: 'The Unburied Knight', where: 'The Sunken Chapel, Buena Forest — after dark', enc: 'edric', xp: 300, newEnc: true, named: true, night: true,
     boon: { mana: 15 }, text: 'Forwarded from Buena: a knight in rusted armour walks the old chapel at night. The priest asks that he be laid to rest. Firmly.' },
 ];
+// Buena's own notice board, by the village waystone: no Guild needed, the village pays what it can
+BOUNTIES.push(
+  { id: 'bWolves', board: 'buena', title: 'Wolves of the West Woods', where: 'The woods north-west of the village', enc: 'westWoods', xp: 60,
+    text: 'The pack in the west woods has had three lambs this month. Gerard says four. Gerard counts badly. — the Elders' },
+  { id: 'bBear', board: 'buena', title: 'The Bear by the Lake Road', where: 'The woods north of the lake, west of the village', enc: 'bearsWest', xp: 70,
+    text: 'A bear has been at the beehives on the lake road. Honey is one thing. Old Maryl\'s goat is another.' },
+  { id: 'bCamp', board: 'buena', title: 'Brigands\' Rest', where: 'The brigand camp south of the east road', enc: 'camp', xp: 120,
+    text: 'The camp south of the road is full again. The Warden can\'t spare men. If you can, the village will pay.' },
+  { id: 'bBears', board: 'buena', title: 'Bears in the Deep Wood', where: 'Deep in Buena Forest, past the chapel road', enc: 'bearsNorth', xp: 100,
+    text: 'Woodcutters won\'t go past the old chapel road. Two bears, they say, big as carts. Bring them back in pieces.' },
+);
 const BOUNTY = Object.fromEntries(BOUNTIES.map(b => [b.id, b]));
+const BOARDS = {};          // roa | buena → { x, z } where you stand to read it
 
 /* The new hunts' quarry. */
 ENEMY_DEFS.scar = {
@@ -59,7 +71,12 @@ function defineBountyEncounters() {
 function buildBountyBoard() {
   const gd = ROA.spots.guildDoor, P = ROA.spots.plaza;
   const a = Math.atan2(P.x - gd.x, P.z - gd.z), sx = Math.cos(a), sz = -Math.sin(a);     // to the door's side
-  const x = gd.x + sx * 5.5, z = gd.z + sz * 5.5, y = heightAt(x, z);
+  noticeBoard(gd.x + sx * 5.5, gd.z + sz * 5.5, a, 'roa');
+  ROA.spots.board = BOARDS.roa;
+  noticeBoard(-381, 338, -Math.PI / 2, 'buena');                                         // east of Buena's waystone, facing the village
+}
+function noticeBoard(x, z, a, kind) {
+  const y = heightAt(x, z);
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = a;
   const wood = toonMat({ color: '#5a3e28' });
   for (const s of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.6, 0.16), wood); post.position.set(s * 1.25, 1.3, 0); g.add(post); }
@@ -82,20 +99,22 @@ function buildBountyBoard() {
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   STRUCT.group.add(g);
   addBox(x, z, 1.4, 0.2, -a, y - 0.5, y + 2.7, 'board');
-  ROA.spots.board = { x: x + Math.sin(a) * 1.6, z: z + Math.cos(a) * 1.6 };
-  INTERACTABLES.push({ pos: new THREE.Vector3(ROA.spots.board.x, y, ROA.spots.board.z), r: 3, label: () => bountiesReady() ? 'Collect a bounty' : 'Read the bounty board',
-    action: () => openBounties() });
+  const at = BOARDS[kind] = { x: x + Math.sin(a) * 1.6, z: z + Math.cos(a) * 1.6 };
+  INTERACTABLES.push({ pos: new THREE.Vector3(at.x, y, at.z), r: 3, label: () => bountiesReady(kind) ? 'Collect a bounty' : kind === 'buena' ? 'Read the village notices' : 'Read the bounty board',
+    action: () => openBounties(kind) });
 }
-const bountiesReady = () => !!G && !!G.bounties && Object.values(G.bounties).includes('done');
+const boardOf = b => b.board || 'roa';
+const bountiesReady = kind => !!G && !!G.bounties && BOUNTIES.some(b => boardOf(b) === kind && G.bounties[b.id] === 'done');
 
-function openBounties() {
+function openBounties(kind = 'roa') {
   G.bounties = G.bounties || {};
-  const body = $('bountyBody');
-  const registered = !!G.flags.guildF;
-  let html = `<p class="flavor" style="margin:0 auto 12px;text-align:center">${registered
+  const body = $('bountyBody'), village = kind === 'buena';
+  $('bounties').querySelector('.h').textContent = village ? 'Village Notices' : 'Bounties';
+  const registered = village || !!G.flags.guildF;
+  let html = `<p class="flavor" style="margin:0 auto 12px;text-align:center">${village ? 'Notices pinned up by the Elders of Buena. Do the work, come back to this board, and the village pays.' : registered
     ? `${G.name} · Adventurer Rank ${guildRank(G.lvl)}. Take a notice, do the work, come back for the coin.`
     : 'The notices are for registered adventurers. The clerk inside keeps the book.'}</p>`;
-  for (const b of BOUNTIES) {
+  for (const b of BOUNTIES.filter(b => boardOf(b) === kind)) {
     const st = G.bounties[b.id] || 'open', tracked = G.trackBounty === b.id && st === 'taken';
     const boon = b.boon ? (b.boon.hp ? ` · <b>+${b.boon.hp} max health</b>` : ` · <b>+${b.boon.mana} max mana</b>`) : '';
     const btn = !registered ? '' : st === 'open' ? `<button data-take="${b.id}">Take the job</button>`
@@ -105,9 +124,9 @@ function openBounties() {
       <div class="bw">${b.where}</div><p>${b.text}</p><div class="bb">${btn}</div></div>`;
   }
   body.innerHTML = html;
-  for (const el of body.querySelectorAll('[data-take]')) el.onclick = () => { takeBounty(el.dataset.take); openBounties(); };
-  for (const el of body.querySelectorAll('[data-track]')) el.onclick = () => { G.trackBounty = el.dataset.track; BUS.emit('sfx', { id: 'uiSelect' }); openBounties(); };
-  for (const el of body.querySelectorAll('[data-claim]')) el.onclick = () => { claimBounty(el.dataset.claim); openBounties(); };
+  for (const el of body.querySelectorAll('[data-take]')) el.onclick = () => { takeBounty(el.dataset.take); openBounties(kind); };
+  for (const el of body.querySelectorAll('[data-track]')) el.onclick = () => { G.trackBounty = el.dataset.track; BUS.emit('sfx', { id: 'uiSelect' }); openBounties(kind); };
+  for (const el of body.querySelectorAll('[data-claim]')) el.onclick = () => { claimBounty(el.dataset.claim); openBounties(kind); };
   if (GAME.state !== 'bounties') { GAME._suppressPause = true; GAME.state = 'bounties'; setTimeout(() => GAME._suppressPause = false, 50); }
   openScreen('bounties');
 }
@@ -136,7 +155,7 @@ BUS.on('encounterClear', id => {
   if (!G || !G.bounties) return;
   for (const b of BOUNTIES) if (b.enc === id && G.bounties[b.id] === 'taken') {
     G.bounties[b.id] = 'done';
-    later(1.2, () => { banner('Bounty Fulfilled', b.title); later(1.6, () => toast('Return to the Guild\'s board for the reward')); });
+    later(1.2, () => { banner('Bounty Fulfilled', b.title); later(1.6, () => toast(boardOf(b) === 'buena' ? 'Return to the notice board in Buena for the reward' : 'Return to the Guild\'s board for the reward')); });
   }
 });
 // a named quarry announces itself the first time it turns on you
@@ -155,7 +174,8 @@ function bountyMarker() {
   if (!G || !G.trackBounty || !G.bounties) return null;
   const b = BOUNTY[G.trackBounty], st = G.bounties[G.trackBounty];
   if (!b) return null;
-  if (st === 'done') return ROA.spots.board ? { x: ROA.spots.board.x, z: ROA.spots.board.z, label: 'Claim: ' + b.title } : null;
+  const B = BOARDS[boardOf(b)];
+  if (st === 'done') return B ? { x: B.x, z: B.z, label: 'Claim: ' + b.title } : null;
   if (st !== 'taken') return null;
   const enc = ENCOUNTERS.find(e => e.id === b.enc);
   return enc ? { x: enc.x, z: enc.z, label: b.title } : null;

@@ -252,6 +252,13 @@ function selfTests() {
     const ok = G.bounties.scar === 'taken' && !!G.flags.bt_scar && !!bountyMarker();
     G.bounties = {}; G.flags.bt_scar = false; G.trackBounty = null; return ok;
   });
+  check('buenaBoard', () => {
+    const local = BOUNTIES.filter(b => boardOf(b) === 'buena');
+    G.bounties = {}; takeBounty('bWolves'); const m = bountyMarker();
+    const ok = !!BOARDS.buena && local.length === 4 && local.every(b => ENCOUNTERS.some(e => e.id === b.enc)) && !!m;
+    G.bounties = {}; G.trackBounty = null;
+    return ok ? local.length : false;
+  });
   check('golem', () => { const p = PL.body.pos, e = new Enemy('golem', p.x + 9, p.z, { dormant: true }); e.wake(1); step(30); const ok = !e.removed && !!e.rig; e.remove(); return ok; });
   check('scar', () => { const p = PL.body.pos, e = new Enemy('scar', p.x + 8, p.z); step(10); const ok = !!e.rig; e.remove(); return ok; });
   check('eris', () => { if (!ALLY.eris) ALLY.eris = new Companion(ERIS_SPEC, 'Eris', '#e8606f'); ALLY.eris.join(); step(10); const ok = ALLY.eris.active; ALLY.eris.leave(); return ok; });
