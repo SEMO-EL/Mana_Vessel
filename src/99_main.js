@@ -182,6 +182,7 @@ function frame(dtReal) {
   if (G && (s === 'play' || s === 'rest')) updateHUD(dtReal, GAME.time);
   updateFlash(dtReal);
   if (typeof updateAudio === 'function') { try { updateAudio(dtReal); } catch (e) { console.error('audio', e); } }
+  if (typeof updatePadUI === 'function') updatePadUI(dtReal);
   assignLights();
   flushPools();
   renderer.info.reset();
@@ -391,6 +392,21 @@ function selfTests() {
     for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
     Object.assign(G, snap);
     return !before && mired;
+  });
+  // the controller in menus (a pretend pad): START pauses, the ring moves, B resumes, BACK opens and closes the map
+  check('pad', () => {
+    const real = navigator.getGamepads, pad = { connected: true, id: 'test', buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })), axes: [0, 0, 0, 0] };
+    navigator.getGamepads = () => [pad];
+    const tap = i => { pad.buttons[i].pressed = true; frame(1 / 30); pad.buttons[i].pressed = false; frame(1 / 30); };
+    let ok = false;
+    try {
+      tap(PAD.START); const paused = GAME.state === 'paused';
+      const f0 = document.querySelector('.padFocus'); tap(PAD.DOWN); const f1 = document.querySelector('.padFocus');
+      tap(PAD.B); const back = GAME.state === 'play';
+      tap(PAD.BACK); const map = GAME.state === 'map'; tap(PAD.BACK); const unmap = GAME.state === 'play';
+      ok = paused && !!f0 && !!f1 && f0 !== f1 && back && map && unmap;
+    } finally { navigator.getGamepads = real; IN.usingPad = false; frame(1 / 30); }
+    return ok;
   });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;

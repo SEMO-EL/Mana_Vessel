@@ -249,3 +249,5 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
 #bark.on{opacity:1}
 #bark b{font:700 12px var(--display);letter-spacing:.2em;text-transform:uppercase;margin-right:10px;font-style:normal}
 body.lb #bark{bottom:13vh}
+
+.padFocus{outline:2px solid var(--hot);outline-offset:3px;box-shadow:0 0 16px rgba(240,207,98,.45)}

@@ -1,0 +1,58 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   THE CONTROLLER IN MENUS — START pauses (and resumes), BACK opens the map,
+   LT the Grimoire; in any screen the d-pad or left stick walks a gold ring
+   over its buttons, A presses, B backs out, left/right moves a slider or a
+   choice. The keyboard and mouse never see the ring.
+   ═══════════════════════════════════════════════════════════════════════ */
+const PADUI = { scr: null, el: null, idx: 0, repeat: 0, armed: false };
+// a button's press this frame (raw: menus want A and B, not what they're bound to in play)
+const padHit = i => { const g = IN.gp; return !!(g && g.buttons[i] && g.buttons[i].pressed && !IN.pad.prev[i]); };
+const padHeld = i => { const g = IN.gp; return !!(g && g.buttons[i] && g.buttons[i].pressed); };
+const suppressPause = () => { GAME._suppressPause = true; setTimeout(() => GAME._suppressPause = false, 50); };
+
+function padFocusClear() { for (const e of document.querySelectorAll('.padFocus')) e.classList.remove('padFocus'); PADUI.el = null; }
+function updatePadUI(dt) {
+  if (!IN.gp || !IN.usingPad) { if (PADUI.el) padFocusClear(); return; }
+  const s = GAME.state;
+  if (s === 'play' || s === 'rest' && !document.querySelector('.screen.on')) {
+    if (UI.dlg || s !== 'play') return;
+    if (padHit(PAD.START)) { pauseGame(); return; }
+    if (padHit(PAD.BACK) && typeof mapOpen === 'function') { suppressPause(); GAME.state = 'map'; mapOpen(); return; }
+    if (padHit(PAD.LT)) { suppressPause(); openGrimoire(); return; }
+    return;
+  }
+  if (s === 'map') { if (padHit(PAD.BACK) || padHit(PAD.B) || padHit(PAD.START)) { mapClose(); GAME.state = 'play'; lockPointer(); } return; }
+  if (s === 'paused' && padHit(PAD.START)) { resumeGame(); return; }
+  if (s === 'grimoire' && padHit(PAD.LT)) { resumeGame(); return; }
+
+  // a screen is up: the ring walks its buttons
+  const scr = SCREENS.map(id => $(id)).find(el => el && el.classList.contains('on'));
+  if (!scr) { if (PADUI.el) padFocusClear(); return; }
+  const items = [...scr.querySelectorAll('button:not([disabled]), .chip, [data-attune], input[type=range], select')].filter(el => el.offsetParent !== null);
+  if (!items.length) return;
+  if (PADUI.scr !== scr) { PADUI.scr = scr; PADUI.idx = 0; PADUI.armed = false; }
+  if (!items.includes(PADUI.el)) PADUI.el = items[Math.min(PADUI.idx, items.length - 1)];    // the screen redrew: keep the place
+  // the A that opened this screen (or closed the talk before it) mustn't also press its first button
+  if (!PADUI.armed) { if (!padHeld(PAD.A)) PADUI.armed = true; }
+  const ay = (IN.gp.axes && IN.gp.axes[1]) || 0;
+  let dir = padHit(PAD.UP) ? -1 : padHit(PAD.DOWN) ? 1 : 0;
+  if (!dir && Math.abs(ay) > 0.6) { PADUI.repeat -= dt; if (PADUI.repeat <= 0) { dir = Math.sign(ay); PADUI.repeat = 0.2; } } else if (!dir) PADUI.repeat = 0;
+  if (dir) {
+    const i = items.indexOf(PADUI.el);
+    PADUI.el = items[(i + dir + items.length) % items.length];
+    PADUI.el.scrollIntoView({ block: 'nearest' });
+    BUS.emit('sfx', { id: 'uiMove' });
+  }
+  const el = PADUI.el;
+  PADUI.idx = items.indexOf(el);
+  const lr = padHit(PAD.LEFT) ? -1 : padHit(PAD.RIGHT) ? 1 : 0;
+  if (lr && el.tagName === 'INPUT') { el.value = +el.value + lr * (+el.step || 1); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+  else if (lr && el.tagName === 'SELECT') { el.selectedIndex = clamp(el.selectedIndex + lr, 0, el.options.length - 1); el.dispatchEvent(new Event('change', { bubbles: true })); }
+  for (const e of document.querySelectorAll('.padFocus')) if (e !== el) e.classList.remove('padFocus');
+  el.classList.add('padFocus');
+  if (PADUI.armed && padHit(PAD.A) && el.tagName !== 'INPUT' && el.tagName !== 'SELECT') { el.click(); return; }
+  if (padHit(PAD.B)) {
+    const back = items.find(b => /^(back|resume|close|leave)$/i.test(b.textContent.trim()));
+    if (back) back.click(); else if (s === 'paused' || s === 'shop' || s === 'bounties') resumeGame();
+  }
+}
