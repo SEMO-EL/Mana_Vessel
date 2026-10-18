@@ -463,6 +463,11 @@ const AUDIO_SFX = {
     auNz(d, 2.2, 0.12, 180, 90, 'lowpass', 0.8, { atk: 0.8, at: 0.3 });                         // the doors' weight
     auNz(d, 0.4, 0.28, 140, 60, 'lowpass', 1, { at: 2.6, atk: 0.005 });                          // they come to rest
   },
+  chest: d => {                                                        // a latch, a short creak of hinges, the lid against its stop
+    auNz(d, 0.05, 0.25, 2400, 1800, 'bandpass', 2, { atk: 0.002 });
+    auTone(d, 'sawtooth', 210, 160, 0.55, 0.03, { lp: 900, atk: 0.12, at: 0.08, vib: [9, 7] });
+    auNz(d, 0.18, 0.18, 220, 90, 'lowpass', 1, { at: 0.62, atk: 0.005 });
+  },
   ignite: d => {                                                       // a brazier catching: breathy whoosh, a few sparks
     auNz(d, 0.45, 0.2, 260, 1400, 'bandpass', 0.9, { atk: 0.04 });
     auNz(d, 0.3, 0.1, 150, 90, 'lowpass', 1);

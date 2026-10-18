@@ -84,6 +84,7 @@ async function boot() {
   buildCrystals(); lap('buildCrystals');
   buildSideQuests(); lap('buildSideQuests');
   buildPages(); lap('buildPages');
+  buildCaches(); lap('buildCaches');
   batchStaticProps(); lap('batchStaticProps');
   initVFX(); lap('initVFX');
   initTrails();
@@ -150,6 +151,7 @@ function frame(dtReal) {
       updateBounties();
       updateCrystals(dt);
       updateEvents(dt);
+      updateCaches(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -196,7 +198,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -274,6 +276,15 @@ function selfTests() {
     step(2);
     const swept = !EVENTS.cur && (G.flags.helped || 0) === h0;
     return ring && saved && swept && !INTERACTABLES.includes(E.interact) && !INTERACTABLES.includes(E2.interact) ? E.foes.length : false;
+  });
+  check('caches', () => {
+    if (CACHES.list.length !== CACHE_SPOTS.length) return false;
+    const C = CACHES.list[0], hp0 = G.maxHp, had = G.caches; G.caches = [];
+    openCache(C); step(40);
+    while (UI.dlg) advanceDialogue();
+    const ok = C.open === 1 && G.maxHp === hp0 + (C.boon.hp || 0) && cachesGot() === 1;
+    G.maxHp = hp0; G.hp = Math.min(G.hp, hp0); G.caches = had || []; resetCaches();
+    return ok && C.open === 0 ? CACHES.list.length : false;
   });
   R.failures = fail; R.ok = fail.length === 0;
   return R;
