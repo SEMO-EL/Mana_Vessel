@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   MANA VESSEL — The Borderlands of Fittoa            (Milestone 1)
+   MANA VESSEL — The Borderlands of Fittoa            (Milestone 2)
    A third-person open-world action RPG. three.js r170, one HTML file.
 
    Every src/*.js file is concatenated, in name order, into ONE ES module,

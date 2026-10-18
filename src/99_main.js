@@ -132,7 +132,7 @@ function frame(dtReal) {
 
   if (s === 'dev') updateDevCam(dtReal);
   else if (s === 'photo') { updateDevCam(dtReal); const p = PL.body.pos, c = camera.position, dx = c.x - p.x, dy = c.y - p.y, dz = c.z - p.z, d = Math.hypot(dx, dy, dz); if (d > 40) c.set(p.x + dx / d * 40, p.y + dy / d * 40, p.z + dz / d * 40); }
-  else if (s === 'title') titleCamera(dtReal);
+  else if (s === 'title') { titleCamera(dtReal); if (_titleRoa) updateTownsfolk(dtReal); }
   else if (s === 'creator') creatorCamera(dtReal);
   else if (s === 'intro') { if (GAME.cine && GAME.cine(dtReal) && GAME.cineDone) { const r = GAME.cineDone; GAME.cineDone = null; r(); } }
   if (SIM_STATES.has(s) && G) {

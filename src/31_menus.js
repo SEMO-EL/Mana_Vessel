@@ -20,22 +20,28 @@ function closeAllScreens() { for (const s of SCREENS) $(s).classList.remove('on'
 // the river leading in, mountains framing the title. (Never into the sun —
 // backlit haze flattens the whole valley to one colour.)
 const TITLE_PATH = [[-690, 100, 715], [-640, 90, 680], [-590, 84, 655], [-530, 78, 642], [-460, 82, 650], [-390, 90, 668], [-330, 100, 690]];
-let _titleT = 0;
+// once a save has reached Roa, the title flies over Roa instead (the sun still on the left)
+const ROA_TITLE_PATH = [[1700, 95, 600], [1660, 88, 585], [1615, 82, 572], [1565, 80, 568], [1515, 82, 572], [1470, 88, 585], [1430, 95, 600]];
+let _titleT = 0, _titleRoa = false;
 function titleCamera(dt) {
   _titleT += dt * 0.012;
-  const pts = TITLE_PATH, n = pts.length - 1;
+  const pts = _titleRoa ? ROA_TITLE_PATH : TITLE_PATH, n = pts.length - 1;
   const u = (Math.sin(_titleT) * 0.5 + 0.5) * n;
   const i = Math.min(n - 1, Math.floor(u)), t = u - i;
   const P = k => pts[clamp(k, 0, n)];
   const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
   const x = cr(P(i - 1)[0], P(i)[0], P(i + 1)[0], P(i + 2)[0], t), y = cr(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1], t), z = cr(P(i - 1)[2], P(i)[2], P(i + 1)[2], P(i + 2)[2], t);
   camera.position.set(x, Math.max(y, heightAt(x, z) + 25), z);
-  const k = u / n, lx = lerp(-475, -385, k);
+  const k = u / n;
+  if (_titleRoa) { const lx = lerp(1600, 1520, k); camera.lookAt(lx, 50, 372); GAME.focus.set(lx, 36, 400); return; }
+  const lx = lerp(-475, -385, k);
   camera.lookAt(lx, 74, 330);
   GAME.focus.set(lx, 26, 380);
 }
 function showTitle() {
   GAME.state = 'title';
+  const sv = loadGame();
+  _titleRoa = !!sv && (sv.quest === 'done' || ROA_STEPS.includes(sv.quest));
   leaveCaveNow();
   if (typeof clearWhiteOut === 'function') { clearWhiteOut(); OMEN.reset(); }
   TOD.hour = 17.2; TOD.frozen = true;

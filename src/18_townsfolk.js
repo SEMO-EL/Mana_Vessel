@@ -210,7 +210,7 @@ function updateTownsfolk(dt) {
   for (const w of TOWN.walkers) w.update(dt, day, cam);
   // a passing word now and then, never mid-fight or mid-talk
   TOWN.greetT -= dt;
-  if (TOWN.greetT <= 0 && !UI.dlg && PL.state === 'move' && !ENT.enemies.some(e => e.aggro && !e.dead)) {
+  if (G && TOWN.greetT <= 0 && !UI.dlg && PL.state === 'move' && !ENT.enemies.some(e => e.aggro && !e.dead)) {
     const p = PL.body.pos;
     const w = TOWN.walkers.find(w => w.shown && w.mode === 'walk' && Math.hypot(w.pos.x - p.x, w.pos.z - p.z) < 3.2);
     if (w) {
