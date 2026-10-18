@@ -300,7 +300,7 @@ function selfTests() {
     for (const f of [0.3, 0.2, 0.4, 0.5, 0.15, 0.6, 0.7]) {
       const P = TER.roadPath[Math.floor(TER.roadPath.length * f)];
       PL.body.pos.set(P[0], heightAt(P[0], P[1]), P[1]);
-      const s = eventSpot(); if (s) { E = startRoadEvent(s); break; }
+      const s = eventSpot(); if (s) { E = startRoadEvent({ ...s, kind: 'beset' }); break; }
     }
     if (!E) { PL.body.pos.copy(p0); G.quest = q0; return false; }
     step(5);
@@ -311,11 +311,18 @@ function selfTests() {
     const saved = E.phase === 'saved' && G.flags.helped === h0 + 1 && !!eventMarker() === false;
     endRoadEvent(E); G.flags.helped = h0; G.quest = q0; PL.body.pos.copy(p0);
     // swept away (a death, a fast travel) is not a rescue
-    const E2 = startRoadEvent({ x: E.x, z: E.z, roadAng: 0 });
+    const E2 = startRoadEvent({ x: E.x, z: E.z, roadAng: 0, kind: 'beset' });
     for (const e of [...E2.foes]) e.remove();
     step(2);
     const swept = !EVENTS.cur && (G.flags.helped || 0) === h0;
-    return ring && saved && swept && !INTERACTABLES.includes(E.interact) && !INTERACTABLES.includes(E2.interact) ? E.foes.length : false;
+    // someone lying hurt: a healing spell close by gets them up (a sword does nothing)
+    PL.body.pos.set(E.x + 3, heightAt(E.x + 3, E.z), E.z);
+    const W = startRoadEvent({ x: E.x, z: E.z, roadAng: 0, kind: 'wounded' }), heal0 = G.prof.heal || 0;
+    BUS.emit('cast', { spell: { school: 'fire' }, incanted: false }); const still = W.phase === 'wounded';
+    BUS.emit('cast', { spell: { school: 'heal' }, incanted: false }); step(2);
+    const healed = still && W.phase === 'saved' && (G.flags.helped || 0) === h0 + 1 && (G.prof.heal || 0) === heal0 + 3;
+    endRoadEvent(W); G.flags.helped = h0; G.prof.heal = heal0; PL.body.pos.copy(p0);
+    return ring && saved && swept && healed && !EVENTS.cur && !INTERACTABLES.includes(E.interact) && !INTERACTABLES.includes(E2.interact) ? E.foes.length : false;
   });
   check('feats', () => {
     const f0 = G.feats; G.feats = undefined; FEATS_T.t = 0; updateFeats(0.016);

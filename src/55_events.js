@@ -15,6 +15,8 @@ const EVENT_FOLK = ['Pedlar Marten', 'Pilgrim Ysolde', 'Courier Fenn', 'Tinker R
 const EVENT_LINES = {
   help: ['Help! Someone, please!', 'Over here — please!', 'Get back! Get BACK!', 'Somebody! Anybody!'],
   thanks: ['You — you saved my life. Gods keep you.', 'I thought that was the end of me. Thank you.', 'Bless you. I\'ll not forget this.', 'That was... thank you. Truly.'],
+  hurt: ['Please... my leg. I can\'t stand. Do you know any healing?', 'Is someone there? Help me... please...', 'A mage? Oh, gods, a mage. Please — it hurts.'],
+  healed: ['It\'s... it\'s closed. The wound\'s closed! You\'re a healer?', 'I can stand. I can STAND. Thank you, thank you.', 'Like warm water over it, and then nothing. Gods bless you.'],
   talk: ['I\'ll keep to the middle of the road from now on, I promise you that.', 'Safe travels — safer than mine, I hope.', 'I\'d pay you if they\'d left me anything worth the paying.'],
 };
 const _evF = new THREE.Vector3(), _evN = new THREE.Vector3();
@@ -56,7 +58,7 @@ function eventSpot() {
     const q = P[Math.min(i + 1, P.length - 1)], o = P[Math.max(i - 1, 0)], dx = q[0] - o[0], dz = q[1] - o[1], l = Math.hypot(dx, dz) || 1;
     for (const side of Math.random() < 0.5 ? [1, -1] : [-1, 1]) {
       const x = P[i][0] - dz / l * 4.5 * side, z = P[i][1] + dx / l * 4.5 * side;
-      if (eventSpotOk(x, z)) return { x, z, roadAng: Math.atan2(dx, dz) };
+      if (eventSpotOk(x, z)) return { x, z, roadAng: Math.atan2(dx, dz), rx: P[i][0], rz: P[i][1] };
     }
   }
   return null;
@@ -92,16 +94,29 @@ function startRoadEvent(s) {
   const k = EVENTS.n++;
   const actor = new Actor(townSpec(mulberry32(WORLD.seed + 900 + (k % 6))));   // six faces, so the material cache stays small
   actor.root.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  // most often someone set upon; sometimes someone already hurt by the road, who needs healing, not a sword —
+  // they sit slumped at the road's very edge, where the grass doesn't hide them
+  const kind = s.kind || (Math.random() < 0.3 ? 'wounded' : 'beset');
+  if (kind === 'wounded' && s.rx !== undefined) s = { ...s, x: lerp(s.x, s.rx, 0.5), z: lerp(s.z, s.rz, 0.5) };
   const y = heightAt(s.x, s.z), pos = new THREE.Vector3(s.x, y, s.z);
   actor.root.position.copy(pos);
   scene.add(actor.root);
-  actor.loop('Blocking', { fade: 0 });
-  const E = { x: s.x, z: s.z, pos, name: EVENT_FOLK[k % EVENT_FOLK.length], actor, face: s.roadAng, phase: 'beset', t: 0, called: false, talked: false, acc: 0 };
+  actor.loop(kind === 'wounded' ? 'Sit_Floor_Idle' : 'Blocking', { fade: 0 });
+  const E = { x: s.x, z: s.z, pos, name: EVENT_FOLK[k % EVENT_FOLK.length], actor, face: s.roadAng, phase: kind, t: 0, called: false, talked: false, acc: 0 };
   E.col = addCircle(s.x, s.z, 0.4, y, y + 1.8, 'npc');
   // what they were carrying, on the ground
   const ra = s.roadAng;
-  E.props = [eventProp('sack', s.x + Math.sin(ra + 1.9) * 1.3, s.z + Math.cos(ra + 1.9) * 1.3, ra + 0.6, 1.2), eventProp('crate_A_big', s.x + Math.sin(ra - 2.3) * 1.6, s.z + Math.cos(ra - 2.3) * 1.6, ra + 0.3, 0)].filter(Boolean);
+  E.props = [eventProp('sack', s.x + Math.sin(ra + 1.9) * 1.3, s.z + Math.cos(ra + 1.9) * 1.3, ra + 0.6, 1.2), kind === 'wounded' ? null : eventProp('crate_A_big', s.x + Math.sin(ra - 2.3) * 1.6, s.z + Math.cos(ra - 2.3) * 1.6, ra + 0.3, 0)].filter(Boolean);
   for (const o of E.props) { const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()); o.userData.col = addCircle(c.x, c.z, Math.max(b.max.x - b.min.x, b.max.z - b.min.z) * 0.4, b.min.y, b.max.y, 'prop'); }
+  E.interact = { pos, r: 2.6, label: () => 'Talk to ' + E.name, enabled: () => E.phase === 'saved' && !E.busy, action: () => talkTraveller(E) };
+  INTERACTABLES.push(E.interact);
+  EVENTS.cur = E;
+  if (kind === 'wounded') {
+    E.foes = []; E.beasts = false;
+    hint('Someone lying by the road up ahead — not moving much.', 3.5);
+    erisSays('event', 1.6);
+    return E;
+  }
   // and who's after them, prowling a ring round them
   const pack = eventPack(s.x, SKY_NOW.night > 0.5);
   E.foes = pack.map((key, i) => {
@@ -112,9 +127,6 @@ function startRoadEvent(s) {
     return e;
   });
   E.beasts = ENEMY_DEFS[pack[0]].rig === 'wolf';
-  E.interact = { pos, r: 2.6, label: () => 'Talk to ' + E.name, enabled: () => E.phase === 'saved' && !E.busy, action: () => talkTraveller(E) };
-  INTERACTABLES.push(E.interact);
-  EVENTS.cur = E;
   if (E.beasts) BUS.emit('sfx', { id: pack[0] === 'boar' ? 'snarl' : 'howl', pos });
   hint(E.beasts ? 'Howling, somewhere up the road — and someone shouting.' : 'Shouting, somewhere up the road.', 3.5);
   erisSays('event', 1.6);
@@ -174,6 +186,9 @@ function updateRoadEvent(E, dt) {
       erisSays('saved', 3.2);
       BUS.emit('sfx', { id: 'discover' });
     } else if (d > 230 && !live.some(e => e.aggro && e.dist() < 60)) { endRoadEvent(E); return; }   // you rode on
+  } else if (E.phase === 'wounded') {
+    if (!E.called && d < 30 && !UI.dlg) { E.called = true; bark(E.name, pick(EVENT_LINES.hurt)); if (!G.flags.toldWound) { G.flags.toldWound = true; later(2.5, () => hint('A healing spell, cast close by, would get them on their feet.', 4)); } }
+    if (d > 230) { endRoadEvent(E); return; }
   } else {
     if (d < 12) want = Math.atan2(p.x - E.x, p.z - E.z);
     // they head on once you've gone, or a while after, when you're not looking
@@ -201,6 +216,23 @@ function updateEvents(dt) {
 // for the compass: someone in trouble, not too far off
 function eventMarker() {
   const E = EVENTS.cur;
-  if (!E || E.phase !== 'beset') return null;
+  if (!E || (E.phase !== 'beset' && E.phase !== 'wounded')) return null;
   return Math.hypot(PL.body.pos.x - E.x, PL.body.pos.z - E.z) < 260 ? { x: E.x, z: E.z } : null;
 }
+// a healing spell cast close to someone lying hurt by the road: up they get
+BUS.on('cast', ({ spell }) => {
+  const E = EVENTS.cur;
+  if (!G || !E || E.phase !== 'wounded' || spell.school !== 'heal') return;
+  if (Math.hypot(PL.body.pos.x - E.x, PL.body.pos.z - E.z) > 9) return;
+  E.phase = 'saved'; E.t = 0;
+  E.actor.once('Sit_Floor_StandUp', { speed: 0.9, fade: 0.2, onEnd: () => { if (EVENTS.cur === E) E.actor.loop('Idle', { fade: 0.4 }); } });
+  emit(20, { pos: E.pos.clone().setY(E.pos.y + 0.5), col: '#fff0a0', spread: 0.6, velSpread: 0.6, upBias: 1.4, life: 1.0, size: 0.12, size2: 0.02, gravity: -0.4, bright: 1.6 });
+  const xp = 15 + G.lvl * 5, before = learnedIds();
+  gainXp(xp); gainCoin(15);
+  G.prof.heal = (G.prof.heal || 0) + 3; checkUnlocks(before);      // healing a stranger teaches the school too
+  G.flags.helped = (G.flags.helped || 0) + 1;
+  later(1.2, () => bark(E.name, pick(EVENT_LINES.healed)));
+  toast('Traveller healed  ·  +' + xp + ' xp', 'good');
+  erisSays('saved', 3.6);
+  BUS.emit('sfx', { id: 'discover' });
+});
