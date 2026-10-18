@@ -61,6 +61,7 @@ kbd{font-family:var(--display);font-size:11px;font-weight:700;min-width:22px;dis
 #compassStrip .cm.bounty{color:#e05a4a;font-size:14px;top:2px}
 #compassStrip .cm.poi{color:var(--parch);font-size:13px;top:3px;opacity:.8}
 #compassStrip .cm.crys{color:#7fd0ff;font-size:12px;top:3px}
+#compassStrip .cm.event{color:#ff9a4a;font-size:15px;font-weight:900;top:1px}
 #compassNeedle{position:absolute;left:50%;bottom:0;width:1px;height:6px;background:var(--hot)}
 #objective{position:absolute;top:54px;left:50%;transform:translateX(-50%);text-align:center;font-size:13px;color:var(--parch);text-shadow:0 1px 10px #000;opacity:.9;transition:opacity .6s}
 #objective b{display:block;font-family:var(--display);font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);margin-bottom:3px}

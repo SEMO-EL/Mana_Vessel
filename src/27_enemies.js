@@ -401,11 +401,12 @@ class Enemy {
       case 'idle': {
         // wander around home
         this.wanderT -= dt;
-        if (this.wanderT <= 0) { this.wanderT = rnd(3, 8); const a = rnd(0, TAU), r = rnd(0, 10); this.wanderTo = new THREE.Vector3(this.home.x + Math.cos(a) * r, 0, this.home.z + Math.sin(a) * r); }
+        // (menace: prowling a ring round someone cornered at home — a road event's traveller — and eyeing them)
+        if (this.wanderT <= 0) { this.wanderT = this.menace ? rnd(1.5, 4) : rnd(3, 8); const a = rnd(0, TAU), r = this.menace ? rnd(3.2, 5) : rnd(0, 10); this.wanderTo = new THREE.Vector3(this.home.x + Math.cos(a) * r, 0, this.home.z + Math.sin(a) * r); }
         if (this.wanderTo) {
           const wx = this.wanderTo.x - this.pos.x, wz = this.wanderTo.z - this.pos.z, wd = Math.hypot(wx, wz);
           if (wd > 0.8) { steer(wx / wd, wz / wd, d.walk, 4); faceTo(Math.atan2(wx, wz), 4); } else { steer(0, 0, 0); this.wanderTo = null; }
-        } else steer(0, 0, 0);
+        } else { steer(0, 0, 0); if (this.menace) faceTo(Math.atan2(this.home.x - this.pos.x, this.home.z - this.pos.z), 5); }
         this.locoAnim();
         if (!playerDown && this.perceives(dist)) alertEnemy(this);
         break;

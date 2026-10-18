@@ -201,6 +201,8 @@ function compassMarks() {
   }
   const bm = typeof bountyMarker === 'function' ? bountyMarker() : null;
   if (bm) out.push({ ang: Math.atan2(bm.x - p.x, bm.z - p.z), label: '✦', cls: 'bounty' });
+  const ev = typeof eventMarker === 'function' ? eventMarker() : null;
+  if (ev) out.push({ ang: Math.atan2(ev.x - p.x, ev.z - p.z), label: '!', cls: 'event' });
   for (const e of ENT.enemies) if (e.aggro && !e.dead && e.dist() < 40) out.push({ ang: e.angleToPlayer() + Math.PI, label: '•', cls: 'enemy' });
   return out;
 }

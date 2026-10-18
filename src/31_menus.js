@@ -274,6 +274,7 @@ function openJournal() {
   html += row('Waystones awakened', woke + ' / ' + ways);
   html += row('Roxy\'s pages', G.pages.length + ' / 5');
   if (typeof CRYSTALS !== 'undefined' && CRYSTALS.list.length) html += row('Mana crystals', crystalsGot() + ' / ' + CRYSTALS.list.length);
+  if (G.flags.helped) html += row('Travellers helped on the road', G.flags.helped);
   // Roxy's pages, to read again
   if (G.pages.length) {
     html += '<h4>Roxy\'s Textbook</h4>';

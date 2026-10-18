@@ -109,6 +109,7 @@ function startDevPlay() {
   if (QS.has('gate')) G.flags.gateOpen = true;                 // dev: the pass gate already open
   if (QS.has('eris')) G.flags.erisWith = true;                 // dev: Eris along
   if (QS.has('horse')) G.flags.horse = true;                   // dev: Kestrel lent already
+  if (QS.has('event')) EVENTS.t = 3;                            // dev: a road event as soon as there's room for one
   TOD.hour = +(QS.get('hour') || 16.5); TOD.frozen = QS.has('freeze');
   const W = WSTONE.list[0];
   spawnPlayer(W.x + 4, W.z + 6, Math.PI * 0.75);
@@ -148,6 +149,7 @@ function frame(dtReal) {
       updateStory(dt);
       updateBounties();
       updateCrystals(dt);
+      updateEvents(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -194,7 +196,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -249,6 +251,25 @@ function selfTests() {
   check('eris', () => { if (!ALLY.eris) ALLY.eris = new Companion(ERIS_SPEC, 'Eris', '#e8606f'); ALLY.eris.join(); step(10); const ok = ALLY.eris.active; ALLY.eris.leave(); return ok; });
   check('horse', () => { G.flags.horse = true; whistleHorse(); step(90); const came = HORSE.mode === 'come' || HORSE.mode === 'idle'; HORSE.body.pos.copy(PL.body.pos).add(new THREE.Vector3(1.5, 0, 0)); HORSE.mode = 'idle'; mountHorse(); const rode = PL.state === 'ride'; step(10); dismountHorse(); const off = PL.state === 'move'; horseStandDown(); return came && rode && off; });
   check('walkers', () => { const w = TOWN.walkers[0], x0 = w.pos.x, z0 = w.pos.z; w.update(1, true, w.pos.clone().setY(w.pos.y + 5)); for (let i = 0; i < 30; i++) w.update(1 / 15, true, w.pos.clone().setY(w.pos.y + 5)); return Math.hypot(w.pos.x - x0, w.pos.z - z0) > 0.5 || w.mode === 'pause'; });
+  check('event', () => {
+    const q0 = G.quest; G.quest = 'wolves';
+    const p0 = PL.body.pos.clone();
+    let E = null;
+    for (const f of [0.3, 0.2, 0.4, 0.5, 0.15, 0.6, 0.7]) {
+      const P = TER.roadPath[Math.floor(TER.roadPath.length * f)];
+      PL.body.pos.set(P[0], heightAt(P[0], P[1]), P[1]);
+      const s = eventSpot(); if (s) { E = startRoadEvent(s); break; }
+    }
+    if (!E) { PL.body.pos.copy(p0); G.quest = q0; return false; }
+    step(5);
+    const ring = E.foes.length >= 2 && E.foes.every(e => !e.aggro && Math.hypot(e.pos.x - E.x, e.pos.z - E.z) < 8);
+    const h0 = G.flags.helped || 0;
+    for (const e of E.foes) killEnemy(e);
+    step(3);
+    const saved = E.phase === 'saved' && G.flags.helped === h0 + 1 && !!eventMarker() === false;
+    endRoadEvent(E); G.flags.helped = h0; G.quest = q0; PL.body.pos.copy(p0);
+    return ring && saved && !EVENTS.cur && !INTERACTABLES.includes(E.interact) ? E.foes.length : false;
+  });
   R.failures = fail; R.ok = fail.length === 0;
   return R;
 }
