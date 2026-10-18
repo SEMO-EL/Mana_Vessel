@@ -83,6 +83,7 @@ async function boot() {
   buildPages();
   batchStaticProps();
   initVFX();
+  initTrails();
   initMenus();
   if (typeof mapBuild === 'function') { bootStatus('Drawing the map'); await nextFrame(); try { mapBuild(); } catch (e) { console.error('map', e); } }
   if (typeof initAudio === 'function') initAudio();
@@ -164,6 +165,7 @@ function frame(dtReal) {
   updateCave(dtReal);
   if (G) updateWaystones(dtReal);
   updateVFX(dt);
+  updateTrails(dt || dtReal * 0.2);
   if (G && (s === 'play' || s === 'rest')) updateHUD(dtReal, GAME.time);
   updateFlash(dtReal);
   if (typeof updateAudio === 'function') { try { updateAudio(dtReal); } catch (e) { console.error('audio', e); } }
