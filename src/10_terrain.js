@@ -112,6 +112,7 @@ function sculptRoaSites() {
 }
 
 async function buildTerrain() {
+  const tt = { t: performance.now() }, lapT = k => { const n = performance.now(); (TER.laps || (TER.laps = {}))[k] = Math.round(n - tt.t); tt.t = n; };
   const c = WORLD.cell, X0 = WORLD.x0, Z0 = WORLD.z0;
   const N = TER.NX = Math.round((WORLD.x1 - WORLD.x0) / c) + 1;     // N: the row stride
   const NZ = TER.NZ = Math.round((WORLD.z1 - WORLD.z0) / c) + 1;
@@ -229,7 +230,9 @@ async function buildTerrain() {
     if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / NZ * 100) + '%'); await nextFrame(); }
   }
 
+  lapT('heights');
   sculptRoaSites();
+  lapT('roaSites');
 
   /* --- grass density: none on water, road, rock, steep ground, or the basin core --- */
   for (let iz = 1; iz < NZ - 1; iz++) {
@@ -252,11 +255,14 @@ async function buildTerrain() {
     }
   }
 
+  lapT('grass');
   buildTerrainTextures();
   bootStatus('Painting the ground');
   await nextFrame();
   buildColorTexture(n3, n4);
+  lapT('colorTex');
   buildTerrainChunks(n3, n4);
+  lapT('chunks');
   scene.add(TER.group);
 }
 
