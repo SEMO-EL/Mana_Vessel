@@ -21,7 +21,7 @@ function updatePadUI(dt) {
     if (padHit(PAD.LT)) { suppressPause(); openGrimoire(); return; }
     return;
   }
-  if (s === 'map') { if (padHit(PAD.BACK) || padHit(PAD.B) || padHit(PAD.START)) { mapClose(); GAME.state = 'play'; lockPointer(); } return; }
+  if (s === 'map') { if (padHit(PAD.BACK) || padHit(PAD.B) || padHit(PAD.START)) { mapClose(); GAME.state = 'play'; lockPointer(); } else padMap(dt); return; }
   if (s === 'paused' && padHit(PAD.START)) { resumeGame(); return; }
   if (s === 'grimoire' && padHit(PAD.LT)) { resumeGame(); return; }
 
@@ -55,4 +55,29 @@ function updatePadUI(dt) {
     const back = items.find(b => /^(back|resume|close|leave)$/i.test(b.textContent.trim()));
     if (back) back.click(); else if (s === 'paused' || s === 'shop' || s === 'bounties') resumeGame();
   }
+}
+// The map on a controller: LB/RB (or the d-pad) step through the waystones you've woken
+// and centre on one; A travels there; the left stick pans, the right stick zooms.
+function padMap(dt) {
+  if (typeof MAP === 'undefined' || !MAP.open || MAP.travelling) return;
+  const V = MAP.view, ax = IN.gp.axes || [];
+  const lx = Math.abs(ax[0] || 0) > 0.2 ? ax[0] : 0, ly = Math.abs(ax[1] || 0) > 0.2 ? ax[1] : 0, ry = Math.abs(ax[3] || 0) > 0.2 ? ax[3] : 0;
+  if (lx || ly) { V.cx += lx * 420 * dt / V.zoom; V.cz += ly * 420 * dt / V.zoom; }
+  if (ry && MAP.frame) {                      // zoom about the middle of the screen (the wheel zooms about the cursor)
+    V.ax = V.cx; V.az = V.cz; V.sx = MAP.frame.vw / 2; V.sy = MAP.frame.vh / 2;
+    V.tz = clamp(V.tz * (1 - ry * 1.6 * dt), MAP_ZOOM.min, MAP_ZOOM.max);
+  }
+  const step = padHit(PAD.RB) || padHit(PAD.RIGHT) ? 1 : padHit(PAD.LB) || padHit(PAD.LEFT) ? -1 : 0;
+  if (step) {
+    const woke = WSTONE.list.filter(W => G && G.waystones[W.id]);
+    if (woke.length) {
+      const i = woke.indexOf(MAP.sel), W = woke[((i < 0 ? (step > 0 ? -1 : 0) : i) + step + woke.length) % woke.length];
+      MAP.sel = W; V.cx = W.x; V.cz = W.z;
+      $('mapTravelName').textContent = W.name;
+      const why = typeof travelBlock === 'function' ? travelBlock() : null;
+      $('mapTravel').classList.toggle('blocked', !!why); $('mapTravelWhy').textContent = why || '';
+      BUS.emit('sfx', { id: 'uiSelect' });
+    }
+  }
+  if (padHit(PAD.A) && MAP.sel) mapTravel();
 }
