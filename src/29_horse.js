@@ -14,52 +14,43 @@ const HORSE = { obj: null, rig: null, body: null, mode: 'gone', speed: 0, headin
 const HORSE_NAME = 'Kestrel';
 
 function buildHorseRig() {
-  const coat = toonMat({ color: '#7a4a2a', rim: true }), dark = toonMat({ color: '#2a1a12', rim: true }), sock = toonMat({ color: '#3a2418' });
-  const muzzleM = toonMat({ color: '#5a3620' }), white = toonMat({ color: '#efe6d6' }), eyeM = toonMat({ color: '#0e0a08' });
-  const leather = toonMat({ color: '#4a3020' }), blanket = toonMat({ color: '#8b2635' }), gold = toonMat({ color: '#c9a227' });
-  const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1);
-  const S = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
+  // every rigid part one mesh, coloured per vertex (the old build was ~45 meshes)
+  const mat = toonMat({ vertexColors: true, rim: true });
+  const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1), cone = new THREE.ConeGeometry(1, 1, 4), cyl = new THREE.CylinderGeometry(1, 1.2, 1, 8);
+  const coat = '#7a4a2a', dark = '#2a1a12', sock = '#3a2418', muzzle = '#5a3620', white = '#efe6d6', eye = '#0e0a08';
+  const leather = '#4a3020', blanket = '#8b2635', gold = '#c9a227';
   const root = new THREE.Group(), body = new THREE.Group();
   body.position.y = 1.08; root.add(body);
-  body.add(S(ball, coat, 0, 0, 0, 0.36, 0.38, 0.86));               // barrel
-  body.add(S(ball, coat, 0, 0.05, 0.6, 0.35, 0.41, 0.38));          // chest
-  body.add(S(ball, coat, 0, 0.09, -0.6, 0.37, 0.38, 0.4));          // rump
-  // saddle: Boreas red blanket, leather seat, gold-trimmed edge
-  body.add(S(box, blanket, 0, 0.34, 0.02, 0.62, 0.05, 0.66));
-  body.add(S(box, leather, 0, 0.4, 0.02, 0.44, 0.08, 0.48));
-  body.add(S(box, leather, 0, 0.47, 0.22, 0.2, 0.08, 0.08));        // pommel
-  body.add(S(box, gold, 0, 0.36, 0.36, 0.63, 0.02, 0.03));
-  for (const s of [-1, 1]) { body.add(S(box, leather, s * 0.37, 0.05, 0.05, 0.02, 0.5, 0.05)); body.add(S(box, dark, s * 0.38, -0.21, 0.05, 0.06, 0.05, 0.12)); }
-  // neck and head
+  const bp = [[ball, coat, 0, 0, 0, 0.36, 0.38, 0.86], [ball, coat, 0, 0.05, 0.6, 0.35, 0.41, 0.38], [ball, coat, 0, 0.09, -0.6, 0.37, 0.38, 0.4],
+    // saddle: Boreas red blanket, leather seat, gold-trimmed edge, stirrups
+    [box, blanket, 0, 0.34, 0.02, 0.62, 0.05, 0.66], [box, leather, 0, 0.4, 0.02, 0.44, 0.08, 0.48], [box, leather, 0, 0.47, 0.22, 0.2, 0.08, 0.08],
+    [box, gold, 0, 0.36, 0.36, 0.63, 0.02, 0.03]];
+  for (const s of [-1, 1]) bp.push([box, leather, s * 0.37, 0.05, 0.05, 0.02, 0.5, 0.05], [box, dark, s * 0.38, -0.21, 0.05, 0.06, 0.05, 0.12]);
+  body.add(mergedPart(bp, mat));
   const neck = new THREE.Group(); neck.position.set(0, 0.22, 0.78); neck.rotation.x = -0.75; body.add(neck);
-  neck.add(S(ball, coat, 0, 0.1, 0.24, 0.19, 0.22, 0.42));
-  for (let i = 0; i < 6; i++) neck.add(S(box, dark, 0, 0.27 - i * 0.012, 0.05 + i * 0.09, 0.05, 0.12, 0.1));   // mane
+  const np = [[ball, coat, 0, 0.1, 0.24, 0.19, 0.22, 0.42]];
+  for (let i = 0; i < 6; i++) np.push([box, dark, 0, 0.27 - i * 0.012, 0.05 + i * 0.09, 0.05, 0.12, 0.1]);    // mane
+  neck.add(mergedPart(np, mat));
   const head = new THREE.Group(); head.position.set(0, 0.2, 0.58); head.rotation.x = 1.15; neck.add(head);
-  head.add(S(ball, coat, 0, 0, 0.05, 0.15, 0.17, 0.27));
-  head.add(S(ball, muzzleM, 0, -0.03, 0.29, 0.12, 0.12, 0.15));
-  head.add(S(box, white, 0, 0.1, 0.12, 0.05, 0.02, 0.3));            // the blaze
-  head.add(S(box, dark, 0, 0.17, -0.12, 0.06, 0.05, 0.14));         // forelock
-  for (const s of [-1, 1]) {
-    const ear = S(new THREE.ConeGeometry(0.045, 0.15, 4), coat, s * 0.08, 0.2, -0.1); ear.rotation.set(-0.3, 0, -s * 0.2); head.add(ear);
-    head.add(S(ball, eyeM, s * 0.135, 0.05, 0.06, 0.03, 0.035, 0.03));
-    head.add(S(ball, dark, s * 0.05, -0.05, 0.43, 0.025, 0.02, 0.015));   // nostril
-    head.add(S(box, leather, s * 0.13, -0.02, 0.2, 0.015, 0.03, 0.2));    // bridle
-  }
+  const hp = [[ball, coat, 0, 0, 0.05, 0.15, 0.17, 0.27], [ball, muzzle, 0, -0.03, 0.29, 0.12, 0.12, 0.15],
+    [box, white, 0, 0.1, 0.12, 0.05, 0.02, 0.3], [box, dark, 0, 0.17, -0.12, 0.06, 0.05, 0.14]];
+  for (const s of [-1, 1]) hp.push([cone, coat, s * 0.08, 0.2, -0.1, 0.045, 0.15, 0.045, -0.3, 0, -s * 0.2], [ball, eye, s * 0.135, 0.05, 0.06, 0.03, 0.035, 0.03],
+    [ball, dark, s * 0.05, -0.05, 0.43, 0.025, 0.02, 0.015], [box, leather, s * 0.13, -0.02, 0.2, 0.015, 0.03, 0.2]);
+  head.add(mergedPart(hp, mat));
   // tail: three falling tufts
   const tail = []; let par = body;
   for (let i = 0; i < 3; i++) {
     const g = new THREE.Group(); g.position.set(0, i === 0 ? 0.32 : -0.02, i === 0 ? -0.92 : -0.24);
     g.rotation.x = i === 0 ? -1.0 : -0.25;                                  // it hangs, it doesn't wag
-    g.add(S(ball, dark, 0, 0, -0.13, 0.07 + i * 0.012, 0.07 + i * 0.012, 0.18)); par.add(g); tail.push(g); par = g;
+    g.add(mergedPart([[ball, dark, 0, 0, -0.13, 0.07 + i * 0.012, 0.07 + i * 0.012, 0.18]], mat)); par.add(g); tail.push(g); par = g;
   }
-  // legs: hip (thigh), knee (cannon), hoof
+  // legs: hip (thigh), knee (cannon + hoof)
   const legs = [];
   for (const [x, z, front] of [[-0.19, 0.6, 1], [0.19, 0.6, 1], [-0.2, -0.62, 0], [0.2, -0.62, 0]]) {
     const hip = new THREE.Group(); hip.position.set(x, -0.14, z); body.add(hip);
-    hip.add(S(ball, coat, 0, -0.2, front ? 0.02 : -0.03, 0.11, 0.3, front ? 0.12 : 0.15));
+    hip.add(mergedPart([[ball, coat, 0, -0.2, front ? 0.02 : -0.03, 0.11, 0.3, front ? 0.12 : 0.15]], mat));
     const knee = new THREE.Group(); knee.position.set(0, -0.46, 0); hip.add(knee);
-    knee.add(S(ball, sock, 0, -0.2, 0, 0.06, 0.24, 0.065));
-    knee.add(S(new THREE.CylinderGeometry(0.07, 0.085, 0.09, 8), dark, 0, -0.42, 0.01));
+    knee.add(mergedPart([[ball, sock, 0, -0.2, 0, 0.06, 0.24, 0.065], [cyl, dark, 0, -0.42, 0.01, 0.07, 0.09, 0.07]], mat));
     legs.push({ hip, knee, front, side: Math.sign(x) });
   }
   root.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
