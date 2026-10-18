@@ -288,6 +288,12 @@ function openJournal() {
   html += '<h4>Great foes felled</h4>';
   html += down.length ? down.map(([, n]) => row(n, '✓')).join('') : '<p class="flavor">None yet.</p>';
   html += row('Kills', G.kills) + row('Times the vessel broke', G.breaks) + row('Deaths', G.deaths);
+  // feats: the ones still ahead are listed too, dimmed
+  const fr = typeof featRows === 'function' ? featRows() : [];
+  if (fr.length) {
+    html += '<h4>Feats · ' + fr.filter(([, ok]) => ok).length + ' / ' + fr.length + '</h4>';
+    html += fr.map(([f, ok]) => `<div class="jr jf${ok ? '' : ' off'}"><span>${f.name}<i>${f.desc}</i></span><b>${ok ? '✓' : ''}</b></div>`).join('');
+  }
   b.innerHTML = html;
   GAME.state = 'journal';
   openScreen('journal');

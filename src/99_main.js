@@ -152,6 +152,7 @@ function frame(dtReal) {
       updateCrystals(dt);
       updateEvents(dt);
       updateCaches(dt);
+      updateFeats(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -276,6 +277,13 @@ function selfTests() {
     step(2);
     const swept = !EVENTS.cur && (G.flags.helped || 0) === h0;
     return ring && saved && swept && !INTERACTABLES.includes(E.interact) && !INTERACTABLES.includes(E2.interact) ? E.foes.length : false;
+  });
+  check('feats', () => {
+    const f0 = G.feats; G.feats = undefined; FEATS_T.t = 0; updateFeats(0.016);
+    const silent = Array.isArray(G.feats);
+    G.kills = Math.max(G.kills, 1); G.feats = G.feats.filter(id => id !== 'blood'); FEATS_T.t = 0; updateFeats(0.016);
+    const got = G.feats.includes('blood'), all = FEATS.every(f => typeof featHeld(f) === 'boolean');
+    G.feats = f0; return silent && got && all ? FEATS.length : false;
   });
   check('caches', () => {
     if (CACHES.list.length !== CACHE_SPOTS.length) return false;
