@@ -199,6 +199,9 @@ function updateSky(dt, focus, time) {
   const dens = 0.0021 + WEATHER.cur.fog * 0.009 + WEATHER.cur.rain * 0.003 + S.night * 0.0008 + DUST.k * (0.0022 + DUST.storm * 0.0065);
   WFOG.wfParams.value.set(dens, 0.011 - WEATHER.cur.fog * 0.004, 12, 0.85 * (1 - WEATHER.cur.cloud * 0.6));
   WFOG.wfMisc.value.y = time;
+  // cloud shadows by day: more cloud, more of the land in shade (till it's all one overcast)
+  const cl = WEATHER.cur.cloud, dayK = (1 - S.night) * smooth(0.02, 0.25, S.elev);
+  WFOG.wfCloud.value.set((0.22 + 0.3 * smooth(0.2, 0.6, cl)) * (1 - smooth(0.78, 0.95, cl)) * dayK, time * 7.5, time * 2.6, lerp(0.62, 0.42, smooth(0.1, 0.8, cl)));
   WFOG.wfMisc.value.w = WEATHER.wet;
 
   // key light: the sun by day, the moon by night, never below the horizon

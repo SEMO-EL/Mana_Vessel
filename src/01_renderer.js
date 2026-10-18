@@ -28,6 +28,8 @@ const WFOG = {
   wfParams:   { value: new THREE.Vector4(0.0026, 0.012, 10, 0.8) },
   // x rim strength, y time (s), z wind strength, w wetness
   wfMisc:     { value: new THREE.Vector4(0.35, 0, 1, 0) },
+  // cloud shadows: x strength, y/z drift offset (m), w coverage threshold
+  wfCloud:    { value: new THREE.Vector4(0, 0, 0, 0.55) },
 };
 
 const FOG_VERT_DECL = /* glsl */`varying vec3 vWFPos;`;
@@ -40,7 +42,17 @@ const FOG_VERT_CALC = /* glsl */`
 const FOG_FRAG_DECL = /* glsl */`
   varying vec3 vWFPos;
   uniform vec3 wfColor; uniform vec3 wfSunColor; uniform vec3 wfSunDir;
-  uniform vec4 wfParams; uniform vec4 wfMisc;
+  uniform vec4 wfParams; uniform vec4 wfMisc; uniform vec4 wfCloud;
+  float wfH( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+  float wfN( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
+    return mix( mix( wfH( i ), wfH( i + vec2( 1.0, 0.0 ) ), f.x ), mix( wfH( i + vec2( 0.0, 1.0 ) ), wfH( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }
+  // big soft shadows of the clouds drifting over the land (sunlight only)
+  float wfCloudShade() {
+    if ( wfCloud.x <= 0.001 ) return 1.0;
+    vec2 p = ( vWFPos.xz + wfCloud.yz ) * 0.0055;
+    float n = wfN( p ) * 0.62 + wfN( p * 2.3 + 3.7 ) * 0.28 + wfN( p * 5.1 + 9.1 ) * 0.1;
+    return 1.0 - wfCloud.x * smoothstep( wfCloud.w, wfCloud.w + 0.16, n );
+  }
   vec3 wfApply( vec3 col ) {
     vec3 V = vWFPos - cameraPosition;
     float d = length( V );
@@ -69,6 +81,7 @@ function patchWorld(shader, flags) {
       #include <opaque_fragment>`);
   }
   if (flags.fog !== false) fs = fs.replace('#include <fog_fragment>', 'gl_FragColor.rgb = wfApply( gl_FragColor.rgb );');
+  fs = fs.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n{ float cs = wfCloudShade(); reflectedLight.directDiffuse *= cs; reflectedLight.directSpecular *= cs; }');
   shader.fragmentShader = fs;
 }
 
