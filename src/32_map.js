@@ -699,6 +699,7 @@ function mapDraw(t) {
     mapBlit(ctx, MAP.fog, wx0, wz0, wx1 - wx0, wz1 - wz0, f.ox + wx0 * s, f.oy + wz0 * s, s);
   }
   mapDrawLabels(ctx, f);
+  mapDrawServices(ctx, f);
   mapDrawBorder(ctx, f);
   mapDrawCompass(ctx, f.ox + (MAP_X1 - 150) * s, f.oy + (MAP_Z1 - 150) * s, 70 * s);
   mapDrawCartouche(ctx, f);
@@ -749,6 +750,34 @@ function mapDrawLabels(ctx, f) {
     // water names in blue-black ink, the rest in brown-black
     mapText(ctx, p.name.toUpperCase(), X, Y, `700 ${px}px Cinzel, Georgia, serif`, px * (o.spread ?? 0.22), o.water ? '#24435c' : MAP_COL.ink, MAP_COL.halo, px * 0.34);
     if (p.sub) mapText(ctx, p.sub, X, Y + px * 1.1, `italic 400 ${px * 0.78}px Spectral, Georgia, serif`, 0.4, '#4a3c28', MAP_COL.halo, px * 0.28);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Who's where to buy, rest, take work or fetch the horse: a dot and a small italic name,
+// once you've seen the place and the map is zoomed in far enough to read them.
+function mapServices() {
+  const out = [], at = (o, name) => { if (o) out.push({ x: o.x, z: o.z, name }); };
+  if (typeof NPCS === 'undefined') return out;
+  at(NPCS.roa3 && NPCS.roa3.pos, "Hilde's stall");
+  at(NPCS.roa7 && NPCS.roa7.pos, 'The Red Hearth (inn)');
+  at(NPCS.stable && NPCS.stable.pos, 'Boreas Stables');
+  at(NPCS.clerk && NPCS.clerk.pos, 'Adventurer Guild · bounties');
+  if (typeof BOARDS !== 'undefined') at(BOARDS.buena, 'Village notices');
+  at(NPCS.gerd && NPCS.gerd.pos, "Hunter Gerd's camp");
+  return out;
+}
+function mapDrawServices(ctx, f) {
+  const z = MAP.view.zoom; if (z < 2.8) return;
+  const a0 = smooth(2.8, 3.2, z), px = 9.5 * f.k * Math.sqrt(z);
+  for (const S of mapServices()) {
+    const a = a0 * smooth(0.3, 0.75, mapSeen(S.x, S.z));
+    if (a <= 0.01) continue;
+    const X = f.ox + S.x * f.s, Y = f.oy + S.z * f.s;
+    if (X < -200 || X > f.vw + 200 || Y < -40 || Y > f.vh + 40) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(X, Y, px * 0.32, 0, TAU); ctx.fillStyle = MAP_COL.gold; ctx.fill(); ctx.lineWidth = Math.max(1, px * 0.1); ctx.strokeStyle = MAP_COL.ink; ctx.stroke();
+    mapText(ctx, S.name, X, Y - px * 1.05, `italic 600 ${px}px Spectral, Georgia, serif`, 0.3, '#3a2c1a', MAP_COL.halo, px * 0.3);
   }
   ctx.globalAlpha = 1;
 }
