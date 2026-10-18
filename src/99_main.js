@@ -79,6 +79,7 @@ async function boot() {
   defineBountyEncounters();
   buildBountyBoard();
   buildCrystals();
+  buildSideQuests();
   buildPages();
   batchStaticProps();
   initVFX();

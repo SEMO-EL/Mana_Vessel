@@ -233,6 +233,8 @@ function openJournal() {
     const st = G.bounties[x.id];
     html += row(x.title + (G.trackBounty === x.id ? ' ✦' : ''), st === 'taken' ? x.where : st === 'done' ? 'Done — claim at the board' : 'Paid');
   }
+  const reqs = typeof sideQuestRows === 'function' ? sideQuestRows() : [];
+  if (reqs.length) { html += '<h4>Requests</h4>'; for (const [k, v] of reqs) html += row(k, v); }
   // what's left to find
   const places = Object.keys(PLACES), found = places.filter(k => G.discovered[k]).length;
   const ways = WSTONE.list.length, woke = WSTONE.list.filter(w => G.waystones[w.id]).length;

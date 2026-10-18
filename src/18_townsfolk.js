@@ -96,6 +96,7 @@ function townLines(where) {
   }
   const L = ['Fine day for it.', 'Mind the carts.', 'Fresh bread at Marga\'s, if you\'re quick.', 'Gods, my back.',
     'Is it true you cast without chanting? My nephew says it\'s impossible.', 'Keep your spells holstered inside the walls, friend.'];
+  L.push(...ROA_RUMOURS);
   if (q === 'toRoa' || q === 'findEris') L.push('You\'re the new tutor? The last one left in tears. Well — left.', 'Lady Eris? Try the forecourt. Follow the shouting.');
   if (q === 'ghislaine' || q === 'guild') L.push('Saw the Sword Saint training at dawn. Didn\'t see her sword move. Just the dummy falling over.');
   if (q === 'bandits') L.push('Brigands at Wagonbreak again. My brother\'s wagon never came home.');
