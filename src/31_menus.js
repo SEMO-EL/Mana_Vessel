@@ -314,6 +314,7 @@ function buildSettings() {
   h += opt('Difficulty', 'difficulty', Object.fromEntries(Object.entries(DIFFICULTY).map(([k, v]) => [k, v.name])));
   h += boolRow('Screen shake', 'shake');
   h += boolRow('Damage numbers', 'damageNumbers');
+  h += boolRow('Minimap', 'minimap');
   h += '<div class="sgroup">Key bindings — click, then press a key or mouse button</div><div class="binds">';
   for (const [a, name] of Object.entries(BIND_NAMES)) h += `<div class="bindrow"><span>${name}</span><button data-bind="${a}">${IN.label(a)}</button></div>`;
   h += '</div>';

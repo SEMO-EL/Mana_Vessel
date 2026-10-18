@@ -348,6 +348,12 @@ function updateHUD(dt, time) {
   UI.calmT = busy ? 0 : UI.calmT + dt;
   $('hud').classList.toggle('calm', UI.calmT > 6);
   updateCompass();
+  // the optional minimap, redrawn ten times a second
+  $('hud').classList.toggle('mm', !!SETTINGS.minimap);
+  if (SETTINGS.minimap && typeof mapMinimapDraw === 'function' && MAP.canvas) {
+    UI.mmT = (UI.mmT || 0) - dt;
+    if (UI.mmT <= 0) { UI.mmT = 0.1; const c = $('minimap'), x = c.getContext('2d'); x.clearRect(0, 0, 300, 300); try { mapMinimapDraw(x, 300, 170); } catch (e) {} }
+  }
   updateFloaters(dt);
   const obj = typeof currentObjective === 'function' ? currentObjective() : null;
   if (obj) { $('objTitle').textContent = obj.title; $('objText').textContent = obj.text; $('objective').style.opacity = UI.calmT > 12 ? 0.35 : 0.9; }
