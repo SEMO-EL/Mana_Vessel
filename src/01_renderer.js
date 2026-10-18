@@ -146,7 +146,34 @@ const GradeShader = {
     }`,
 };
 
-let composer, bloomPass, gradePass, renderPass;
+/* Sun shafts: march from each pixel toward the sun's place on screen, adding
+   only what's brighter than the sky's ordinary blue (the glare round the sun).
+   Whatever stands in front of the sun — a ridge, a canopy, a tower — cuts
+   dark lanes through the glare. Off when the sun is behind you or gone. */
+const RaysShader = {
+  uniforms: { tDiffuse: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uAmt: { value: 0 }, uCol: { value: new THREE.Color(1, 0.9, 0.7) }, uAspect: { value: 1.6 } },
+  vertexShader: /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uAmt; uniform vec3 uCol; uniform float uAspect;
+    varying vec2 vUv;
+    void main(){
+      vec4 base = texture2D(tDiffuse, vUv);
+      if (uAmt <= 0.002) { gl_FragColor = base; return; }
+      vec2 d = (vUv - uSun) * (0.92 / 36.0);
+      vec2 uv = vUv; float illum = 1.0; vec3 acc = vec3(0.0);
+      for (int i = 0; i < 36; i++) {
+        uv -= d;
+        vec3 s = texture2D(tDiffuse, clamp(uv, vec2(0.001), vec2(0.999))).rgb;
+        float l = dot(s, vec3(0.2126, 0.7152, 0.0722));
+        // the source: open sky close round the sun (anything dark in front of it casts a lane)
+        float near = 1.0 - smoothstep(0.04, 0.42, length((uv - uSun) * vec2(uAspect, 1.0)));
+        acc += min(s, vec3(4.0)) * smoothstep(0.32, 1.1, l) * near * illum;
+        illum *= 0.966;
+      }
+      gl_FragColor = vec4(base.rgb + acc * (uAmt / 36.0) * uCol, base.a);
+    }`,
+};
+let composer, bloomPass, gradePass, renderPass, raysPass;
 function buildComposer() {
   const q = Q();
   if (composer) composer.dispose();
@@ -154,6 +181,9 @@ function buildComposer() {
   composer = new EffectComposer(renderer, rt);
   renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+  raysPass = new ShaderPass(RaysShader);
+  raysPass.enabled = q.bloom;
+  composer.addPass(raysPass);
   bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.5, 0.92);
   bloomPass.enabled = q.bloom;
   composer.addPass(bloomPass);

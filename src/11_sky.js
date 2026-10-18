@@ -168,6 +168,7 @@ scene.add(skyDome);
 
 /* ───────────── per-frame ───────────── */
 const _snap = new THREE.Vector3(), _lsx = new THREE.Vector3(), _lsy = new THREE.Vector3(), _lsz = new THREE.Vector3();
+const _raysV = new THREE.Vector3(), _raysF = new THREE.Vector3();
 function updateSky(dt, focus, time) {
   if (!TOD.frozen) TOD.hour = (TOD.hour + dt * TOD.speed + 24) % 24;
 
@@ -226,6 +227,19 @@ function updateSky(dt, focus, time) {
   const cl = WEATHER.cur.cloud, dayK = (1 - S.night) * smooth(0.02, 0.25, S.elev);
   WFOG.wfCloud.value.set((0.22 + 0.3 * smooth(0.2, 0.6, cl)) * (1 - smooth(0.78, 0.95, cl)) * dayK, time * 7.5, time * 2.6, lerp(0.62, 0.42, smooth(0.1, 0.8, cl)));
   WFOG.wfMisc.value.w = WEATHER.wet;
+
+  // sun shafts: only with the sun in front of you, low suns most of all, clouds thin them
+  if (typeof raysPass !== 'undefined' && raysPass && raysPass.enabled) {
+    const sp = _raysV.copy(camera.position).addScaledVector(S.sunDir, 1000).project(camera);
+    const inFront = camera.getWorldDirection(_raysF).dot(S.sunDir) > 0.05;
+    const edge = 1 - smooth(0.85, 1.5, Math.max(Math.abs(sp.x), Math.abs(sp.y)));
+    const low = 0.55 + 0.45 * (1 - smooth(0.12, 0.55, S.elev));
+    const amt = inFront && !GAME.inCave ? 1.9 * edge * low * (1 - S.night) * (1 - WEATHER.cur.cloud * 0.75) * smooth(-0.02, 0.06, S.elev) : 0;
+    raysPass.uniforms.uAmt.value = amt;
+    raysPass.uniforms.uSun.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
+    raysPass.uniforms.uAspect.value = camera.aspect;
+    raysPass.uniforms.uCol.value.copy(S.sun).multiplyScalar(0.55).lerp(_c2.set(1, 0.95, 0.85), 0.4);
+  }
 
   // key light: the sun by day, the moon by night, never below the horizon
   const keyDir = S.night > 0.5 ? S.moonDir : S.sunDir;
