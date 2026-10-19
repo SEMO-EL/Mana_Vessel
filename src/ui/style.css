@@ -168,6 +168,7 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
 .panel.center{min-width:360px}
 .panel.wide{width:min(900px,92vw);max-height:86vh;text-align:left}
 .panel.scroll{overflow-y:auto}
+.panel{max-height:94vh;overflow-y:auto}                 /* no panel taller than the window can ever trap its last rows */
 .panel .h{font-family:var(--display);font-weight:900;letter-spacing:.3em;text-transform:uppercase;font-size:18px;text-align:center;margin-bottom:10px}
 #title{background:linear-gradient(180deg,rgba(5,6,12,.1) 0%,rgba(5,6,12,.0) 40%,rgba(5,6,12,.75) 100%)}
 .titleBlock{margin-top:28vh}
