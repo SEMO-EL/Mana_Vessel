@@ -264,6 +264,7 @@ function openJournal() {
   const q = questStep(), b = $('journalBody');
   const row = (k, v) => `<div class="jr"><span>${k}</span><b>${v}</b></div>`;
   let html = `<div class="jq"><div class="jt">${q.title}</div><p>${q.text}</p></div>`;
+  html += `<p class="flavor" style="margin:4px 0 0;text-align:center">Day ${(G.flags.day || 0) + 1} in Fittoa · ${G.coin || 0} silver</p>`;
   // jobs
   const jobs = typeof BOUNTIES !== 'undefined' ? BOUNTIES.filter(x => G.bounties && G.bounties[x.id]) : [];
   html += '<h4>Bounties</h4>';
@@ -274,6 +275,22 @@ function openJournal() {
   }
   const reqs = [...(typeof sideQuestRows === 'function' ? sideQuestRows() : []), ...(typeof errandRows === 'function' ? errandRows() : [])];
   if (reqs.length) { html += '<h4>Requests</h4>'; for (const [k, v] of reqs) html += row(k, v); }
+  // what you carry that makes you more than you were
+  const keep = [];
+  const g = G.gear || {}, f = G.flags;
+  if (g.blade >= 2) keep.push(['Master-forged blade', 'Sword +24%']); else if (g.blade >= 1) keep.push(['Boreas steel edge', 'Sword +12%']);
+  if (g.staff) keep.push(['Ironwood staff core', 'Spells +10%']);
+  if (g.boots) keep.push(['Traveller\'s boots', 'Stamina +10']);
+  if (g.bandolier) keep.push(['Draught bandolier', 'Carry 5 draughts']);
+  if (g.oats) keep.push(['Oat-cakes for Kestrel', 'Cheaper gallop']);
+  if (g.chart) keep.push(['Smuggler\'s chart', 'Chests on the map']);
+  if (f.ashback === 'done') keep.push(['Bear-hide cloak', 'Health +15']);
+  if (f.kidFire) keep.push(['The street kid\'s lucky stone', 'Mana +6']);
+  if (f.flock === 'done') keep.push(['Marthe\'s stew, remembered', 'Health +8']);
+  if (f.moon === 'done') keep.push(['Lilia\'s brew', 'A fresh draught each day']);
+  if (f.caravan === 'done') keep.push(['Hilde\'s friendship', 'Her prices −20%']);
+  if (f.spell_quagmire) keep.push(['Wenna\'s lesson', 'Quagmire']);
+  if (keep.length) { html += '<h4>Gear &amp; keepsakes</h4>'; for (const [k, v] of keep) html += row(k, v); }
   // what's left to find
   const places = Object.keys(PLACES), found = places.filter(k => G.discovered[k]).length;
   const ways = WSTONE.list.length, woke = WSTONE.list.filter(w => G.waystones[w.id]).length;

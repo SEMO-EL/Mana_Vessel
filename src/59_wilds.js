@@ -289,10 +289,11 @@ function resetWilds() {
 
 let _wildPrevHour = -1;
 function updateWilds(dt) {
-  if (!WILDS.built || !G || GAME.inCave) return;
-  // a new day when the clock runs past midnight (or a wait skips over it)
+  if (!WILDS.built || !G) return;
+  // a new day when the clock runs past midnight (or a wait skips over it) — underground too
   if (_wildPrevHour >= 0 && TOD.hour < _wildPrevHour - 1) G.flags.day = (G.flags.day || 0) + 1;
   _wildPrevHour = TOD.hour;
+  if (GAME.inCave) return;
   const p = PL.body.pos, t = GAME.time;
   for (const S1 of WILDS.sheep) {
     const r = S1.sh.root;

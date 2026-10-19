@@ -75,8 +75,15 @@ if grep -q '</script' "$GAME"; then echo "src contains </script — escape it" >
   # painted art from v2, verbatim (never re-encoded)
   echo '<script>window.ART = {'
   if [ -f "$V2" ]; then
-    awk '/^const ART = \{$/{f=1;next} /^\};$/{if(f){f=0}} f' "$V2"
+    # (minus any key repainted below, so the old picture isn't carried as dead weight)
+    SKIP="^ *($(ls "$ROOT"/assets/art/*.jpg 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/\.jpg$//' | paste -sd'|' -)):"
+    awk '/^const ART = \{$/{f=1;next} /^\};$/{if(f){f=0}} f' "$V2" | { if [ "$SKIP" = "^ *():" ]; then cat; else grep -Ev "$SKIP"; fi; }
   fi
+  # repainted art (assets/art/<key>.jpg) replaces v2's image of the same key: a later key wins
+  for f in "$ROOT"/assets/art/*.jpg; do
+    [ -f "$f" ] || continue
+    printf "  %s: 'data:image/jpeg;base64,%s',\n" "$(basename "$f" .jpg)" "$(b64 "$f")"
+  done
   echo '};</script>'
 
   printf '<script type="application/x-mv-game">\n'
