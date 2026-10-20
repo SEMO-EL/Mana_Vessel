@@ -150,7 +150,7 @@ const QUALITY = {
 };
 const SETTINGS = {
   quality: 'high',
-  master: 0.7, music: 0.45, sfx: 0.8,
+  master: 0.7, music: 0.45, sfx: 0.8, voice: 0.7,
   sens: 1.0, invertY: false, fov: 60,
   shake: true, damageNumbers: true, subtitles: true, minimap: false, rumble: true,
   difficulty: 'adventurer',          // story | adventurer | deadend

@@ -346,6 +346,7 @@ function buildSettings() {
   h += slider('Master', 'master', 0, 1, 0.01, v => Math.round(v * 100));
   h += slider('Music', 'music', 0, 1, 0.01, v => Math.round(v * 100));
   h += slider('Effects', 'sfx', 0, 1, 0.01, v => Math.round(v * 100));
+  h += slider('Voices', 'voice', 0, 1, 0.01, v => Math.round(v * 100));
   h += '<div class="sgroup">Game</div>';
   h += opt('Difficulty', 'difficulty', Object.fromEntries(Object.entries(DIFFICULTY).map(([k, v]) => [k, v.name])));
   h += boolRow('Screen shake', 'shake');
@@ -384,7 +385,7 @@ function afterSettingChange(k) {
   saveSettings();
   if (k === 'quality') { applyQuality(); rebuildQualityDependents(); }
   if (k === 'fov') { camera.fov = SETTINGS.fov; camera.updateProjectionMatrix(); }
-  if (['master', 'music', 'sfx'].includes(k) && typeof auVolumes === 'function') auVolumes();
+  if (['master', 'music', 'sfx', 'voice'].includes(k) && typeof auVolumes === 'function') auVolumes();
 }
 function rebuildQualityDependents() {
   if (FOL.grass) { scene.remove(FOL.grass); FOL.grass.geometry.dispose(); buildGrass(); }
@@ -461,7 +462,7 @@ function initMenus() {
   $('pQuit').onclick = () => { saveGame(true); showTitle(); };
   $('gBack').onclick = () => { GAME.state = 'paused'; openScreen('pause'); };
   $('sBack').onclick = () => closeSettings();
-  $('sReset').onclick = () => { SETTINGS.binds = { ...DEFAULT_BINDS }; Object.assign(SETTINGS, { quality: 'high', master: 0.7, music: 0.45, sfx: 0.8, sens: 1, invertY: false, fov: 60, shake: true, damageNumbers: true }); afterSettingChange('quality'); buildSettings(); };
+  $('sReset').onclick = () => { SETTINGS.binds = { ...DEFAULT_BINDS }; Object.assign(SETTINGS, { quality: 'high', master: 0.7, music: 0.45, sfx: 0.8, voice: 0.7, sens: 1, invertY: false, fov: 60, shake: true, damageNumbers: true }); afterSettingChange('quality'); buildSettings(); };
   $('dRise').onclick = () => riseAgain();
   $('bBack').onclick = () => resumeGame();
   $('eKeep').onclick = () => {

@@ -277,7 +277,11 @@ function updateDialogue(dt) {
   if (d.shown < L.t.length) {
     d.t += dt;
     const n = Math.min(L.t.length, Math.floor(d.t * 52));
-    if (n !== d.shown) { d.shown = n; $('dlgText').textContent = L.t.slice(0, n); }
+    if (n !== d.shown) {
+      // a speaker talks in blips as their words type out (narration stays quiet)
+      if (L.s && typeof auBlip === 'function') for (let k = d.shown; k < n; k++) { const ch = L.t[k]; if (/[\p{L}\d]/u.test(ch) && auBlip(L.s, ch, k)) break; }
+      d.shown = n; $('dlgText').textContent = L.t.slice(0, n);
+    }
   }
   if (IN.pressed('interact') || IN.pressed('jump') || IN.edgesDown.has('Enter') || IN.edgesDown.has('Mouse0')) advanceDialogue();
 }

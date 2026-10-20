@@ -28,7 +28,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const AUDIO_MAX_VOICES = 24;           // concurrent one-shot sfx voices (priority sounds get +8)
 const AUDIO_NOISE_SEC = 3;             // length of the one shared noise loop
-const AUDIO_MIX = { music: 0.5, sfx: 0.62, amb: 0.55 };   // bus trims under the settings sliders
+const AUDIO_MIX = { music: 0.5, sfx: 0.62, amb: 0.55, speech: 0.9 };   // bus trims under the settings sliders
 const AUDIO_STRIDE_WALK = 0.9, AUDIO_STRIDE_SPRINT = 1.4; // metres per footstep
 const AUDIO_GESTURES = ['pointerdown', 'keydown', 'pointerup', 'touchend'];
 const AUDIO_NOOPT = {};
@@ -38,7 +38,7 @@ const AUDIO = {
   ctx: null, dead: false, armed: false, onGesture: null, hidden: false, warned: false,
   master: null, comp: null, sfx: null, amb: null, music: null, duck: null, explore: null, combat: null,
   echoIn: null, caveIn: null, noiseBuf: null, cbDest: null,
-  voices: 0, last: {}, learned: false, volv: [-1, -1, -1], tick: 0, clock: 0,
+  voices: 0, last: {}, learned: false, volv: [-1, -1, -1, -1], speech: null, speechDest: null, blipN: 0, tick: 0, clock: 0,
   duckUntil: 0, duckAmt: 1,
   glide: null,
   step: { init: false, x: 0, z: 0, acc: 0 },
@@ -109,6 +109,8 @@ function auCreate() {
   AUDIO.sfx = gain(0, AUDIO.master);
   AUDIO.amb = gain(0, AUDIO.master);
   AUDIO.music = gain(0, AUDIO.master);
+  AUDIO.speech = gain(0, AUDIO.master);
+  AUDIO.speechDest = { node: AUDIO.speech, pan: null, live: 0, cap: 1 };
   AUDIO.duck = gain(1, AUDIO.music);
   AUDIO.explore = gain(1, AUDIO.duck);
   AUDIO.combat = gain(0, AUDIO.duck);
@@ -142,11 +144,12 @@ function auVolumes() {
   AUDIO.music.gain.setTargetAtTime(mu * AUDIO_MIX.music, t, 0.03);
   AUDIO.sfx.gain.setTargetAtTime(s * AUDIO_MIX.sfx, t, 0.03);
   AUDIO.amb.gain.setTargetAtTime(s * AUDIO_MIX.amb, t, 0.03);    // ambience follows the sfx slider
-  const v = AUDIO.volv; v[0] = SETTINGS.master; v[1] = SETTINGS.music; v[2] = SETTINGS.sfx;
+  AUDIO.speech.gain.setTargetAtTime(clamp(+SETTINGS.voice || 0, 0, 1) * AUDIO_MIX.speech, t, 0.03);
+  const v = AUDIO.volv; v[0] = SETTINGS.master; v[1] = SETTINGS.music; v[2] = SETTINGS.sfx; v[3] = SETTINGS.voice;
 }
 function auSyncVolumes() {
   const v = AUDIO.volv;
-  if (v[0] !== SETTINGS.master || v[1] !== SETTINGS.music || v[2] !== SETTINGS.sfx) auVolumes();
+  if (v[0] !== SETTINGS.master || v[1] !== SETTINGS.music || v[2] !== SETTINGS.sfx || v[3] !== SETTINGS.voice) auVolumes();
 }
 
 /* ───────────── voices ─────────────
@@ -628,6 +631,49 @@ function auPlay(id, e = AUDIO_NOOPT) {
     def(d, e);
     auRelease(d);
   } catch (err) { auWarn(err); }
+}
+/* ───────────── voice blips ─────────────
+   No recorded voices: each speaker "talks" in short tuned blips as their
+   line types out. f base pitch, wave, lp brightness, spread how far the
+   letters wander, glide the pitch fall inside a blip, every n letters. */
+const AUDIO_SPEAKERS = {
+  Eris:      { f: 330, type: 'square',   lp: 2300, spread: 0.2,  glide: 1.06, dur: 0.045, vol: 0.05,  every: 2 },
+  Roxy:      { f: 300, type: 'triangle', lp: 2800, spread: 0.09, glide: 0.97, dur: 0.065, vol: 0.09,  every: 3 },
+  Ghislaine: { f: 150, type: 'sawtooth', lp: 850,  spread: 0.05, glide: 0.94, dur: 0.05,  vol: 0.07,  every: 3 },
+  Paul:      { f: 165, type: 'sawtooth', lp: 1300, spread: 0.13, glide: 1.0,  dur: 0.055, vol: 0.06,  every: 3 },
+  Sauros:    { f: 118, type: 'square',   lp: 1150, spread: 0.24, glide: 1.08, dur: 0.07,  vol: 0.06,  every: 2 },
+  Zenith:    { f: 265, type: 'triangle', lp: 2300, spread: 0.1,  glide: 0.98, dur: 0.06,  vol: 0.09,  every: 3 },
+  Lilia:     { f: 285, type: 'sine',     lp: 3000, spread: 0.05, glide: 0.99, dur: 0.05,  vol: 0.1,   every: 3 },
+};
+const _speakers = new Map();
+function auSpeaker(name) {
+  let v = _speakers.get(name);
+  if (v) return v;
+  for (const k in AUDIO_SPEAKERS) if (name.includes(k)) { v = AUDIO_SPEAKERS[k]; break; }
+  if (!v) {
+    // anyone else: a voice of their own, the same every time they speak
+    let h = 2166136261;
+    for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619) >>> 0;
+    const r = k => ((h >>> k) & 255) / 255;
+    v = { f: 130 + r(0) * 170, type: ['triangle', 'sawtooth', 'square'][h % 3], lp: 1000 + r(8) * 1500, spread: 0.06 + r(16) * 0.12,
+      glide: 0.95 + r(24) * 0.1, dur: 0.05 + r(4) * 0.02, vol: 0.06, every: 3 };
+  }
+  _speakers.set(name, v);
+  return v;
+}
+// one blip for the letter just typed (k = its index in the line); false if it isn't this voice's turn
+function auBlip(name, ch, k) {
+  const v = auSpeaker(name);
+  if (k % v.every) return false;
+  AUDIO.blipN++;
+  if (!auReady() || !(SETTINGS.voice > 0) || !AUDIO.speech) return true;
+  try {
+    const up = ch !== ch.toLowerCase();                                   // SHOUTING: louder, higher
+    const step = ((ch.toLowerCase().charCodeAt(0) * 37) % 9 - 4) / 4;    // the same letter, the same note
+    const f = auVar(v.f * (1 + step * v.spread) * (up ? 1.1 : 1), 0.015);
+    auTone(AUDIO.speechDest, v.type, f, f * v.glide, v.dur, v.vol * (up ? 1.35 : 1), { lp: v.lp, q: 1.3, atk: 0.005 });
+  } catch (err) { auWarn(err); }
+  return true;
 }
 function auWarn(err) { if (!AUDIO.warned) { AUDIO.warned = true; console.warn('[audio]', err); } }
 
