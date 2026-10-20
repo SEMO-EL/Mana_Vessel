@@ -354,6 +354,7 @@ async function birthdayScene() {
   CAM.override = sky; letterbox(true);
   OMEN.burst();
   BUS.emit('sfx', { id: 'break' }); shake(0.8);
+  if (typeof calamityWave === 'function') calamityWave(OMEN.core.position, 2.6);
   await whiteOut(2.4);
   await new Promise(r => setTimeout(r, 900));                 // hold the white a beat
   CAM.override = null; letterbox(false);
@@ -409,7 +410,8 @@ const OMEN = {
     // (dim: the light that waits after the birthday — always low over the east of wherever you are, no light of its own)
     if (this.dim) { p.copy(camera.position).add(_omenOff); const vis = !GAME.inCave; this.core.visible = this.glow.visible = vis; for (const h of this.halos) h.visible = vis; }
     const rise = 0.4 + 0.6 * smooth(0, 3, this.t);
-    const swell = 1 + Math.sin(this.t * 2.3) * 0.06 + (this.burstT >= 0 ? this.burstT * this.burstT * 40 : 0);
+    // (when it opens it flares to a star a few times its size — the wave that follows is what fills the world)
+    const swell = 1 + Math.sin(this.t * 2.3) * 0.06 + (this.burstT >= 0 ? Math.pow(Math.min(this.burstT, 1.2), 2) * 3 : 0);
     this.core.scale.setScalar(70 * swell * rise);
     this.glow.position.copy(p); this.glow.scale.setScalar(330 * swell * rise);
     this.glow.material.opacity = 0.85 * smooth(0, 4, this.t) * (this.dim ? 0.45 : 1);

@@ -222,7 +222,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, TOWN_ERRAND, KID, setupEscape, finishEscape, breakPlanks, AUDIO, DEMON, DCS, DREAM, faceTheLight, ruijerdArrives, buildDemonLand, NPC_DC: () => NPCS, STORMF, lightningBolt, REGION, wakeMother, BANTER, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, TOWN_ERRAND, KID, setupEscape, finishEscape, breakPlanks, AUDIO, DEMON, DCS, DREAM, faceTheLight, ruijerdArrives, buildDemonLand, NPC_DC: () => NPCS, STORMF, lightningBolt, REGION, wakeMother, BANTER, calamityWave, WAVE, OMEN_: () => OMEN, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },

@@ -230,6 +230,43 @@ function updateDream(dt) {
   g.rotation.y = dampAngle(g.rotation.y, Math.atan2(p.x - g.position.x, p.z - g.position.z), 4, dt);
 }
 
+/* ───────────── the wave: the light, coming for everything ─────────────
+   A shell of violet light swelling out of the omen faster than anything should move,
+   rolling over the city toward you; the ground lets go of its dust and motes and
+   they rise; the world shakes harder the closer it comes. (Then the white.) */
+const WAVE = { on: false, t: 0, dur: 2.3, at: new THREE.Vector3(), shells: [] };
+function calamityWave(origin, dur = 2.3) {
+  if (!WAVE.shells.length) {
+    for (const [col, op] of [['#e8dcff', 0.32], ['#b49cff', 0.22]]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      m.renderOrder = 18; m.frustumCulled = false; m.userData.op = op;
+      WAVE.shells.push(m);
+    }
+  }
+  WAVE.at.copy(origin); WAVE.t = 0; WAVE.dur = dur; WAVE.on = true;
+  for (const m of WAVE.shells) { m.position.copy(origin); m.scale.setScalar(1); scene.add(m); }
+}
+function updateWave(dt) {
+  if (!WAVE.on) return;
+  WAVE.t += dt;
+  const k = clamp(WAVE.t / WAVE.dur, 0, 1), reach = WAVE.at.distanceTo(camera.position) + 40;
+  WAVE.shells.forEach((m, i) => {
+    m.scale.setScalar(Math.max(1, reach * Math.pow(k, 1.6) * (1 - i * 0.06)));
+    m.material.opacity = m.userData.op * (0.35 + 0.65 * k);
+  });
+  // the ground lets go
+  const p = PL.body.pos, n = Math.round(2 + k * 10);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, d = rnd(2, 26), x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+    emit(1, { pos: _wvP.set(x, heightAt(x, z) + rnd(0, 0.6), z), col: Math.random() < 0.5 ? '#d8c8ff' : '#a89a8a', vel: { x: 0, y: rnd(2, 5) * (0.5 + k), z: 0 }, velSpread: 0.6, drag: 0.2,
+      life: rnd(1.4, 2.4), size: rnd(0.06, 0.16), size2: 0.02, bright: Math.random() < 0.5 ? 2.2 : 0, gravity: -1.5 });
+  }
+  if (Math.random() < dt * 8) shake(0.08 + k * 0.4);
+  if (WAVE.t > WAVE.dur + 1.5) { WAVE.on = false; for (const m of WAVE.shells) scene.remove(m); }
+}
+const _wvP = new THREE.Vector3();
+
 /* ───────────── the light opens ───────────── */
 const DCS = { busy: false, wolves: [], killed: 0, ruiDone: false };
 // from the terrace (quest 'done'), or straight from the endcard (the screen's already white)
@@ -253,6 +290,7 @@ async function faceTheLight(fromEndcard = false) {
       await say(say$(DC_LINES.terrace), { cam: sky });
       setPlayerState('talk'); $('hud').classList.add('off'); CAM.override = sky; letterbox(true);
       OMEN.burst(); BUS.emit('sfx', { id: 'break' }); shake(0.8);
+      calamityWave(OMEN.core.position, 2.4);
       await whiteOut(2.2);
     } else {
       const e = fadeEl(); e.style.transition = 'none'; e.style.background = '#ffffff'; e.style.opacity = 1;
@@ -379,6 +417,7 @@ async function ruijerdArrives() {
 /* ───────────── each frame ───────────── */
 function updateDemonStory(dt) {
   updateDream(dt);
+  updateWave(dt);
   if (!G || DCS.busy || UI.dlg) return;
   if (G.quest === 'dcSurvive' && !DCS.ruiDone && PL.state !== 'dead') {
     const live = DCS.wolves.filter(e => !e.dead && !e.removed);
