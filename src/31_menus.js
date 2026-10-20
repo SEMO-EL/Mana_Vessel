@@ -301,6 +301,7 @@ function openJournal() {
   if (f.spell_quagmire) keep.push(['Wenna\'s lesson', 'Quagmire']);
   if (f.migurdCharm) keep.push(['A braided Migurd charm', 'For Roxy, from her mother']);
   if (f.deadEnd) keep.push(['A name: Dead End', 'Eris, Ruijerd and you']);
+  if (f.ruiSparWon) keep.push(['Superd footwork', 'Stamina +6 · bouts won: ' + f.ruiSparWon]);
   if (keep.length) { html += '<h4>Gear &amp; keepsakes</h4>'; for (const [k, v] of keep) html += row(k, v); }
   // what's left to find
   const places = Object.keys(PLACES).filter(placeCounts), found = places.filter(k => G.discovered[k]).length;

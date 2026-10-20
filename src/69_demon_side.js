@@ -36,6 +36,58 @@ VENDORS.migurd = { title: 'Migurd Barter', wares: () => MIGURD_WARES, price: p =
 const TRADER_LINES = ['Silver? Here? ...Oh, the caravans used to take it. When there were caravans. Yes, all right.',
   'Bitter-root, smoked hare, a good cloak. Everything a person needs, and nothing they want.', 'You trade like an outsider: with your mouth. It\'s charming.'];
 
+/* ───────────── sparring with Ruijerd ─────────────
+   By the east gate, a rack of Migurd hunting spears: spar there and Ruijerd fights you
+   for real, until you've earned a nod. His first yield teaches Superd footwork. */
+const RUI_SPAR_AT = { x: 384, z: 1598 };
+ENEMY_DEFS.ruiSpar = {
+  name: 'Ruijerd Superdia', ...RUIJERD_SPEC, weaponAim: (e, dt) => aimSpear({ actor: e.actor, state: e.state === 'windup' || e.state === 'active' ? 'attack' : 'idle', pos: e.pos, face: e.face }, dt),
+  hp: 560, poise: 120, r: 0.42, h: 1.9, walk: 2.6, run: 7.2, sight: 40, hear: 40, xp: 140, weight: 1, flinchAt: 16, spar: true,
+  shield: 0.7, guardPoise: 0.25, flinchCd: 2.2, armorWindup: true,
+  idle: '2H_Melee_Idle', walkClip: 'Walking_B', runClip: 'Running_A',
+  attacks: [
+    { clip: '2H_Melee_Attack_Stab',  speed: 1.15, hitAt: 0.42, range: [1.5, 4.4], reach: 3.6, arc: 0.45, dmg: 12, poise: 26, lunge: 6 },
+    { clip: '2H_Melee_Attack_Slice', speed: 1.1,  hitAt: 0.4,  range: [0, 3.2],   reach: 3.0, arc: 1.6,  dmg: 10, poise: 20, lunge: 2.5 },
+    { clip: '2H_Melee_Attack_Spin',  speed: 1.0,  hitAt: 0.45, range: [0, 3.4],   dmg: 12, poise: 40, unblockable: true, aoe: { r: 3.2, at: 'self' } },
+  ],
+};
+const RUI_SPAR_LINES = {
+  ask: [{ p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Spear against staff. Show me what the waste has taught you — and do not hold back. I will not.' }],
+  win: [{ p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Enough. ...Good. You moved before I did. That is the whole of it.' }],
+  firstWin: [{ p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Keep your weight over the balls of your feet, and never cross them. The Superd teach it to children. Now I have.' }],
+  lose: [{ p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Breathe. You looked at the spear; look at my shoulders. Again, when you have breath.' }],
+};
+function buildRuijerdSpar() {
+  const R = RUI_SPAR_AT;
+  placeProp('weaponrack', R.x + 3.5, R.z - 2.5, { s: 2.6, rot: -0.6, pad: 0.7 });
+  INTERACTABLES.push({ pos: new THREE.Vector3(R.x + 3.5, heightAt(R.x + 3.5, R.z - 2.5), R.z - 2.5), r: 3, label: () => 'Spar with Ruijerd',
+    enabled: () => !!G && dcAt('dcStorm') && !!G.flags.ruiWith && ALLY.ruijerd && ALLY.ruijerd.active && !UI.spar && !DCSIDE.busy,
+    action: () => sparRuijerd() });
+}
+async function sparRuijerd() {
+  DCSIDE.busy = true;
+  try {
+    const p = PL.body.pos, a = Math.atan2(RUI_SPAR_AT.x - p.x, RUI_SPAR_AT.z - p.z), R = NPCS.ruijerd;
+    const rx = p.x + Math.sin(a) * 6, rz = p.z + Math.cos(a) * 6;
+    ALLY.ruijerd.leave();
+    R.moveTo(rx, rz, Math.atan2(p.x - rx, p.z - rz)); R.setVisible(true);
+    await npcSay(R, RUI_SPAR_LINES.ask);
+    const back = () => { NPCS.ruijerd.setVisible(false); if (G.flags.ruiWith && ALLY.ruijerd) { ALLY.ruijerd.join(); } };
+    startSpar('ruijerd', 'ruiSpar', {
+      yieldAt: 0.45,
+      onWin: () => {
+        const first = !G.flags.ruiSparWon; G.flags.ruiSparWon = (G.flags.ruiSparWon || 0) + 1;
+        gainXp(first ? 160 : 40);
+        npcSay(NPCS.ruijerd, first ? [...RUI_SPAR_LINES.win, ...RUI_SPAR_LINES.firstWin] : RUI_SPAR_LINES.win).then(() => {
+          if (first) { G.maxStamina += 6; G.stamina = G.maxStamina; toast('Superd footwork — Max stamina +6', 'good'); }
+          back(); autosave();
+        });
+      },
+      onLose: () => npcSay(NPCS.ruijerd, RUI_SPAR_LINES.lose).then(back),
+    });
+  } finally { DCSIDE.busy = false; }
+}
+
 /* ───────────── the lost hunter ───────────── */
 const HUNTER_AT = { x: 562, z: 1658 };              // (in the canyon's bed)
 const HUNTER_LINES = {
@@ -65,6 +117,7 @@ function buildDemonSide() {
   new NPC('migHunter', MIGURD_SPEC('#4572c0', '#7a6a52', '#3e352c', 'Rogue', 0.86), HUNTER_AT.x, HUNTER_AT.z, { name: 'Migurd Hunter', idle: 'Sit_Floor_Idle', face: 0.4, talk: n => talkHunter(n) });
   // the scorpions that have him pinned (they come when you've been asked to look)
   defineEncounter('dcHunter', HUNTER_AT.x, HUNTER_AT.z + 4, [['rustScorp', 0, 0], ['rustScorp', 5, 3], ['rustScorp', -5, 4]], { flag: 'lostHunterAsked' });
+  buildRuijerdSpar();
   resetDemonSide();
 }
 async function talkHunterWife(n) {

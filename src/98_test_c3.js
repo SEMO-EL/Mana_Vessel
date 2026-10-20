@@ -70,6 +70,12 @@ async function chapterThreeTest() {
     place(Wf.pos.x + 1.5, Wf.pos.z + 1.5); talkHunterWife(Wf);
     if (!await drive(() => G.flags.lostHunter === 'done' && !DCSIDE.busy)) return { ...out, c3fail: 'hunter home' };
     step('side');
+    // a bout with Ruijerd by the gate: he yields, teaches, and walks with you again
+    place(RUI_SPAR_AT.x + 2, RUI_SPAR_AT.z); sparRuijerd();
+    if (!await drive(() => !!UI.spar && !UI.dlg, 300)) return { ...out, c3fail: 'spar start' };
+    damageEnemy(UI.spar, UI.spar.maxHp * 0.6, {});
+    if (!await drive(() => G.flags.ruiSparWon === 1 && ALLY.ruijerd.active && !UI.spar && !UI.dlg, 600)) return { ...out, c3fail: 'spar end' };
+    step('spar');
     for (const e of [...ENT.enemies]) e.remove();
     place(1040, 1700);
     await drive(() => STORMF.said && (REGION.storm || 0) > 0.4, 400);

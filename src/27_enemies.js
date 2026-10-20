@@ -360,6 +360,7 @@ class Enemy {
     if (near !== this._shadowNear) { this._shadowNear = near; this.root.traverse(o => { if (!o.isMesh) return; if (o.userData.cs === undefined) o.userData.cs = o.castShadow; o.castShadow = near && o.userData.cs; }); }
     if (this.rig) this.rig.update(dt, this);
     else this.actor.update(dt * (this.slow ? 1 - this.slow * 0.6 : 1));
+    if (this.def.weaponAim) this.def.weaponAim(this, dt);        // a held weapon that follows the fight (a spear)
   }
 
   remove() {
