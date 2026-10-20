@@ -247,7 +247,8 @@ function sculptDemonSites(n) {
     const j0 = Math.max(TER.NZF, Math.floor((z - R - WORLD.z0) / c)), j1 = Math.min(TER.NZ - 2, Math.ceil((z + R - WORLD.z0) / c));
     for (let j = j0; j <= j1; j++) for (let k = i0; k <= i1; k++) { const i = j * N + k; H[i] = fn(H[i], WORLD.x0 + k * c, WORLD.z0 + j * c); }
   };
-  for (const key of ['migurd', 'wake', 'bones']) {
+  for (const key of ['migurd', 'wake', 'bones', 'raiders']) {
+    if (!DC_SPOTS[key]) continue;
     const P = DC_SPOTS[key], lv = P.lv = median(P.x, P.z, P.r);
     each(P.x, P.z, P.r + 60, (h, x, z) => lerp(h, lv + n.c(x / 40, z / 40) * 0.35, 1 - smooth(P.r * 0.85, P.r + 50, Math.hypot(x - P.x, z - P.z))));
   }

@@ -470,6 +470,7 @@ function resetDemonState() {
   } else if (ALLY.ruijerd) ALLY.ruijerd.leave();
   if (typeof resetMigurdState === 'function') resetMigurdState();
   if (typeof resetDemonSide === 'function') resetDemonSide();
+  if (typeof resetRaiders === 'function') resetRaiders();
 }
 // while the light waits for you: a violet star low over the east, from anywhere in Fittoa
 function dcShowOmen() {

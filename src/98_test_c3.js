@@ -76,6 +76,18 @@ async function chapterThreeTest() {
     damageEnemy(UI.spar, UI.spar.maxHp * 0.6, {});
     if (!await drive(() => G.flags.ruiSparWon === 1 && ALLY.ruijerd.active && !UI.spar && !UI.dlg, 600)) return { ...out, c3fail: 'spar end' };
     step('spar');
+    // the Raiders' Notch: Ghoro down, the trader out of his cage and trading by the square
+    for (const e of [...ENT.enemies]) e.remove();
+    place(DC_SPOTS.raiders.x, DC_SPOTS.raiders.z + 40);
+    if (!await drive(() => { const E = ENCOUNTERS.find(e => e.id === 'dcRaiders'); return E && E.active && E.live.length >= 7; }, 300)) return { ...out, c3fail: 'raiders spawn' };
+    for (const e of ENCOUNTERS.find(e => e.id === 'dcRaiders').live) damageEnemy(e, 999999, {});
+    await drive(() => { for (const e of ENT.enemies) if (!e.dead) damageEnemy(e, 999999, {}); return !!G.flags.dcRaiders; }, 300);
+    if (!G.flags.dcRaiders) return { ...out, c3fail: 'raiders clear' };
+    talkOkkah(NPCS.dcOkkah);
+    if (!await drive(() => G.flags.okkah === 'freed' && !RAID.busy)) return { ...out, c3fail: 'okkah' };
+    G.coin = 500;
+    if (!buyWare('okLens', 'okkah') || staffGearMul() < 1.09) return { ...out, c3fail: 'okkah shop' };
+    step('raiders');
     for (const e of [...ENT.enemies]) e.remove();
     place(1040, 1700);
     await drive(() => STORMF.said && (REGION.storm || 0) > 0.4, 400);

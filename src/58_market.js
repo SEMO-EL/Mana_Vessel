@@ -9,8 +9,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const gear = () => G.gear || (G.gear = {});
 const draughtCap = () => gear().bandolier ? 5 : 3;
-const swordGearMul = () => 1 + 0.12 * (G && G.gear && G.gear.blade || 0);
-const staffGearMul = () => 1 + 0.10 * (G && G.gear && G.gear.staff || 0);
+const swordGearMul = () => 1 + 0.12 * ((G && G.gear && G.gear.blade || 0) + (G && G.gear && G.gear.wasteEdge || 0));
+const staffGearMul = () => 1 + 0.10 * ((G && G.gear && G.gear.staff || 0) + (G && G.gear && G.gear.lens || 0));
 
 function gainCoin(n, at) {
   n = Math.round(n); if (!G || n <= 0) return;

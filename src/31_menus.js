@@ -267,7 +267,7 @@ function exitPhoto() {
 /* ───────────── journal ─────────────
    Where you are in the story, the jobs you've taken, and what's left to find. */
 const JOURNAL_FOES = [['warden', 'The Barrow Warden'], ['treant', 'The Elder Treant'], ['alpha', 'The Grey Alpha'], ['wagons', 'Brannoc, Brigand Captain'],
-  ['firstWall', 'The First Golem'], ['oldScar', 'Old Scar'], ['edric', 'Sir Edric, the Unburied'], ['sandMother', 'The Sand Mother']];
+  ['firstWall', 'The First Golem'], ['oldScar', 'Old Scar'], ['edric', 'Sir Edric, the Unburied'], ['sandMother', 'The Sand Mother'], ['dcRaiders', 'Ghoro the Horned']];
 function openJournal() {
   const q = questStep(), b = $('journalBody');
   const row = (k, v) => `<div class="jr"><span>${k}</span><b>${v}</b></div>`;
@@ -299,6 +299,12 @@ function openJournal() {
   if (f.moon === 'done') keep.push(['Lilia\'s brew', 'A fresh draught each day']);
   if (f.caravan === 'done') keep.push(['Hilde\'s friendship', 'Her prices −20%']);
   if (f.spell_quagmire) keep.push(['Wenna\'s lesson', 'Quagmire']);
+  if (g.lens) keep.push(['Demon-glass lens', 'Spells +10%']);
+  if (g.wasteEdge) keep.push(['Waste-forged edge', 'Sword +12%']);
+  if (g.horn) keep.push(['Horn amulet', 'Health +15']);
+  if (g.wasteCloak) keep.push(['Waste cloak', 'Health +12']);
+  if (g.quietCharm) keep.push(['Quiet-mind charm', 'Stamina +8']);
+  if (f.lostHunter === 'done') keep.push(['Migurd hunting tea', 'Health +10']);
   if (f.migurdCharm) keep.push(['A braided Migurd charm', 'For Roxy, from her mother']);
   if (f.deadEnd) keep.push(['A name: Dead End', 'Eris, Ruijerd and you']);
   if (f.ruiSparWon) keep.push(['Superd footwork', 'Stamina +6 · bouts won: ' + f.ruiSparWon]);

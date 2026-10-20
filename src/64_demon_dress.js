@@ -44,6 +44,7 @@ function buildDemonDressing() {
   if (typeof defineMotherEncounter === 'function') defineMotherEncounter();
   if (typeof buildDemonPeople === 'function') buildDemonPeople();
   if (typeof buildDemonSide === 'function') buildDemonSide();
+  if (typeof buildRaiderCamp === 'function') buildRaiderCamp();
   batchStaticProps();                       // the fences and props just placed join the static batch
 }
 
