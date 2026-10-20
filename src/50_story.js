@@ -437,7 +437,9 @@ function savedSpot(s) {
   const p = s.pos;
   if (s.inCave || !Array.isArray(p) || p.length < 3 || !p.every(Number.isFinite)) return null;
   const [x, y, z] = p;
-  if (x < WORLD.px0 || x > WORLD.px1 || z < WORLD.pz0 || z > WORLD.pz1) return null;
+  const B = inDemon(z) ? DEMON : WORLD;
+  if (x < B.px0 || x > B.px1 || z < B.pz0 || z > B.pz1) return null;
+  if (B === DEMON && !DEMON.built) return null;
   const w = waterAt(x, z), gy = groundAt(x, z, y + 0.6);         // a bridge deck or a floe counts as ground
   if (w > NO_WATER && w - gy > PHYS.WADE) return null;
   return { x, y: gy, z, face: Number.isFinite(s.face) ? s.face : 0 };

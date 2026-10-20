@@ -93,6 +93,14 @@ const SKYP = {
   day:    { zen: '#3a74bd', hor: '#b9d2e8', fog: '#a8c1d8', sun: '#fff1dc', sunI: 2.7,  sky: '#9cc2ea', gnd: '#6b6049', hemiI: 1.15, lift: '#000000', gain: '#ffffff' },
 };
 for (const k in SKYP) for (const f in SKYP[k]) if (typeof SKYP[k][f] === 'string') SKYP[k][f] = new THREE.Color(SKYP[k][f]);
+// the Demon Continent: the same hours under a rust-and-rose haze (REGION.k blends it in)
+const SKYP_DC = {
+  night:  { zen: '#0b0710', hor: '#26171d', fog: '#21151b', sun: '#bfa2bc', sunI: 0.8,  sky: '#43344a', gnd: '#181216', hemiI: 0.74, lift: '#0a0508', gain: '#dcb8cc' },
+  dawn:   { zen: '#43314d', hor: '#e0906a', fog: '#b98572', sun: '#ffa26c', sunI: 1.6,  sky: '#937482', gnd: '#46302c', hemiI: 0.9,  lift: '#130708', gain: '#ffd6c0' },
+  day:    { zen: '#6c6078', hor: '#d3b3a2', fog: '#b89c8e', sun: '#ffe2c4', sunI: 2.5,  sky: '#b6a3a4', gnd: '#5e4a40', hemiI: 1.08, lift: '#060203', gain: '#fff0e6' },
+};
+for (const k in SKYP_DC) for (const f in SKYP_DC[k]) if (typeof SKYP_DC[k][f] === 'string') SKYP_DC[k][f] = new THREE.Color(SKYP_DC[k][f]);
+const ASH_COL = new THREE.Color('#9c8478');
 
 const _c1 = new THREE.Color(), _c2 = new THREE.Color();
 const SKY_NOW = {
@@ -117,11 +125,14 @@ function skyState() {
   const wTw = (1 - smooth(0.05, 0.3, Math.abs(e - 0.02))) * (1 - wDay * 0.6);   // twilight band around the horizon
   const wNight = smooth(0.02, -0.18, e);
   const W = WEATHER.cur;
+  const rk = REGION.k;
   for (const f of ['zen', 'hor', 'fog', 'sun', 'sky', 'gnd', 'lift', 'gain']) {
     S[f].copy(SKYP.night[f]).lerp(SKYP.day[f], 1 - wNight).lerp(SKYP.dawn[f], wTw);
+    if (rk > 0.001) S[f].lerp(_c1.copy(SKYP_DC.night[f]).lerp(SKYP_DC.day[f], 1 - wNight).lerp(SKYP_DC.dawn[f], wTw), rk);
   }
-  S.sunI = lerp(lerp(SKYP.night.sunI, SKYP.day.sunI, 1 - wNight), SKYP.dawn.sunI, wTw);
-  S.hemiI = lerp(lerp(SKYP.night.hemiI, SKYP.day.hemiI, 1 - wNight), SKYP.dawn.hemiI, wTw);
+  const iA = s => lerp(lerp(s.night.sunI, s.day.sunI, 1 - wNight), s.dawn.sunI, wTw), iB = s => lerp(lerp(s.night.hemiI, s.day.hemiI, 1 - wNight), s.dawn.hemiI, wTw);
+  S.sunI = rk > 0.001 ? lerp(iA(SKYP), iA(SKYP_DC), rk) : iA(SKYP);
+  S.hemiI = rk > 0.001 ? lerp(iB(SKYP), iB(SKYP_DC), rk) : iB(SKYP);
   S.night = wNight;
   // cloud cover greys the sky and softens the sun; rain darkens everything
   const grey = W.cloud * 0.55 + W.rain * 0.3;
@@ -215,15 +226,26 @@ const _raysV = new THREE.Vector3(), _raysF = new THREE.Vector3();
 function updateSky(dt, focus, time) {
   if (!TOD.frozen) TOD.hour = (TOD.hour + dt * TOD.speed + 24) % 24;
 
+  // which side of the seam: the Demon Continent's sky and weather fade in (under a white-out you don't see it)
+  const dc = REGION.dc = !!focus && inDemon(focus.z) && !GAME.inCave;
+  REGION.k = Math.abs(REGION.k - (dc ? 1 : 0)) < 0.003 ? (dc ? 1 : 0) : damp(REGION.k, dc ? 1 : 0, 1.6, dt);
+  if (dc !== REGION.wasDC) { REGION.wasDC = dc; WEATHER.timer = 0; }        // a new sky: pick its weather now
   // weather: drift toward a target state, pick a new one now and then
   WEATHER.timer -= dt;
   if (WEATHER.timer <= 0) {
     const r = Math.random();
-    const next = r < 0.35 ? 'clear' : r < 0.62 ? 'fair' : r < 0.78 ? 'overcast' : r < 0.92 ? 'rain' : 'mist';
+    // the waste is dry: no rain there but the storm plateau's own
+    const next = dc ? (r < 0.5 ? 'clear' : r < 0.85 ? 'fair' : 'overcast')
+      : r < 0.35 ? 'clear' : r < 0.62 ? 'fair' : r < 0.78 ? 'overcast' : r < 0.92 ? 'rain' : 'mist';
     Object.assign(WEATHER.tgt, WEATHER_STATES[next]);
     WEATHER.timer = rnd(120, 260);
   }
-  for (const k of ['cloud', 'rain', 'fog']) WEATHER.cur[k] = damp(WEATHER.cur[k], WEATHER.tgt[k], 0.05, dt);
+  // the storm plateau keeps its own weather: walk up into it and the sky closes over you
+  const storm = REGION.storm = dc ? dcStormW(focus.x, focus.z) : 0;
+  if (storm > 0.35) { Object.assign(WEATHER.tgt, WEATHER_STATES.rain); REGION.inStorm = true; }
+  else if (REGION.inStorm) { REGION.inStorm = false; Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = rnd(120, 260); }
+  const wk = dc ? 0.22 : 0.05;                  // out on the waste, the weather turns fast
+  for (const k of ['cloud', 'rain', 'fog']) WEATHER.cur[k] = damp(WEATHER.cur[k], WEATHER.tgt[k], wk, dt);
   WEATHER.wet = clamp(WEATHER.wet + (WEATHER.cur.rain > 0.3 ? dt / 20 : -dt / 90), 0, 1);
 
   const S = skyState();
@@ -236,13 +258,14 @@ function updateSky(dt, focus, time) {
   }
 
   // dust over the badlands: the haze follows where you are, storms come and go
-  const inDry = focus && focus.x > 900 && !GAME.inCave ? outskirtsW(focus.x, focus.z) : 0;
+  // (and the waste's red haze, everywhere on it but under the storm)
+  const inDry = focus && !GAME.inCave ? Math.max(focus.x > 900 && !dc ? outskirtsW(focus.x, focus.z) : 0, REGION.k * 0.6 * (1 - storm)) : 0;
   DUST.timer -= dt;
   if (DUST.timer <= 0) { DUST.stormT = Math.random() < 0.35 ? 1 : 0; DUST.timer = DUST.stormT ? rnd(70, 140) : rnd(150, 320); }
   DUST.storm = damp(DUST.storm, DUST.stormT * (1 - WEATHER.cur.rain), 0.08, dt);
   DUST.k = damp(DUST.k, inDry * (0.5 + 0.5 * DUST.storm) * (1 - WEATHER.cur.rain * 0.85), 0.6, dt);
   if (DUST.k > 0.001) {
-    _c1.copy(DUST_COL).lerp(DUST_STORM, DUST.storm).multiplyScalar(lerp(1, 0.22, S.night));
+    _c1.copy(DUST_COL).lerp(DUST_STORM, DUST.storm).lerp(ASH_COL, REGION.k).multiplyScalar(lerp(1, 0.22, S.night));
     S.fog.lerp(_c1, DUST.k * 0.55);
     S.hor.lerp(_c1, DUST.k * 0.4);
     S.zen.lerp(_c1, DUST.k * DUST.storm * 0.45);                   // a storm browns the whole sky

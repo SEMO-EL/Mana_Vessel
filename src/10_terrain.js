@@ -116,6 +116,7 @@ async function buildTerrain() {
   const c = WORLD.cell, X0 = WORLD.x0, Z0 = WORLD.z0;
   const N = TER.NX = Math.round((WORLD.x1 - WORLD.x0) / c) + 1;     // N: the row stride
   const NZ = TER.NZ = Math.round((WORLD.z1 - WORLD.z0) / c) + 1;
+  const NZF = TER.NZF = Math.round((WORLD.zF - WORLD.z0) / c) + 1;   // Fittoa's rows: the rest wait for buildDemonLand()
   const NN = N * NZ;
   TER.H = new Float32Array(NN);
   TER.WATER = new Float32Array(NN).fill(NO_WATER);
@@ -148,7 +149,7 @@ async function buildTerrain() {
   const hw = RIVER_WIDTH / 2;
   const rdx = RIDGE.bx - RIDGE.ax, rdz = RIDGE.bz - RIDGE.az, rlen2 = rdx * rdx + rdz * rdz;
 
-  for (let iz = 0; iz < NZ; iz++) {
+  for (let iz = 0; iz < NZF; iz++) {
     const z = iz * c + Z0;
     for (let ix = 0; ix < N; ix++) {
       const x = ix * c + X0;
@@ -231,11 +232,15 @@ async function buildTerrain() {
       if (rv < hw + 2.5) TER.WATER[i] = L;
       else if (dl < LAKE.r + 4 && h < WORLD.lakeLevel + 0.05) TER.WATER[i] = WORLD.lakeLevel;
     }
-    if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / NZ * 100) + '%'); await nextFrame(); }
+    if ((iz & 63) === 0) { bootStatus('Raising the land  ' + Math.round(iz / NZF * 100) + '%'); await nextFrame(); }
   }
 
   lapT('heights');
   sculptRoaSites();
+  // the strip south of Fittoa waits for buildDemonLand(); till then it carries on
+  // Fittoa's last row, so the seam's normals (and the far peaks' shading) stay as they were
+  const seam = TER.H.slice((NZF - 1) * N, NZF * N);
+  for (let iz = NZF; iz < NZ; iz++) TER.H.set(seam, iz * N);
   lapT('roaSites');
 
   /* --- grass density: none on water, road, rock, steep ground, or the basin core --- */
@@ -271,10 +276,10 @@ async function buildTerrain() {
 }
 
 /* Ground colour at 4 m resolution, so grass matches the soil it grows from. */
-function buildColorTexture(nA, nB) {
+function buildColorTexture(nA, nB, j0 = 0, j1 = (TER.NZF - 1) / 2) {
   const N = TER.NX, MX = (TER.NX - 1) / 2 + 1, MZ = (TER.NZ - 1) / 2 + 1, c = WORLD.cell;
-  const data = new Uint8Array(MX * MZ * 4), col = new THREE.Color(), n = new THREE.Vector3();
-  for (let j = 0; j < MZ; j++) for (let k = 0; k < MX; k++) {
+  const data = TER.colorData || (TER.colorData = new Uint8Array(MX * MZ * 4)), col = new THREE.Color(), n = new THREE.Vector3();
+  for (let j = j0; j <= j1; j++) for (let k = 0; k < MX; k++) {
     const ix = k * 2, iz = j * 2, i = iz * N + ix;
     const x = ix * c + WORLD.x0, z = iz * c + WORLD.z0;
     normalAt(x, z, n);
@@ -284,6 +289,7 @@ function buildColorTexture(nA, nB) {
     // store sqrt(linear): spends the 8 bits where the dark greens live
     data[o] = Math.sqrt(col.r) * 255; data[o + 1] = Math.sqrt(col.g) * 255; data[o + 2] = Math.sqrt(col.b) * 255; data[o + 3] = 255;
   }
+  if (TER.colorTex) { TER.colorTex.needsUpdate = true; return; }       // (a later strip: re-upload the one texture)
   const t = new THREE.DataTexture(data, MX, MZ, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
   TER.colorTex = t; TER.colorMX = MX; TER.colorMZ = MZ;
@@ -294,6 +300,7 @@ function buildTerrainTextures() {
   const NX = TER.NX, NZ = TER.NZ;
   const half = new Uint16Array(NX * NZ);
   for (let i = 0; i < NX * NZ; i++) half[i] = THREE.DataUtils.toHalfFloat(TER.H[i]);
+  TER.heightHalf = half;
   const ht = new THREE.DataTexture(half, NX, NZ, THREE.RedFormat, THREE.HalfFloatType);
   ht.minFilter = ht.magFilter = THREE.LinearFilter; ht.needsUpdate = true;
   TER.heightTex = ht;
@@ -318,6 +325,7 @@ const TCOL = (() => {
 })();
 const _tc = new THREE.Color(), _tc2 = new THREE.Color();
 function terrainColor(x, z, h, slope, i, nA, nB, out) {
+  if (z > WORLD.zF) return demonColor(x, z, h, slope, i, nA, nB, out);
   const v1 = nA(x / 45, z / 45), v2 = nB(x / 12, z / 12);
   // meadow: lush <-> dry <-> dark, broken up by two noise scales
   out.copy(TCOL.lush).lerp(TCOL.dry, smooth(-0.1, 0.7, v1)).lerp(TCOL.dark, smooth(0.2, 0.8, -v1) * 0.6);
@@ -404,21 +412,23 @@ function terrainMaterial() {
   return toonMat({ vertexColors: true, onShader });
 }
 
-function buildTerrainChunks(nA, nB) {
-  const CH = 100, perX = Math.round((WORLD.x1 - WORLD.x0) / CH), perZ = Math.round((WORLD.z1 - WORLD.z0) / CH);
-  const mat = terrainMaterial();
-  TER.material = mat;
-  for (let cz = 0; cz < perZ; cz++) {
+// Chunk rows cz0..cz1-1 (100 m each); boot builds Fittoa's, buildDemonLand() the strip south of it.
+// `inner(mx, mz)` says which get full detail: where you can walk, plus a margin.
+function buildTerrainChunks(nA, nB, cz0 = 0, cz1 = Math.round((WORLD.zF - WORLD.z0) / 100), xr = null, inner = null) {
+  const CH = 100, perX = Math.round((WORLD.x1 - WORLD.x0) / CH);
+  const mat = TER.material || (TER.material = terrainMaterial());
+  for (let cz = cz0; cz < cz1; cz++) {
     for (let cx = 0; cx < perX; cx++) {
       const x0 = WORLD.x0 + cx * CH, z0 = WORLD.z0 + cz * CH;
+      if (xr && (x0 + CH <= xr[0] || x0 >= xr[1])) continue;
       // full detail where you can walk (plus a margin); the far mountains at half
       const mx = x0 + CH / 2, mz = z0 + CH / 2;
-      const inner = mx > WORLD.px0 - 80 && mx < WORLD.px1 + 80 && mz > WORLD.pz0 - 80 && mz < WORLD.pz1 + 80;
-      const step = inner ? 2 : 4;
+      const isInner = inner ? inner(mx, mz) : mx > WORLD.px0 - 80 && mx < WORLD.px1 + 80 && mz > WORLD.pz0 - 80 && mz < WORLD.pz1 + 80;
+      const step = isInner ? 2 : 4;
       const geo = chunkGeometry(x0, z0, CH, step, nA, nB);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
-      mesh.castShadow = inner;               // far mountains don't need to cast into the shadow map
+      mesh.castShadow = isInner;               // far mountains don't need to cast into the shadow map
       mesh.matrixAutoUpdate = false;
       TER.group.add(mesh);
       TER.chunks.push(mesh);

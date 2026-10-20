@@ -13,7 +13,8 @@
 const WORLD = {
   half: 800,                       // Buena's half-extent (its ring, its map frame)
   x0: -1100, x1: 2700,             // heightfield bounds (metres): Buena's square + the Roa basin
-  z0: -1100, z1: 1100,
+  z0: -1100, z1: 2300,
+  zF: 1100,                        // Fittoa's rows end here; past it, the Demon Continent strip (built on demand: 63_demon.js)
   px0: -780, px1: 2380,            // playable rectangle (soft wall)
   pz0: -780, pz1: 780,
   cell: 2,                         // heightfield spacing

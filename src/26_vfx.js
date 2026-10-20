@@ -265,7 +265,12 @@ const _dv = new THREE.Vector3();
 function dustAround(cp) {
   const k = DUST.k, st = DUST.storm, night = SKY_NOW.night;
   const wind = 3 + st * 9, wx = -wind * 0.92, wz = wind * 0.38;          // out of the east-north-east
-  const col = night > 0.5 ? '#4a4038' : '#cdb38a';
+  const red = REGION.k > 0.5, col = night > 0.5 ? (red ? '#3e2a28' : '#4a4038') : red ? '#b09080' : '#cdb38a';
+  // ash, falling slowly out of the haze over the waste
+  if (red && WEATHER.cur.rain < 0.3) for (let i = 0; i < 2; i++) {
+    _dv.set(cp.x + rnd(-14, 14), cp.y + rnd(3, 9), cp.z + rnd(-14, 14));
+    emit(1, { pool: 'soft', pos: _dv, vel: { x: wx * 0.2, y: -0.6, z: wz * 0.2 }, velSpread: 0.25, drag: 0.1, col: night > 0.5 ? '#231d1e' : '#4b4343', life: 7, size: 0.05, size2: 0.035 });
+  }
   const puffs = Math.round(k * (1.5 + st * 6));
   for (let i = 0; i < puffs; i++) {
     const a = Math.random() * TAU, d = rnd(10, 42), x = cp.x + Math.cos(a) * d - wx * 1.2, z = cp.z + Math.sin(a) * d - wz * 1.2;
@@ -282,7 +287,7 @@ function dustAround(cp) {
   if (DUST.devilT <= 0 && night < 0.3 && WEATHER.cur.rain < 0.2 && DUST.devils.length < 1) {
     DUST.devilT = rnd(25, 60);
     const a = Math.random() * TAU, d = rnd(45, 120), x = cp.x + Math.cos(a) * d, z = cp.z + Math.sin(a) * d;
-    if (outskirtsW(x, z) > 0.6) DUST.devils.push({ x, z, t: 0, life: rnd(10, 16), vx: rnd(-2, 2), vz: rnd(-2, 2), spin: Math.random() * TAU });
+    if (red ? DUST.storm < 0.5 && dcStormW(x, z) < 0.1 : outskirtsW(x, z) > 0.6) DUST.devils.push({ x, z, t: 0, life: rnd(10, 16), vx: rnd(-2, 2), vz: rnd(-2, 2), spin: Math.random() * TAU });
   }
   for (let i = DUST.devils.length - 1; i >= 0; i--) {
     const D = DUST.devils[i];
@@ -292,7 +297,7 @@ function dustAround(cp) {
     for (let j = 0; j < 4; j++) {
       const h = Math.random() * 14 * grow, r = 0.6 + h * 0.28, a = D.spin + j * 1.57 + h * 0.5;
       _dv.set(D.x + Math.cos(a) * r, gy + h, D.z + Math.sin(a) * r);
-      emit(1, { pool: 'haze', pos: _dv, vel: { x: -Math.sin(a) * 6 + D.vx, y: 2.5 + h * 0.1, z: Math.cos(a) * 6 + D.vz }, velSpread: 0.6, drag: 0.6, col: '#c4a77c', life: 1.6, size: 1.6 + h * 0.18, size2: 3 + h * 0.3 });
+      emit(1, { pool: 'haze', pos: _dv, vel: { x: -Math.sin(a) * 6 + D.vx, y: 2.5 + h * 0.1, z: Math.cos(a) * 6 + D.vz }, velSpread: 0.6, drag: 0.6, col: red ? '#a88a76' : '#c4a77c', life: 1.6, size: 1.6 + h * 0.18, size2: 3 + h * 0.3 });
     }
     if (D.t > D.life) DUST.devils.splice(i, 1);
   }
@@ -371,7 +376,9 @@ function updateVFX(dt) {
     const cp = camera.position;
     if (SKY_NOW.night > 0.5 && WEATHER.cur.rain < 0.3) {
       const x = cp.x + rnd(-30, 30), z = cp.z + rnd(-30, 30);
-      emit(1, { pos: new THREE.Vector3(x, heightAt(x, z) + rnd(0.4, 2.2), z), col: '#d8ff7a', velSpread: 0.4, drag: 0.5, life: 4, size: 0.1, size2: 0.1, bright: 2.2 });
+      // (out on the waste, no fireflies: embers, drifting up off the warm ground)
+      if (REGION.k < 0.5) emit(1, { pos: new THREE.Vector3(x, heightAt(x, z) + rnd(0.4, 2.2), z), col: '#d8ff7a', velSpread: 0.4, drag: 0.5, life: 4, size: 0.1, size2: 0.1, bright: 2.2 });
+      else if (Math.random() < 0.5) emit(1, { pos: new THREE.Vector3(x, heightAt(x, z) + rnd(0.2, 1.2), z), col: '#ff7a46', vel: { x: 0, y: 0.5, z: 0 }, velSpread: 0.3, drag: 0.3, life: 3.5, size: 0.07, size2: 0.03, bright: 2 });
     }
     if (DUST.k > 0.05) dustAround(cp);
     const fx = PLACES.falls.x, fz = PLACES.falls.z + 14;

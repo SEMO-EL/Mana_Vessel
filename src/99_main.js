@@ -95,6 +95,8 @@ async function boot() {
   initMenus(); lap('initMenus');
   if (typeof mapBuild === 'function') { bootStatus('Drawing the map'); await nextFrame(); try { mapBuild(); } catch (e) { console.error('map', e); } lap('mapBuild'); }
   if (typeof initAudio === 'function') initAudio();
+  // a save that's already on the Demon Continent (or ?demon): raise the waste now, not at Continue
+  if (QS.has('demon') || savedInDemon()) { await buildDemonLand(); lap('buildDemonLand'); }
   GAME.bootMs = Math.round(performance.now() - t0);
   $('boot').classList.add('gone');
   canvas.addEventListener('click', () => { if (GAME.state === 'play' || GAME.state === 'dev') lockPointer(); });
@@ -120,8 +122,14 @@ function startDevPlay() {
   spawnPlayer(W.x + 4, W.z + 6, Math.PI * 0.75);
   resetWorldState();
   enterPlay();
+  // dev: straight onto the Demon Continent, where you wake (or ?at=x,z)
+  if (QS.has('demon')) {
+    const at = (QS.get('at') || '').split(',').map(Number), S = DC_SPOTS.wake;
+    const x = at.length === 2 && at.every(Number.isFinite) ? at[0] : S.x + 6, z = at.length === 2 && at.every(Number.isFinite) ? at[1] : S.z - 6;
+    placePlayerAt(x, groundAt(x, z, 999), z, Math.PI);
+  }
   const list = (QS.get('enemies') || '').split(',').filter(Boolean);
-  list.forEach((k, i) => new Enemy(k, W.x + 10 + i * 3, W.z - 14 + (i % 2) * 4));
+  list.forEach((k, i) => new Enemy(k, PL.body.pos.x + 10 + i * 3, PL.body.pos.z - 14 + (i % 2) * 4));
 }
 
 let _last = performance.now();

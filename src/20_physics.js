@@ -139,7 +139,11 @@ function moveBody(b, dt) {
   pushOut(_p, b.r, feet, b.h);
 
   // playable boundary — a soft wall well inside the mountains
-  if (!b.noBounds) { _p.x = clamp(_p.x, WORLD.px0, WORLD.px1); _p.z = clamp(_p.z, WORLD.pz0, WORLD.pz1); }
+  // (each side of the seam has its own: Fittoa's basins, or the Demon Continent's waste)
+  if (!b.noBounds) {
+    const B = inDemon(_p.z) ? DEMON : WORLD;
+    _p.x = clamp(_p.x, B.px0, B.px1); _p.z = clamp(_p.z, B.pz0, B.pz1);
+  }
 
   b.pos.x = _p.x; b.pos.z = _p.z;
 
