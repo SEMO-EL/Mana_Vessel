@@ -213,18 +213,29 @@ async function hitogamiDream() {
   CAM.override = back; CAM.ovBlend = 1; letterbox(true); $('hud').classList.add('off');
   await fadeIn(1.8);
   const cams = [back, back, face, face, two, two, face, two, back];
-  await say(say$(DREAM_LINES()).map((L, i) => ({ ...L, cam: cams[i] || two })), { cam: back });
+  // he talks with his hands: a flourish when he names himself, a summoning when he gives advice, a cheer to send you off
+  const gesture = { 3: 'Interact', 6: 'Spellcast_Summon', 7: 'Cheer' };
+  const lines = say$(DREAM_LINES()).map((L, i) => ({ ...L, cam: cams[i] || two,
+    onShow: gesture[i] ? () => god.once(gesture[i], { fade: 0.2, onEnd: () => god.loop('Idle', { fade: 0.3 }) }) : undefined }));
+  await say(lines, { cam: back });
   setPlayerState('talk'); $('hud').classList.add('off'); letterbox(true);
   god.once('Spellcast_Raise', { fade: 0.2 });
   await whiteOut(1.6);
   DREAM.on = false; DREAM.group.visible = false; god.root.visible = false; silhouette(false);
 }
 const DREAM_LINES = () => DC_LINES.dream;
+const _drmP = new THREE.Vector3();
 function updateDream(dt) {
   if (!DREAM.on) return;
   DREAM.t += dt;
   if (DREAM.t > 0.11) { DREAM.t = 0; paintMosaic(); }
   DREAM.god.update(dt);
+  // pale motes drifting up through the white
+  if (Math.random() < 0.6) {
+    const A = DREAM.at, a = Math.random() * TAU, d = rnd(1, 9);
+    emit(1, { pos: _drmP.set(A.x + Math.cos(a) * d, A.y + rnd(0, 0.4), A.z + Math.sin(a) * d), col: Math.random() < 0.5 ? '#cbbf96' : '#a9a4b8', vel: { x: 0, y: rnd(0.3, 0.7), z: 0 },
+      velSpread: 0.15, drag: 0.05, life: rnd(3, 5), size: rnd(0.04, 0.09), size2: 0.02, gravity: 0 });
+  }
   // (the god turns to you; you were facing it already)
   const p = PL.body.pos, g = DREAM.god.root;
   g.rotation.y = dampAngle(g.rotation.y, Math.atan2(p.x - g.position.x, p.z - g.position.z), 4, dt);

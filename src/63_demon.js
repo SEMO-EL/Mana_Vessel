@@ -35,6 +35,15 @@ const DC_TRACK = [
 // a dry riverbed down the west of the waste, crossed by the track twice
 const DC_CANYON = [[560, 1420], [575, 1520], [545, 1620], [590, 1720], [560, 1820], [610, 1930], [580, 2040], [640, 2160]];
 const DC_NEST_FLOOR = 25;
+// what flies over the waste: vultures over the bones and the nest, ash-crows over the Migurd, hawks above the canyon
+// (19_wildlife builds every flock at boot; a flock's ground height is re-read once the strip is raised)
+FLOCKS.push(
+  { x: 720,  z: 1890, r: 46, h: 52, n: 5, col: '#2a2220', s: 2.0, w: 0.1,  glide: 0.94 },
+  { x: 1200, z: 1990, r: 55, h: 60, n: 4, col: '#2a2220', s: 2.1, w: 0.09, glide: 0.95 },
+  { x: 330,  z: 1600, r: 70, h: 40, n: 6, col: '#1c1a1e', s: 0.9, w: 0.25, glide: 0.4 },
+  { x: 575,  z: 1760, r: 90, h: 70, n: 2, col: '#4a3428', s: 1.5, w: 0.08, glide: 0.95 },
+);
+BUS.on('demonBuilt', () => { for (const f of FLOCKS) if (inDemon(f.z)) f.gy = undefined; });
 // the waste's names, for the banners (and the map, once it has a page for here)
 Object.assign(PLACES, {
   dcWaste:  { x: 300,  z: 1990, r: 90,  name: 'The Red Waste',  sub: 'The Demon Continent' },
