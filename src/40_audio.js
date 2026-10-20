@@ -683,6 +683,8 @@ function auWarn(err) { if (!AUDIO.warned) { AUDIO.warned = true; console.warn('[
 /* ───────────── footsteps, landings, glide ───────────── */
 function auSurface(x, z) {
   if (GAME.inCave) return 'gravel';
+  // the waste: dry earth and grit underfoot (the Migurd valley's scrub is the only grass there)
+  if (inDemon(z)) return Math.hypot(x - DC_SPOTS.migurd.x, z - DC_SPOTS.migurd.z) < 110 && roadDistAt(x, z) > 3.5 ? 'grass' : 'gravel';
   if (waterAt(x, z) > heightAt(x, z)) return 'water';
   if (x > 1400 && roaPaved(x, z, roadDistAt(x, z)) > 0.5) return 'stone';
   if (roadDistAt(x, z) < 3.5) return 'gravel';
