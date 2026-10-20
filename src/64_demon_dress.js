@@ -39,6 +39,7 @@ function buildDemonDressing() {
   dcSkeleton();
   dcMigurdVillage(R);
   dcNestWreckage(R);
+  dcTrackMarkers();
   for (const w of DC_WAYSTONES) buildWaystone(w);
   if (typeof defineDemonEncounters === 'function') defineDemonEncounters();
   if (typeof defineMotherEncounter === 'function') defineMotherEncounter();
@@ -372,4 +373,29 @@ function mapPaintDemon(ctx) {
     ctx.fillStyle = '#6a4a30'; ctx.fillRect(-1.1 * S, -2 * S, 2.2 * S, 4 * S); ctx.strokeStyle = MAP_COL.ink; ctx.lineWidth = 0.8; ctx.strokeRect(-1.1 * S, -2 * S, 2.2 * S, 4 * S);
     ctx.restore();
   }
+}
+
+/* ───────────── the track, marked: cairns the caravans left, and a cart that didn't make it ───────────── */
+function dcTrackMarkers() {
+  const pts = TER.dcTrack; if (!pts) return;
+  const out = [], R = mulberry32(6060), stone = ['#7a6458', '#8c7466', '#655248'];
+  let acc = 0, side = 1;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1], [bx, bz] = pts[i], seg = Math.hypot(bx - ax, bz - az);
+    acc += seg;
+    if (acc < 75) continue;
+    acc = 0; side = -side;
+    const dx = (bx - ax) / seg, dz = (bz - az) / seg, x = bx - dz * 5 * side, z = bz + dx * 5 * side;
+    if (!dcOpen(x, z, 3, 0.8)) continue;
+    const y = heightAt(x, z) - 0.1;
+    // a cairn: flat stones stacked, a pole, a faded strip of cloth
+    let h = 0;
+    for (let k = 0; k < 4; k++) { const s = 0.55 - k * 0.1; out.push([new THREE.DodecahedronGeometry(1, 0), stone[k % 3], x, y + h + s * 0.35, z, s, s * 0.55, s, 0, R() * TAU, 0]); h += s * 0.6; }
+    out.push([new THREE.CylinderGeometry(0.035, 0.045, 1.6, 5), '#4a3a2c', x, y + h + 0.6, z]);
+    out.push([new THREE.BoxGeometry(0.05, 0.5, 0.42), R() < 0.5 ? '#8a6a5a' : '#6a7a8a', x, y + h + 1.1, z + 0.22, 1, 1, 1, 0.1, 0, 0.15]);
+    addCircle(x, z, 0.5, y - 1, y + h + 0.2, 'cairn').thin = true;
+  }
+  // two carts abandoned by the track
+  for (const [x, z, rot, tilt] of [[470, 1655, 0.9, 0.18], [905, 1772, 2.2, -0.1]]) wagonPieces(out, x, z, rot, tilt, R);
+  if (out.length) { const m = mergedPart(out, dcMat('vc', { vertexColors: true })); m.receiveShadow = true; STRUCT.group.add(m); }
 }
