@@ -431,7 +431,11 @@ function showEndcard(kind = 'm1') {
   GAME.state = 'end';
   _endKind = kind;
   const stats = `${G.name}, level ${G.lvl}, Adventurer Rank ${guildRank(G.lvl)}. You broke the vessel ${G.breaks} times; it is ${Math.round(G.maxMana)} deep now. ${G.kills} kills, ${G.pages.length} of Roxy's pages, ${G.deaths} deaths.`;
-  if (kind === 'm2') {
+  if (kind === 'm3') {
+    $('endSub').textContent = 'End of Chapter III';
+    $('endTitle').textContent = 'Dead End';
+    $('endText').textContent = stats + ' The nest is quiet, the caravans can run again, and three people a continent from home have a name to carry back. Chapter IV comes next.';
+  } else if (kind === 'm2') {
     $('endSub').textContent = 'End of Milestone 2';
     $('endTitle').textContent = 'The Boreas Girl';
     $('endSub').textContent = 'End of Chapter II';
@@ -443,7 +447,7 @@ function showEndcard(kind = 'm1') {
   }
   $('hud').classList.add('off'); $('toasts').innerHTML = ''; letterbox(false);
   $('eNext').style.display = kind === 'm2' ? '' : 'none';
-  $('eKeep').textContent = kind === 'm2' ? 'Keep Fittoa a while' : 'Keep exploring';
+  $('eKeep').textContent = kind === 'm2' ? 'Keep Fittoa a while' : kind === 'm3' ? 'Keep walking the waste' : 'Keep exploring';
   openScreen('endcard');
   autosave();
 }

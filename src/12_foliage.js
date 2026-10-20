@@ -66,7 +66,7 @@ function buildGrass() {
         vec2 wxz = (wc + vec2(gH(wc), gH(wc + 7.13))) * uSpacing;
         vec2 huv = ((wxz - uOrigin) / uCell + 0.5) / uN;
         float dens = texture2D(uGrassTex, huv).r;
-        float keep = step(gH(wc + 17.3), dens);
+        float keep = step(gH(wc + 17.3), dens) * step(0.004, dens);   // (far from the origin the hash can land on exactly 0: never a blade where there's no grass)
         float gy = texture2D(uHeightTex, huv).r;
         float dcam = distance(wxz, cameraPosition.xz);
         float fade = 1.0 - smoothstep(uRadius * 0.62, uRadius, dcam);

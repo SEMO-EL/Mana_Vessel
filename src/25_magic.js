@@ -367,17 +367,21 @@ function updateEffects(dt) {
         // an enemy area attack: the ring fills, then the blow lands inside it
         const k = clamp(e.t / e.delay, 0, 1);
         e.circle.material.opacity = 0.25 + 0.65 * k;
-        e.circle.material.color.setRGB(1.2 + k, 0.35, 0.2);
+        if (e.o.tint) e.circle.material.color.copy(e.o.tint).multiplyScalar(1 + k);       // (a lightning mark is blue-white)
+        else e.circle.material.color.setRGB(1.2 + k, 0.35, 0.2);
         e.circle.rotation.y += dt * (1 + k * 4);
         if (k >= 1) {
           const b = PL.body;
-          if (Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z) < e.r + b.r && b.pos.y - e.pos.y < 2.5)
-            damagePlayer(e.dmg, { dir: new THREE.Vector3(b.pos.x - e.pos.x, 0, b.pos.z - e.pos.z).normalize(), poise: e.o.poise || 50, unblockable: e.o.unblockable });
+          const hit = Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z) < e.r + b.r && b.pos.y - e.pos.y < 2.5;
+          const res = hit ? damagePlayer(e.dmg, { dir: new THREE.Vector3(b.pos.x - e.pos.x, 0, b.pos.z - e.pos.z).normalize(), poise: e.o.poise || 50, unblockable: e.o.unblockable }) : null;
           if (e.o.roots) spikeRing(e.pos, e.r * 0.55);
-          emit(50, { pool: 'soft', pos: e.pos, col: e.o.dust || '#6a5a44', spread: e.r * 0.6, velSpread: 4, upBias: 3, life: 1.2, size: 0.8, size2: 2.2, gravity: 6 });
-          ring(e.pos, { col: '#ffb070', r1: e.r * 1.1, life: 0.4 });
-          shake(0.35);
-          BUS.emit('sfx', { id: 'pillar', pos: e.pos });
+          if (e.o.onLand) e.o.onLand(e.pos, res === 'hit');
+          if (!e.o.quiet) {
+            emit(50, { pool: 'soft', pos: e.pos, col: e.o.dust || '#6a5a44', spread: e.r * 0.6, velSpread: 4, upBias: 3, life: 1.2, size: 0.8, size2: 2.2, gravity: 6 });
+            ring(e.pos, { col: '#ffb070', r1: e.r * 1.1, life: 0.4 });
+            shake(0.35);
+            BUS.emit('sfx', { id: 'pillar', pos: e.pos });
+          }
           scene.remove(e.circle);
           done = true;
         }

@@ -40,6 +40,8 @@ function buildDemonDressing() {
   dcMigurdVillage(R);
   dcNestWreckage(R);
   for (const w of DC_WAYSTONES) buildWaystone(w);
+  if (typeof defineDemonEncounters === 'function') defineDemonEncounters();
+  if (typeof defineMotherEncounter === 'function') defineMotherEncounter();
   if (typeof buildDemonPeople === 'function') buildDemonPeople();
   batchStaticProps();                       // the fences and props just placed join the static batch
 }

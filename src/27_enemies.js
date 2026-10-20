@@ -13,6 +13,8 @@
    expose the same small interface: root, update(dt, e), play hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 const TOKENS = 2;
+// procedural bodies added by later files: rig name → builder(def) (the built-in ones are below)
+const RIGS = {};
 const LEASH = 55;
 
 /* attack fields: clip speed hitAt (normalised) | windup active recover (s, for rigs)
@@ -259,6 +261,9 @@ class Enemy {
     } else if (d.rig === 'stone') {
       this.rig = buildStoneRig();
       this.root = this.rig.root;
+    } else if (RIGS[d.rig]) {
+      this.rig = RIGS[d.rig](d);
+      this.root = this.rig.root;
     } else {
       this.actor = new Actor({ base: d.base, recolor: d.recolor, show: d.show || [], hide: d.hide || [], scale: opts.scale || d.scale || 1, extra: d.extra });
       for (const [from, mesh, bone] of d.borrow || []) { borrowMesh(this.actor, from, mesh, bone); this.actor.show(mesh, true); }
@@ -394,6 +399,7 @@ class Enemy {
   think(dt) {
     const d = this.def, dist = this.dist(), p = PL.body.pos;
     if (d.phase2 && !this.phase2 && this.hp / this.maxHp < d.phase2.at && this.state !== 'windup' && this.state !== 'active') { this.enterPhase2(); return; }
+    if (d.brain && d.brain(this, dt)) return;          // a body with its own ideas (a burrowing worm) runs them first
     const speedMul = this.slow ? 1 - this.slow : 1;
     const playerDown = PL.state === 'dead';
     const steer = (tx, tz, spd, k = 8) => {
@@ -560,7 +566,7 @@ class Enemy {
       const p = a.aoe.at === 'self' ? this.pos.clone()
         : a.aoe.at === 'target' ? PL.body.pos.clone()
         : this.pos.clone().add(new THREE.Vector3(Math.sin(this.face) * a.aoe.dist, 0, Math.cos(this.face) * a.aoe.dist));
-      hostileAoE(p, a.aoe.r, this.windup + (a.aoe.delay || 0), a.dmg, { poise: a.poise, unblockable: a.unblockable, roots: a.name === 'roots' });
+      hostileAoE(p, a.aoe.r, this.windup + (a.aoe.delay || 0), a.dmg, { poise: a.poise, unblockable: a.unblockable, roots: a.name === 'roots', tint: a.aoe.tint, quiet: a.aoe.quiet, onLand: a.aoe.onLand });
       this.hits = true;
     }
   }
@@ -666,7 +672,7 @@ function updateEnemies(dt) {
 // Bodies don't pass through each other: push overlapping circles apart,
 // heavier things move less. The player counts as weight 1.
 function separateBodies() {
-  const list = ENT.enemies.filter(e => !e.dead && e.state !== 'dormant');
+  const list = ENT.enemies.filter(e => !e.dead && !e.inactive && e.state !== 'dormant');
   const all = [...(PL.state !== 'dead' ? [{ body: PL.body, w: 1 }] : []), ...allyBodies().map(body => ({ body, w: 1 })), ...townBodies().map(body => ({ body, w: 0.5 })), ...list.map(e => ({ body: e.body, w: e.def.weight || 1 }))];
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
     const a = all[i].body, b = all[j].body;

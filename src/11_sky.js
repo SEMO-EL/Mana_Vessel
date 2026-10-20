@@ -270,6 +270,12 @@ function updateSky(dt, focus, time) {
     S.hor.lerp(_c1, DUST.k * 0.4);
     S.zen.lerp(_c1, DUST.k * DUST.storm * 0.45);                   // a storm browns the whole sky
   }
+  // under the storm plateau's weather the waste's rose drains to a bruised slate
+  if (storm > 0.001) {
+    const k = smooth(0, 1, storm) * (1 - S.night * 0.5);
+    S.zen.lerp(_c1.set(0x2b2a33), k * 0.75); S.hor.lerp(_c1.set(0x55525c), k * 0.65); S.fog.lerp(_c1.set(0x4c4a52), k * 0.6);
+    S.sky.lerp(_c1.set(0x7a7884), k * 0.5); S.sunI *= 1 - k * 0.45; S.hemiI *= 1 - k * 0.2;
+  }
 
   skyMat.uniforms.uZen.value.copy(S.zen);
   skyMat.uniforms.uHor.value.copy(S.hor);
