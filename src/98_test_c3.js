@@ -55,6 +55,22 @@ async function chapterThreeTest() {
     if (!await drive(() => G.quest === 'dcStorm' && !MIG.busy, 3000)) return { ...out, c3fail: 'fire' };
     if (!G.flags.deadEnd || !ALLY.ruijerd.active || !ALLY.eris.active) return { ...out, c3fail: 'dead end' };
     step('deadEnd');
+    // the village's side of things: the trader, and the lost hunter brought home
+    G.coin = 500; const d0 = G.draughts || 0;
+    if (!buyWare('migDraught', 'migurd') || (G.draughts || 0) !== d0 + 1) return { ...out, c3fail: 'trader' };
+    const Wf = NPCS.migWife, Hn = NPCS.migHunter;
+    place(Wf.pos.x + 1.5, Wf.pos.z + 1.5); talkHunterWife(Wf);
+    if (!await drive(() => G.flags.lostHunter === 'asked' && !DCSIDE.busy) || !Hn.visible) return { ...out, c3fail: 'hunter asked' };
+    place(Hn.pos.x + 10, Hn.pos.z);
+    await drive(() => { const E = ENCOUNTERS.find(e => e.id === 'dcHunter'); return E && E.live.length === 3; }, 300);
+    for (const e of ENCOUNTERS.find(e => e.id === 'dcHunter').live) damageEnemy(e, 99999, {});
+    await drive(() => false, 20);
+    place(Hn.pos.x + 1.6, Hn.pos.z + 1); talkHunter(Hn);
+    if (!await drive(() => G.flags.lostHunter === 'found' && !DCSIDE.busy)) return { ...out, c3fail: 'hunter found' };
+    place(Wf.pos.x + 1.5, Wf.pos.z + 1.5); talkHunterWife(Wf);
+    if (!await drive(() => G.flags.lostHunter === 'done' && !DCSIDE.busy)) return { ...out, c3fail: 'hunter home' };
+    step('side');
+    for (const e of [...ENT.enemies]) e.remove();
     place(1040, 1700);
     await drive(() => STORMF.said && (REGION.storm || 0) > 0.4, 400);
     if (!(WEATHER.tgt.rain > 0.9)) return { ...out, c3fail: 'storm weather' };

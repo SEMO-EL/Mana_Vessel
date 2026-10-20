@@ -266,21 +266,22 @@ function exitPhoto() {
 /* ───────────── journal ─────────────
    Where you are in the story, the jobs you've taken, and what's left to find. */
 const JOURNAL_FOES = [['warden', 'The Barrow Warden'], ['treant', 'The Elder Treant'], ['alpha', 'The Grey Alpha'], ['wagons', 'Brannoc, Brigand Captain'],
-  ['firstWall', 'The First Golem'], ['oldScar', 'Old Scar'], ['edric', 'Sir Edric, the Unburied']];
+  ['firstWall', 'The First Golem'], ['oldScar', 'Old Scar'], ['edric', 'Sir Edric, the Unburied'], ['sandMother', 'The Sand Mother']];
 function openJournal() {
   const q = questStep(), b = $('journalBody');
   const row = (k, v) => `<div class="jr"><span>${k}</span><b>${v}</b></div>`;
   let html = `<div class="jq"><div class="jt">${q.title}</div><p>${q.text}</p></div>`;
-  html += `<p class="flavor" style="margin:4px 0 0;text-align:center">Day ${(G.flags.day || 0) + 1} in Fittoa · ${G.coin || 0} silver</p>`;
+  const dc = inDemon(PL.body.pos.z);
+  html += `<p class="flavor" style="margin:4px 0 0;text-align:center">Day ${(G.flags.day || 0) + 1} ${dc ? 'on the Demon Continent' : 'in Fittoa'} · ${G.coin || 0} silver${G.flags.deadEnd ? ' · the party: Dead End' : ''}</p>`;
   // jobs
   const jobs = typeof BOUNTIES !== 'undefined' ? BOUNTIES.filter(x => G.bounties && G.bounties[x.id]) : [];
   html += '<h4>Bounties</h4>';
-  if (!jobs.length) html += `<p class="flavor">${G.flags.guildF ? 'None taken. The board by the Guild door has work.' : 'Register at the Adventurer Guild in Roa to take bounties.'}</p>`;
+  if (!jobs.length) html += `<p class="flavor">${dc ? 'The Guild board in Roa is a continent away.' : G.flags.guildF ?'None taken. The board by the Guild door has work.' : 'Register at the Adventurer Guild in Roa to take bounties.'}</p>`;
   for (const x of jobs) {
     const st = G.bounties[x.id];
     html += row(x.title + (G.trackBounty === x.id ? ' ✦' : ''), st === 'taken' ? x.where : st === 'done' ? 'Done — claim at the board' : 'Paid');
   }
-  const reqs = [...(typeof sideQuestRows === 'function' ? sideQuestRows() : []), ...(typeof errandRows === 'function' ? errandRows() : [])];
+  const reqs = [...(typeof sideQuestRows === 'function' ? sideQuestRows() : []), ...(typeof errandRows === 'function' ? errandRows() : []), ...(typeof dcQuestRows === 'function' ? dcQuestRows() : [])];
   if (reqs.length) { html += '<h4>Requests</h4>'; for (const [k, v] of reqs) html += row(k, v); }
   // what you carry that makes you more than you were
   const keep = [];
@@ -297,6 +298,8 @@ function openJournal() {
   if (f.moon === 'done') keep.push(['Lilia\'s brew', 'A fresh draught each day']);
   if (f.caravan === 'done') keep.push(['Hilde\'s friendship', 'Her prices −20%']);
   if (f.spell_quagmire) keep.push(['Wenna\'s lesson', 'Quagmire']);
+  if (f.migurdCharm) keep.push(['A braided Migurd charm', 'For Roxy, from her mother']);
+  if (f.deadEnd) keep.push(['A name: Dead End', 'Eris, Ruijerd and you']);
   if (keep.length) { html += '<h4>Gear &amp; keepsakes</h4>'; for (const [k, v] of keep) html += row(k, v); }
   // what's left to find
   const places = Object.keys(PLACES).filter(placeCounts), found = places.filter(k => G.discovered[k]).length;

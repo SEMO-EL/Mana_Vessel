@@ -81,7 +81,7 @@ function buyWare(id, vendor = 'hilde') {
 
 /* ───────────── drinking ───────────── */
 function startDrink() {
-  if (!(G.draughts > 0)) { hint('No healing draughts. Merchant Hilde sells them, by Roa\'s plaza.', 2.5); return false; }
+  if (!(G.draughts > 0)) { hint(inDemon(PL.body.pos.z) ? 'No healing draughts. The Migurd trader barters bitter-root draughts, by the village square.' : 'No healing draughts. Merchant Hilde sells them, by Roa\'s plaza.', 2.5); return false; }
   if (G.hp >= G.maxHp) { hint('You\'re not hurt.', 1.5); return false; }
   G.draughts--; PL.drank = false; PL.guarding = false;
   setPlayerState('drink');

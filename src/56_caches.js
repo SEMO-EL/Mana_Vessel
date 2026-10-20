@@ -88,9 +88,13 @@ function thinGrassAround(x, z, r) {
 
 function buildCaches() {
   STRUCT.group.add(CACHES.group);
-  for (const s of CACHE_SPOTS) {
+  for (const s of CACHE_SPOTS) buildCacheAt(s);
+}
+// one chest, on level dry ground near its anchor (the Demon Continent's are placed once the waste is raised)
+function buildCacheAt(s) {
+  {
     const p = findCacheSpot(s);
-    if (!p) { if (DEV) console.warn('cache: no ground near', s.id); continue; }
+    if (!p) { if (DEV) console.warn('cache: no ground near', s.id); return; }
     const { root, lid } = buildChest();
     const y = heightAt(p.x, p.z);
     // facing downhill/outward a little at random, sat into the ground
