@@ -180,6 +180,7 @@ function resetWorldState() {
   if (typeof resetWilds === 'function') resetWilds();
   if (typeof resetTownErrands === 'function') resetTownErrands();
   if (typeof resetKidnap === 'function') resetKidnap();
+  if (typeof resetDemonState === 'function') resetDemonState();
   buildSpellBar();
 }
 function enterPlay() {
@@ -433,13 +434,16 @@ function showEndcard(kind = 'm1') {
   if (kind === 'm2') {
     $('endSub').textContent = 'End of Milestone 2';
     $('endTitle').textContent = 'The Boreas Girl';
-    $('endText').textContent = stats + ' The light over Fittoa was the last thing anyone in Roa saw that night. Chapter III — The Displaced — comes next.';
+    $('endSub').textContent = 'End of Chapter II';
+    $('endText').textContent = stats + ' The light over Fittoa was the last thing anyone in Roa saw that night. Go on into Chapter III — or keep Fittoa a while longer; the light will wait over the east until you face it from the terrace.';
   } else {
     $('endSub').textContent = 'End of Milestone 1';
     $('endTitle').textContent = 'The Road to Roa';
     $('endText').textContent = stats + ' The Boreas estate is waiting in Roa — and a girl who punches.';
   }
   $('hud').classList.add('off'); $('toasts').innerHTML = ''; letterbox(false);
+  $('eNext').style.display = kind === 'm2' ? '' : 'none';
+  $('eKeep').textContent = kind === 'm2' ? 'Keep Fittoa a while' : 'Keep exploring';
   openScreen('endcard');
   autosave();
 }
@@ -471,10 +475,12 @@ function initMenus() {
       TOD.hour = 8.5;
       Object.assign(WEATHER.cur, WEATHER_STATES.fair); Object.assign(WEATHER.tgt, WEATHER_STATES.fair); WEATHER.timer = 90;
       resetRoaState();
+      if (typeof dcShowOmen === 'function') dcShowOmen();     // the light, waiting over the east
     }
     if (PL.state === 'talk') setPlayerState('move');            // a scene may have ended holding you
     enterPlay(); lockPointer();
   };
+  $('eNext').onclick = () => { if (typeof faceTheLight === 'function') faceTheLight(true); };
   $('eTitle').onclick = () => showTitle();
   BUS.on('key', code => {
     if (BUS.rebinding) return;

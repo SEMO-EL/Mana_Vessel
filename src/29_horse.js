@@ -172,6 +172,7 @@ function spawnHorse(x, z, heading) {
 function whistleHorse() {
   if (!horseUnlocked()) { hint('You have no horse yet. Lord Sauros keeps horses at the Boreas stables, on the estate terrace.', 3.5); return; }
   if (GAME.inCave) { hint('She won\'t come underground.', 3); return; }
+  if (inDemon(PL.body.pos.z)) { hint('Kestrel is a continent away, in a stable that may not be there any more.', 3.5); return; }
   BUS.emit('sfx', { id: 'whistle' });
   const p = PL.body.pos;
   if (HORSE.mode !== 'gone' && HORSE.body.pos.distanceTo(p) < 70) { HORSE.leaving = HORSE.mode === 'stall'; HORSE.mode = 'come'; HORSE.stuckT = 0; HORSE.lastD = 1e9; return; }

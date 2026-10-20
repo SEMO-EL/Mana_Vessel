@@ -38,9 +38,12 @@ function erisSays(kind, delay = 0) {
   if (delay > 0) later(delay, () => { if (E.active) E.bark(kind, true); }); else E.bark(kind, true);
 }
 
+// opts (all optional — Eris's are the defaults): barks, firsts (first-of-a-kind lines), sawKey (their flag
+// prefix), clips (the attack chain), dmgMul, reach (closes to this), hitReach (lands within this), side
+// (+1 right shoulder, -1 left), noRide (stays on foot when you ride)
 class Companion {
-  constructor(spec, name, col) {
-    this.name = name; this.col = col;
+  constructor(spec, name, col, opts = {}) {
+    this.name = name; this.col = col; this.o = opts;
     this.actor = new Actor(spec);
     this.body = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), r: 0.38, h: 1.6, grounded: true, groundY: 0 };
     this.pos = this.body.pos;
@@ -51,10 +54,14 @@ class Companion {
     scene.add(this.actor.root);
     this.actor.loop('Idle', { fade: 0 });
   }
-  // stand her a few steps behind your left shoulder, on the ground
+  // where they keep to: a few steps behind your shoulder (Eris your left, unless told otherwise)
+  followPoint() {
+    const P = PL.body.pos, f = PL.face, sd = (this.o.side ?? 1) * 1.4;
+    return [P.x - Math.sin(f) * 2.6 - Math.cos(f) * sd, P.z - Math.cos(f) * 2.6 + Math.sin(f) * sd];
+  }
+  // stand them there, on the ground
   placeBehind() {
-    const P = PL.body.pos, f = PL.face;
-    const x = P.x - Math.sin(f) * 2.6 - Math.cos(f) * 1.4, z = P.z - Math.cos(f) * 2.6 + Math.sin(f) * 1.4;
+    const f = PL.face, [x, z] = this.followPoint();
     this.pos.set(x, floorAt(x, z), z); this.body.vel.set(0, 0, 0); this.body.grounded = true;
     this.face = f;
     this.actor.root.position.copy(this.pos); this.actor.root.rotation.y = f;
@@ -64,7 +71,7 @@ class Companion {
   set(s) { this.state = s; this.stateT = 0; }
   bark(kind, force) {
     if (!force && this.barkCd > 0) return;
-    const list = ERIS_BARKS[kind]; if (!list) return;
+    const list = (this.o.barks || ERIS_BARKS)[kind]; if (!list) return;
     bark(this.name, pick(list).replace('{name}', G.name), this.col);
     this.barkCd = 6 + Math.random() * 4;
   }
@@ -101,7 +108,7 @@ class Companion {
   }
   update(dt) {
     if (!this.active) return;
-    if (typeof HORSE !== 'undefined' && HORSE.mode === 'ride') { this.ridePillion(dt); return; }
+    if (typeof HORSE !== 'undefined' && HORSE.mode === 'ride' && !this.o.noRide) { this.ridePillion(dt); return; }
     if (this.riding) { this.riding = false; this.placeBehind(); this.set('follow'); }
     const A = this.actor, b = this.body, P = PL.body.pos;
     this.stateT += dt; this.cd -= dt; this.barkCd -= dt; this.idleT -= dt;
@@ -118,9 +125,9 @@ class Companion {
         if (T && !T.dead) {
           const dx = T.pos.x - this.pos.x, dz = T.pos.z - this.pos.z, d = Math.hypot(dx, dz);
           const facing = (dx * Math.sin(this.face) + dz * Math.cos(this.face)) / Math.max(d, 1e-3);
-          if (d < 2.5 + T.r && facing > 0.3) {
+          if (d < (this.o.hitReach || 2.5) + T.r && facing > 0.3) {
             const dir = new THREE.Vector3(dx / d, 0, dz / d);
-            damageEnemy(T, (11 + G.lvl * 2.2) * (this.combo === 2 ? 1.5 : 1), { dir, knock: 2.2, poise: 20, kind: 'ally' });
+            damageEnemy(T, (11 + G.lvl * 2.2) * (this.combo === 2 ? 1.5 : 1) * (this.o.dmgMul || 1), { dir, knock: 2.2, poise: 20, kind: 'ally' });
             BUS.emit('sfx', { id: 'hit', pos: T.pos });
             if (T.def.steelRes && !this.toldSteel) { this.toldSteel = true; this.bark('steel', true); }
             if (T.dead) this.bark('kill');
@@ -135,25 +142,25 @@ class Companion {
       if (T && T !== this.target) {
         this.target = T;
         // the first of a kind gets a line of its own
-        const first = ERIS_FIRSTS[T.key];
-        if (first && G && !G.flags['erisSaw_' + T.key]) { G.flags['erisSaw_' + T.key] = true; bark(this.name, first.replace('{name}', G.name), this.col); this.barkCd = 8; }
+        const first = (this.o.firsts || ERIS_FIRSTS)[T.key], saw = (this.o.sawKey || 'erisSaw_') + T.key;
+        if (first && G && !G.flags[saw]) { G.flags[saw] = true; bark(this.name, first.replace('{name}', G.name), this.col); this.barkCd = 8; }
         else this.bark('engage');
       }
       if (!T) { this.target = null; this.combo = 0; }
       if (this.target) {
         const T2 = this.target, dx = T2.pos.x - this.pos.x, dz = T2.pos.z - this.pos.z, d = Math.hypot(dx, dz);
-        const reach = 1.7 + T2.r;
+        const reach = (this.o.reach || 1.7) + T2.r;
         this.face = dampAngle(this.face, Math.atan2(dx, dz), 9, dt);
         if (d > reach) { want = [dx / d, dz / d]; speed = d > 6 ? 6.2 : 3.4; }
         else if (this.cd <= 0) {
-          this.clip = ALLY_CLIPS[this.combo]; this.hitDone = false;
+          this.clip = (this.o.clips || ALLY_CLIPS)[this.combo]; this.hitDone = false;
           A.once(this.clip, { speed: 1.3, fade: 0.08 });
           BUS.emit('sfx', { id: 'swing', pos: this.pos });
           this.set('attack');
         }
       } else {
         // follow: a point behind your left shoulder; run if you're running away from her
-        const f = PL.face, tx = P.x - Math.sin(f) * 2.6 - Math.cos(f) * 1.4, tz = P.z - Math.cos(f) * 2.6 + Math.sin(f) * 1.4;
+        const [tx, tz] = this.followPoint();
         const dx = tx - this.pos.x, dz = tz - this.pos.z, d = Math.hypot(dx, dz);
         if (d > 1.2) { want = [dx / d, dz / d]; speed = d > 7 ? 6.6 : d > 3 ? 4.2 : 2.2; this.face = dampAngle(this.face, Math.atan2(dx, dz), 8, dt); }
         else this.face = dampAngle(this.face, PL.face, 3, dt);
@@ -176,6 +183,9 @@ class Companion {
   }
 }
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler();
-function updateAllies(dt) { if (ALLY.eris) ALLY.eris.update(dt); if (ALLY.erisNight) ALLY.erisNight.update(dt); }
-function allyBodies() { return [ALLY.eris, ALLY.erisNight].filter(a => a && a.active && !a.riding).map(a => a.body); }
-BUS.on('vesselBreak', () => { if (ALLY.eris && ALLY.eris.active) later(1.2, () => ALLY.eris.bark('vessel', true)); });
+function updateAllies(dt) { for (const a of [ALLY.eris, ALLY.erisNight, ALLY.ruijerd]) if (a) a.update(dt); }
+function allyBodies() { return [ALLY.eris, ALLY.erisNight, ALLY.ruijerd].filter(a => a && a.active && !a.riding).map(a => a.body); }
+BUS.on('vesselBreak', () => {
+  if (ALLY.eris && ALLY.eris.active) later(1.2, () => ALLY.eris.bark('vessel', true));
+  if (ALLY.ruijerd && ALLY.ruijerd.active) later(2.6, () => ALLY.ruijerd.bark('vessel', true));
+});

@@ -351,4 +351,5 @@ function updateSky(dt, focus, time) {
     gradePass.uniforms.uTime.value = time % 100;
   }
   renderer.toneMappingExposure = lerp(1.0, 1.35, S.night) * (1 + WEATHER.cur.cloud * 0.1);
+  if (DREAM.on) dreamLighting();                 // the white place has its own light
 }

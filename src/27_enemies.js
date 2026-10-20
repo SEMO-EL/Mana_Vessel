@@ -99,7 +99,7 @@ function buildWolfRig(scale = 1, tint = '#6e737b', o = {}) {
   // every rigid part one vertex-coloured mesh (half the draws of the old build); the eyes keep their own glowing material
   const mat = WOLF_MAT || (WOLF_MAT = toonMat({ vertexColors: true, rim: true }));
   const dark = tint, light = '#' + new THREE.Color(tint).lerp(new THREE.Color('#c9c3b8'), 0.55).getHexString(), nose = '#1a1a1c';
-  const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd24a').multiplyScalar(2.2) });
+  const eyeM = new THREE.MeshBasicMaterial({ color: new THREE.Color(o.eye || '#ffd24a').multiplyScalar(2.2) });
   const ball = new THREE.IcosahedronGeometry(1, 2), box = new THREE.BoxGeometry(1, 1, 1);
   if (o.boar) return buildBoarRig(scale, tint, mat, eyeM, ball, box);
   if (o.bear) return buildBearRig(scale, tint, mat, eyeM, ball, box);
@@ -245,7 +245,7 @@ class Enemy {
     this.burn = 0; this.burnT = 0; this.slow = 0; this.slowT = 0; this.rootT = 0; this.staggerT = 0; this.hurtT = 0;
     this.fade = 1;
     if (d.rig === 'wolf') {
-      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars, boar: d.boar, bear: d.bear, scorpion: d.scorpion });
+      this.rig = buildWolfRig(d.scale || 1, d.tint || (key === 'alpha' ? '#4d5158' : pick(['#6e737b', '#7a7166', '#5d6168'])), { bigEars: d.bigEars, boar: d.boar, bear: d.bear, scorpion: d.scorpion, eye: d.eye });
       this.root = this.rig.root;
     } else if (d.rig === 'golem') {
       this.rig = buildGolemRig();

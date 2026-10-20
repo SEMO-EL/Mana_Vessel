@@ -644,6 +644,9 @@ const AUDIO_SPEAKERS = {
   Sauros:    { f: 118, type: 'square',   lp: 1150, spread: 0.24, glide: 1.08, dur: 0.07,  vol: 0.06,  every: 2 },
   Zenith:    { f: 265, type: 'triangle', lp: 2300, spread: 0.1,  glide: 0.98, dur: 0.06,  vol: 0.09,  every: 3 },
   Lilia:     { f: 285, type: 'sine',     lp: 3000, spread: 0.05, glide: 0.99, dur: 0.05,  vol: 0.1,   every: 3 },
+  Ruijerd:   { f: 128, type: 'triangle', lp: 950,  spread: 0.04, glide: 0.95, dur: 0.06,  vol: 0.1,   every: 3 },
+  Hitogami:  { f: 236, type: 'sine',     lp: 2600, spread: 0.22, glide: 1.07, dur: 0.05,  vol: 0.1,   every: 2 },
+  Migurd:    { f: 360, type: 'sine',     lp: 3200, spread: 0.07, glide: 1.0,  dur: 0.045, vol: 0.09,  every: 3 },
 };
 const _speakers = new Map();
 function auSpeaker(name) {

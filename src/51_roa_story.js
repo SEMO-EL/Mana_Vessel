@@ -368,6 +368,7 @@ async function birthdayScene() {
 // The light over the east: a still, impossible star that swells, then opens.
 // A hot core, a wide bloom that lights the sky around it, and slow halos
 // breathing outward from it — all soft-edged, so it reads as light, not a shape.
+const _omenOff = new THREE.Vector3(700, 310, -120);
 const OMEN = {
   core: null, glow: null, halos: [], t: 0, on: false, burstT: -1,
   build() {
@@ -395,26 +396,32 @@ const OMEN = {
     scene.add(this.core, this.glow, ...this.halos);
   },
   burst() { this.burstT = 0; },
-  reset() { this.on = false; if (this.core) scene.remove(this.core, this.glow, ...this.halos); },
+  reset() {
+    this.on = false; this.dim = false;
+    if (this.core) { scene.remove(this.core, this.glow, ...this.halos); this.core.visible = this.glow.visible = true; for (const h of this.halos) h.visible = true; }
+  },
   update(dt) {
     if (!this.on) return;
     this.t += dt;
     if (this.burstT >= 0) this.burstT += dt;
     // far over the eastern horizon, low in the sky
     const p = this.core.position.set(this.from.x + 700, this.from.y + 310, this.from.z - 120);
+    // (dim: the light that waits after the birthday — always low over the east of wherever you are, no light of its own)
+    if (this.dim) { p.copy(camera.position).add(_omenOff); const vis = !GAME.inCave; this.core.visible = this.glow.visible = vis; for (const h of this.halos) h.visible = vis; }
     const rise = 0.4 + 0.6 * smooth(0, 3, this.t);
     const swell = 1 + Math.sin(this.t * 2.3) * 0.06 + (this.burstT >= 0 ? this.burstT * this.burstT * 40 : 0);
     this.core.scale.setScalar(70 * swell * rise);
     this.glow.position.copy(p); this.glow.scale.setScalar(330 * swell * rise);
-    this.glow.material.opacity = 0.85 * smooth(0, 4, this.t);
+    this.glow.material.opacity = 0.85 * smooth(0, 4, this.t) * (this.dim ? 0.45 : 1);
+    if (this.dim) this.core.material.opacity = 0.6;
     // three halos, staggered, each swelling out and thinning away
     this.halos.forEach((h, i) => {
       const k = ((this.t + i * 1.2) % 3.6) / 3.6;
       h.position.copy(p);
       h.scale.setScalar((80 + k * 150) * swell);
-      h.material.opacity = Math.pow(1 - k, 1.6) * smooth(0, 0.25, k) * 0.6 * smooth(0.5, 3, this.t);
+      h.material.opacity = Math.pow(1 - k, 1.6) * smooth(0, 0.25, k) * 0.6 * smooth(0.5, 3, this.t) * (this.dim ? 0.4 : 1);
     });
-    requestLight(PL.body.pos.clone().setY(PL.body.pos.y + 6).add(new THREE.Vector3(8, 0, -2)), '#c8b8ff', 6 + (this.burstT >= 0 ? this.burstT * 30 : 0), 40);
+    if (!this.dim) requestLight(PL.body.pos.clone().setY(PL.body.pos.y + 6).add(new THREE.Vector3(8, 0, -2)), '#c8b8ff', 6 + (this.burstT >= 0 ? this.burstT * 30 : 0), 40);
   },
 };
 // the whole screen goes to white, and stays there
