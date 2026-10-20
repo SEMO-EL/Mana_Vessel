@@ -25,7 +25,7 @@ ENEMY_DEFS.ogre = {
 };
 ENEMY_DEFS.rustScorp = { ...ENEMY_DEFS.scorpion, name: 'Rust Scorpion', tint: '#8e3e26', hp: 130, xp: 44, scale: 1.45,
   attacks: ENEMY_DEFS.scorpion.attacks.map(a => ({ ...a, dmg: Math.round(a.dmg * 1.3) })) };
-ENEMY_DEFS.ashAlpha = { ...ENEMY_DEFS.alpha, name: 'Black Alpha', tint: '#1c1a20', eye: '#ff4a3a', hp: 300, xp: 120,
+ENEMY_DEFS.ashAlpha = { ...ENEMY_DEFS.alpha, name: 'Black Alpha', tint: '#1c1a20', eye: '#ff1a0a', hp: 300, xp: 120,
   attacks: ENEMY_DEFS.alpha.attacks.map(a => ({ ...a, dmg: Math.round(a.dmg * 1.25) })) };
 // the storm's own: a knot of lightning that throws sparks and calls the bolt down on you
 const STRIKE_TINT = new THREE.Color('#9fc4ff');

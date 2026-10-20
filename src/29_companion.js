@@ -185,6 +185,7 @@ class Companion {
     A.root.position.copy(this.pos);
     A.root.rotation.y = this.face;
     A.update(dt);
+    if (this.o.weaponAim) this.o.weaponAim(this, dt);
   }
 }
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler();

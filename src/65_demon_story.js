@@ -38,7 +38,7 @@ QUEST.push(
 /* ───────────── the waste's wolves ───────────── */
 {
   const W = ENEMY_DEFS.wolf;
-  ENEMY_DEFS.bwolf = { ...W, name: 'Black Wolf', tint: '#24212a', eye: '#ff4a3a', hp: 105, poise: 34, xp: 34, sight: 28, hear: 16, run: 9.4,
+  ENEMY_DEFS.bwolf = { ...W, name: 'Black Wolf', tint: '#24212a', eye: '#ff1a0a', hp: 105, poise: 34, xp: 34, sight: 28, hear: 16, run: 9.4,
     attacks: [{ ...W.attacks[0], dmg: 16, poise: 22 }, { ...W.attacks[1], dmg: 24, poise: 38 }] };
 }
 
@@ -58,7 +58,7 @@ const spearInHand = a => {
   const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.34, 6), wrap); grip.position.y = 0.05; g.add(grip);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.rotation.z = Math.PI / 2;                 // the slot's −X is up in the idle grip: the spear stands upright
-  hand.add(g);
+  hand.add(g); a.spear = g;
 };
 const RUIJERD_SPEC = { base: 'Rogue', scale: 1.12,
   recolor: { rogue: { 1: '#2f9e6a', 0: '#e3cdb4', 23: '#e3cdb4', 8: '#c8bfa8', 21: '#c8bfa8', 9: '#4a4440', 6: '#5e5248' } },
@@ -79,8 +79,25 @@ const RUIJERD_FIRSTS = {
   stormWisp: 'Storm spirits. Lightning with a grudge. Magic unmakes them; my spear only annoys them.',
   rustScorp: 'Rock scorpions. The sting first, then the rest.',
 };
+// The spear follows the fight, not the hand slot's whims: upright at rest; in a blow, out along the
+// line from his chest to his hand (a stab thrusts forward, a spin sweeps round)
+const _spQ = new THREE.Quaternion(), _spP = new THREE.Quaternion(), _spD = new THREE.Vector3(), _spUp = new THREE.Vector3(0, 1, 0), _spH = new THREE.Vector3();
+function aimSpear(c, dt) {
+  const g = c.actor.spear; if (!g || !g.parent) return;
+  const atk = c.state === 'attack';
+  if (atk) {
+    g.parent.getWorldPosition(_spH);
+    _spD.set(_spH.x - c.pos.x, 0, _spH.z - c.pos.z);
+    if (_spD.lengthSq() < 0.01) _spD.set(Math.sin(c.face), 0, Math.cos(c.face));
+    _spD.normalize(); _spD.y = -0.08; _spD.normalize();
+  } else _spD.set(Math.sin(c.face) * 0.1, 1, Math.cos(c.face) * 0.1).normalize();
+  _spQ.setFromUnitVectors(_spUp, _spD);
+  g.parent.getWorldQuaternion(_spP).invert();
+  _spQ.premultiply(_spP);
+  g.quaternion.slerp(_spQ, 1 - Math.exp(-(atk ? 24 : 10) * dt));
+}
 const RUIJERD_OPTS = { barks: RUIJERD_BARKS, firsts: RUIJERD_FIRSTS, sawKey: 'ruiSaw_', side: -1, noRide: true,
-  clips: ['2H_Melee_Attack_Stab', '2H_Melee_Attack_Slice', '2H_Melee_Attack_Spin'], dmgMul: 1.6, reach: 2.3, hitReach: 3.3 };
+  clips: ['2H_Melee_Attack_Stab', '2H_Melee_Attack_Slice', '2H_Melee_Attack_Spin'], dmgMul: 1.6, reach: 2.3, hitReach: 3.3, weaponAim: aimSpear };
 
 /* ───────────── what's said ───────────── */
 const DC_LINES = {
