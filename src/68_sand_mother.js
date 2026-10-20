@@ -163,14 +163,14 @@ function buildWormRig() {
 const MOTHER_LINES = {
   intro: [
     { t: 'The sand inhales.' },
-    { s: 'Ruijerd Superdia', t: 'Empty yourself if you must. I will hold it off while you rise. That is what a party is.' },
+    { p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Empty yourself if you must. I will hold it off while you rise. That is what a party is.' },
     { p: 'eris', s: 'Eris Boreas Greyrat', t: 'It\'s HUGE. ...Good. More to hit!' },
   ],
   win: [
     { t: 'The Sand Mother goes down the way a tower does: slowly, then everywhere.' },
-    { s: 'Ruijerd Superdia', t: 'It is done. The caravans will run again.' },
-    { s: 'Ruijerd Superdia', t: 'You emptied yourself and got back up. Again and again. Most people call that stupidity.' },
-    { s: 'Ruijerd Superdia', t: 'I have decided to call it Dead End.' },
+    { p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'It is done. The caravans will run again.' },
+    { p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'You emptied yourself and got back up. Again and again. Most people call that stupidity.' },
+    { p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'I have decided to call it Dead End.' },
     { p: 'eris', s: 'Eris Boreas Greyrat', t: '...We\'re really doing this, aren\'t we. Walking home. All the way.' },
     { t: 'All the way. One caravan, one city, one fight at a time — and the name Dead End going ahead of you.' },
   ],

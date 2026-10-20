@@ -140,6 +140,39 @@ function updateBolts(dt) {
   }
 }
 
+/* ───────────── on the road: Eris and Ruijerd ─────────────
+   Now and then, out on the waste with nothing trying to kill you, the two of them talk.
+   One exchange at a time, never twice, never in a fight or a scene. */
+const DC_BANTER = [
+  { a: ['Eris', 'Ruijerd. Teach me that spin thing.'], b: ['Ruijerd', 'When your guard stops dropping, Eris. Not before.'] },
+  { a: ['Eris', 'How old ARE you?'], b: ['Ruijerd', 'Older than your grandfather\'s grandfather. Watch your left.'] },
+  { a: ['Ruijerd', '{name}. Your magic is strange. You do not chant.'], b: ['Eris', 'He does that. It\'s annoying. You get used to it.'] },
+  { a: ['Eris', 'Do Superd even eat? I\'ve never seen you eat.'], b: ['Ruijerd', '...I eat while you sleep.'], c: ['Eris', 'THAT IS SUSPICIOUS.'] },
+  { a: ['Eris', '{name} talks about his teacher in his sleep. Roxy this, Roxy that.'], b: ['Ruijerd', 'The Migurd woman will be glad to know it.'] },
+  { a: ['Ruijerd', 'Eris. You walk ahead of him without looking back. Good. Now look back sometimes.'], b: ['Eris', '...I look back. I just don\'t let him SEE.'] },
+  { a: ['Eris', 'When we get home I\'m telling Ghislaine I fought a worm the size of a TOWER.'], b: ['Ruijerd', 'Tell her it was two. Swordsmen respect exaggeration.'], after: 'sandMother' },
+  { a: ['Ruijerd', 'Dead End. People will run when they hear it, at first.'], b: ['Eris', 'Then we\'ll make them stop running. One town at a time.'], after: 'deadEnd' },
+];
+const BANTER = { t: 150, busy: false };
+function updateBanter(dt) {
+  if (!G || !REGION.dc || BANTER.busy || UI.dlg || PL.state !== 'move') return;
+  const E = ALLY.eris, R = ALLY.ruijerd;
+  if (!E || !E.active || !R || !R.active || ENT.enemies.some(e => e.aggro && !e.dead)) return;
+  if ((BANTER.t -= dt) > 0) return;
+  BANTER.t = rnd(140, 220);
+  const said = G.flags.banter || (G.flags.banter = []);
+  const next = DC_BANTER.findIndex((x, i) => !said.includes(i) && (!x.after || G.flags[x.after]));
+  if (next < 0) return;
+  said.push(next);
+  const x = DC_BANTER[next], col = n => n === 'Eris' ? '#e8606f' : '#6fce8a', line = s => s.replace('{name}', G.name);
+  BANTER.busy = true;
+  bark(x.a[0], line(x.a[1]), col(x.a[0]));
+  // each reply waits for the line before it to be read (a bark stays up ~1.8 s + 45 ms a letter)
+  const tA = 1.2 + x.a[1].length * 0.04, tB = tA + 1.2 + x.b[1].length * 0.04;
+  later(tA, () => bark(x.b[0], line(x.b[1]), col(x.b[0])));
+  later(x.c ? tB : tA + 0.2, () => { if (x.c) bark(x.c[0], line(x.c[1]), col(x.c[0])); BANTER.busy = false; });
+}
+
 /* ───────────── the storm front ───────────── */
 const STORMF = { strikeT: 4, farT: 2, said: false, crossed: false };
 function updateStormFront(dt) {
@@ -172,7 +205,7 @@ function updateStormStory() {
     STORMF.said = true;
     say(say$([
       { t: 'The rain on the Demon Continent does not fall so much as arrive.' },
-      { s: 'Ruijerd Superdia', t: 'Keep the lightning at your back. It shows them where you are.' },
+      { p: 'ruijerd2', s: 'Ruijerd Superdia', t: 'Keep the lightning at your back. It shows them where you are.' },
       { p: 'eris', s: 'Eris Boreas Greyrat', t: 'And watch the ground! If it glows, MOVE.' },
     ]));
   }

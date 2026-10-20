@@ -218,8 +218,12 @@ function hutPieces(out, x, z, face, s = 1) {
   const dx = Math.sin(face), dz = Math.cos(face);
   out.push([new THREE.CylinderGeometry(r, r * 1.06, wall, 12), '#a89070', x, y + wall / 2, z]);
   out.push([new THREE.CylinderGeometry(r * 1.02, r * 1.08, 0.35, 12), '#8a7258', x, y + 0.17, z]);
+  // thatch in three overlapping courses, darker as they go up, a knot of straw at the peak
   out.push([new THREE.ConeGeometry(r * 1.38, 2.5 * s, 12), '#7d6a4c', x, y + wall + 1.2 * s, z]);
+  out.push([new THREE.CylinderGeometry(r * 1.0, r * 1.36, 0.5 * s, 12, 1, true), '#8f7a56', x, y + wall + 0.18 * s, z]);
+  out.push([new THREE.CylinderGeometry(r * 0.66, r * 0.98, 0.45 * s, 12, 1, true), '#6e5c40', x, y + wall + 0.95 * s, z]);
   out.push([new THREE.ConeGeometry(r * 0.42, 0.9 * s, 8), '#5e4e38', x, y + wall + 2.35 * s, z]);
+  out.push([new THREE.CylinderGeometry(r * 1.07, r * 1.07, 0.16, 12, 1, true), '#6e5640', x, y + wall * 0.62, z]);
   out.push([new THREE.BoxGeometry(1.0 * s, 1.65 * s, 0.4), '#2a2220', x + dx * r * 0.93, y + 0.85 * s, z + dz * r * 0.93, 1, 1, 1, 0, face, 0]);
   out.push([new THREE.BoxGeometry(1.1 * s, 1.1 * s, 0.06), '#3f5f94', x + dx * (r + 0.1), y + 1.15 * s, z + dz * (r + 0.1), 1, 1, 1, 0, face, 0]);
   addCircle(x, z, r * 1.04, y - 1, y + wall + 2.6 * s, 'hut');

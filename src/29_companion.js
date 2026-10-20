@@ -20,6 +20,9 @@ const ERIS_BARKS = {
   vessel: ['{name}?! ...Show-off.'],
   mount: ['Move over. I\'m riding too.', 'Budge up, tutor.', 'Don\'t you dare leave without me!'],
   ride: ['FASTER!', 'Hah! Kestrel likes me better.', 'If you fall off, I\'m not stopping.', 'Grandfather says I ride like a bandit. Good!'],
+  // on the Demon Continent her idle talk turns homeward
+  idleDC: ['I\'m not scared of this place. I\'m keeping an eye on it. There\'s a difference.', 'When we get home, Grandfather is throwing a feast. A BIG one. I\'ve decided.',
+    'Ruijerd says I hold my sword like a Boreas. Obviously I do.', 'The sky\'s the wrong colour. I keep looking up to check.', 'Ghislaine would like it here. She\'d hit everything.'],
   event: ['Someone\'s in trouble — come ON, {name}!', 'Hear that? Let\'s GO!', 'Finally, something worth doing!'],
   saved: ['See? Heroes. Obviously.', 'You\'re welcome! ...We\'re welcome.', 'Hmph. They should carry a sword.'],
   chest: ['A chest! Open it, open it!', 'There\'d better be a sword in that.', 'Finders keepers. That\'s a rule.'],
@@ -71,7 +74,9 @@ class Companion {
   set(s) { this.state = s; this.stateT = 0; }
   bark(kind, force) {
     if (!force && this.barkCd > 0) return;
-    const list = (this.o.barks || ERIS_BARKS)[kind]; if (!list) return;
+    const B = this.o.barks || ERIS_BARKS;
+    if (kind === 'idle' && REGION.dc && B.idleDC) kind = 'idleDC';
+    const list = B[kind]; if (!list) return;
     bark(this.name, pick(list).replace('{name}', G.name), this.col);
     this.barkCd = 6 + Math.random() * 4;
   }
