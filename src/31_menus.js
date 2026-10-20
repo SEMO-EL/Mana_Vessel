@@ -167,6 +167,8 @@ function continueJourney() {
   if (at) { let bd = Infinity; for (const pl of Object.values(PLACES)) { const d = Math.hypot(pl.x - at.x, pl.z - at.z) - pl.r; if (d < bd) { bd = d; where = pl.name; } } }
   banner(where, 'The journey continues');
   if (typeof kidnapResume === 'function') kidnapResume();      // saved mid-escape: back to the shed
+  // the light is waiting: say where Chapter III begins
+  if (G.quest === 'done') later(5.5, () => { if (G.quest === 'done') hint('The light still hangs over the east. Chapter III begins when you face it — from the Boreas terrace in Roa.', 6); });
 }
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
