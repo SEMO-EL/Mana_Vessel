@@ -46,6 +46,7 @@ function showTitle() {
   const sv = loadGame();
   _titleDC = !!sv && DEMON.built && savedInDemon();
   _titleRoa = !_titleDC && !!sv && (sv.quest === 'done' || ROA_STEPS.includes(sv.quest));
+  $('titleSub').textContent = _titleDC ? 'The Red Waste' : 'The Borderlands of Fittoa';
   leaveCaveNow();
   if (typeof clearWhiteOut === 'function') { clearWhiteOut(); OMEN.reset(); }
   TOD.hour = 17.2; TOD.frozen = true;
