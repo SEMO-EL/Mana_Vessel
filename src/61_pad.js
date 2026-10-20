@@ -69,7 +69,7 @@ function padMap(dt) {
   }
   const step = padHit(PAD.RB) || padHit(PAD.RIGHT) ? 1 : padHit(PAD.LB) || padHit(PAD.LEFT) ? -1 : 0;
   if (step) {
-    const woke = WSTONE.list.filter(W => G && G.waystones[W.id]);
+    const woke = WSTONE.list.filter(W => G && G.waystones[W.id] && sameSide(W.z));
     if (woke.length) {
       const i = woke.indexOf(MAP.sel), W = woke[((i < 0 ? (step > 0 ? -1 : 0) : i) + step + woke.length) % woke.length];
       MAP.sel = W; V.cx = W.x; V.cz = W.z;

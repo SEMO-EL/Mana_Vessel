@@ -35,6 +35,15 @@ const DC_TRACK = [
 // a dry riverbed down the west of the waste, crossed by the track twice
 const DC_CANYON = [[560, 1420], [575, 1520], [545, 1620], [590, 1720], [560, 1820], [610, 1930], [580, 2040], [640, 2160]];
 const DC_NEST_FLOOR = 25;
+// the waste's names, for the banners (and the map, once it has a page for here)
+Object.assign(PLACES, {
+  dcWaste:  { x: 300,  z: 1990, r: 90,  name: 'The Red Waste',  sub: 'The Demon Continent' },
+  migurd:   { x: 330,  z: 1600, r: 75,  name: 'Migurd Village', sub: 'Biegoya Region · The Demon Continent' },
+  dcCanyon: { x: 575,  z: 1640, r: 40,  name: 'The Dry Canyon' },
+  dcBones:  { x: 720,  z: 1890, r: 60,  name: 'The Bone Field', sub: 'Whatever it was, nothing ate it' },
+  dcStorm:  { x: 1090, z: 1640, r: 150, name: 'The Storm Front', sub: 'The weather the Migurd warn you about' },
+  dcNest:   { x: 1200, z: 1990, r: 80,  name: 'The Sand Nest' },
+});
 
 // which side of the seam a point is on (the strip starts a little past it: the seam itself is peaks)
 const inDemon = z => z > DEMON.zF + 150;
@@ -46,6 +55,10 @@ function savedInDemon() {
   return DC_QUESTS.has(s.quest) || (Array.isArray(s.pos) && Number.isFinite(s.pos[2]) && inDemon(s.pos[2]));
 }
 const REGION = { k: 0, dc: false };
+// the other continent is a world away: waystones, compass marks and travel only on your side of the seam
+const sameSide = (z, ref = PL.body.pos.z) => inDemon(z) === inDemon(ref);
+// a place counts toward "every place" once its ground exists (the waste's, once you've been sent there)
+const placeCounts = k => DEMON.built || !inDemon(PLACES[k].z);
 // how much of the storm plateau's weather a point is under (1 well inside it)
 const dcStormW = (x, z) => 1 - smooth(DC_SPOTS.storm.r * 0.55, DC_SPOTS.storm.r + 30, Math.hypot(x - DC_SPOTS.storm.x, z - DC_SPOTS.storm.z));
 
@@ -193,8 +206,8 @@ async function raiseDemonLand() {
       const slope = Math.hypot(H[i + 1] - H[i - 1], H[i + N] - H[i - N]) / (2 * c);
       let g = (1 - smooth(0.4, 0.7, slope)) * smooth(ROAD_WIDTH * 0.5, ROAD_WIDTH * 0.5 + 3, TER.ROADD[i]);
       const dm = Math.hypot(x - DC_SPOTS.migurd.x, z - DC_SPOTS.migurd.z), dn = Math.hypot(x - DC_SPOTS.nest.x, z - DC_SPOTS.nest.z);
-      const patch = smooth(0.1, 0.55, n.c(x / 30, z / 30));
-      g *= Math.max(0.42 * patch, (1 - smooth(70, 170, dm)) * 0.85);
+      const patch = smooth(0.25, 0.7, n.c(x / 30, z / 30));
+      g *= Math.max(0.3 * patch, (1 - smooth(70, 170, dm)) * 0.85);
       g *= smooth(DC_SPOTS.nest.r + 10, DC_SPOTS.nest.r + 60, dn) * smooth(6, 14, dcCanyonAt(i)) * (1 - dcStormW(x, z) * 0.7);
       g *= smooth(14, 26, dm);                                                   // the village square stays trodden
       G8[i] = Math.round(clamp(g, 0, 1) * 255);

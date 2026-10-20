@@ -184,12 +184,12 @@ function compassMarks() {
   for (const [k, [x, z]] of Object.entries(cards)) out.push({ ang: Math.atan2(x, z), label: k, cls: 'card' });
   for (let i = 0; i < 24; i++) if (i % 6) { const a = i / 24 * TAU; out.push({ ang: a, label: '|', cls: 'tick' }); }
   const p = PL.body.pos;
-  for (const W of WSTONE.list) if (G.waystones[W.id]) out.push({ ang: Math.atan2(W.x - p.x, W.z - p.z), label: '◈', cls: 'way', d: Math.hypot(W.x - p.x, W.z - p.z) });
+  for (const W of WSTONE.list) if (G.waystones[W.id] && sameSide(W.z)) out.push({ ang: Math.atan2(W.x - p.x, W.z - p.z), label: '◈', cls: 'way', d: Math.hypot(W.x - p.x, W.z - p.z) });
   const q = typeof questMarker === 'function' ? questMarker() : null;
   if (q) out.push({ ang: Math.atan2(q.x - p.x, q.z - p.z), label: '◆', cls: 'quest' });
   // somewhere new not far off: a question mark until you've been there
   if (!GAME.inCave) for (const [k, pl] of Object.entries(PLACES)) {
-    if (G.discovered[k]) continue;
+    if (G.discovered[k] || !sameSide(pl.z)) continue;
     const d = Math.hypot(pl.x - p.x, pl.z - p.z);
     if (d < 260 && d > pl.r) out.push({ ang: Math.atan2(pl.x - p.x, pl.z - p.z), label: '?', cls: 'poi' });
   }

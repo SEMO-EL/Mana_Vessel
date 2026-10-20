@@ -294,7 +294,7 @@ function openJournal() {
   if (f.spell_quagmire) keep.push(['Wenna\'s lesson', 'Quagmire']);
   if (keep.length) { html += '<h4>Gear &amp; keepsakes</h4>'; for (const [k, v] of keep) html += row(k, v); }
   // what's left to find
-  const places = Object.keys(PLACES), found = places.filter(k => G.discovered[k]).length;
+  const places = Object.keys(PLACES).filter(placeCounts), found = places.filter(k => G.discovered[k]).length;
   const ways = WSTONE.list.length, woke = WSTONE.list.filter(w => G.waystones[w.id]).length;
   html += '<h4>Found</h4>';
   html += row('Places discovered', found + ' / ' + places.length);
@@ -419,7 +419,7 @@ function openTravel() {
   if (typeof mapOpen === 'function') { GAME.state = 'map'; mapOpen(); return; }
   // fallback: a simple list if the map module is absent
   const m = $('restMenu'); m.innerHTML = '';
-  for (const W of WSTONE.list) if (G.waystones[W.id]) { const b = document.createElement('button'); b.textContent = W.name; b.onclick = () => fastTravel(W.id); m.appendChild(b); }
+  for (const W of WSTONE.list) if (G.waystones[W.id] && sameSide(W.z)) { const b = document.createElement('button'); b.textContent = W.name; b.onclick = () => fastTravel(W.id); m.appendChild(b); }
   openScreen('rest');
 }
 

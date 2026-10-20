@@ -391,7 +391,7 @@ function travelBlock() {
 }
 async function fastTravel(id) {
   const W = WSTONE.list.find(w => w.id === id);
-  if (!W || !G.waystones[id]) return;
+  if (!W || !G.waystones[id] || !sameSide(W.z)) return;
   closeAllScreens();
   await fadeOut(0.6);
   leaveCaveNow();
