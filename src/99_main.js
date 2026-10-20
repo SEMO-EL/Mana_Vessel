@@ -86,6 +86,7 @@ async function boot() {
   buildMarket();
   buildWilds();
   buildTown();
+  buildHideout();
   buildPages(); lap('buildPages');
   buildCaches(); lap('buildCaches');
   batchStaticProps(); lap('batchStaticProps');
@@ -157,6 +158,7 @@ function frame(dtReal) {
       updateCaches(dt);
       updateFeats(dt);
       updateWilds(dt);
+      updateKidnap(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
@@ -205,7 +207,7 @@ function reportFatal(e) {
 /* Test/inspection hooks — used by the headless harness and by me in devtools. */
 window.__mv = {
   THREE, scene, camera, renderer, TER, FOL, TOD, WEATHER, GAME, setView, heightAt, waterAt, floorAt, groundAt, PROPS_LIB, propSize,
-  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, TOWN_ERRAND, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
+  PL, CAM, ENT, IN, MAGIC, VFX, PHYS, STRUCT, CAVE, NPCS, ENCOUNTERS, WSTONE, UI, PAGES, BUS, ROA, CHARS, ALLY, DUST, ROA_GREEN, TOWN, WILD, CRYSTALS, STORM, HORSE, DEER, CACHES, openCache, STABLE, leadOutHorse, sendHorseHome, WILDS, WILD_SPOTS, buyWare, openShop, TOWN_ERRAND, KID, setupEscape, finishEscape, breakPlanks, EVENTS, eventSpot, startRoadEvent, endRoadEvent,
   get G() { return G; }, set G(v) { G = v; }, get MAP() { return typeof MAP !== 'undefined' ? MAP : null; },
   Enemy, damageEnemy, damagePlayer, spawnPlayer, castPlayerSpell, SPELL, setQuest, enterCave, exitCave, climbTower, fastTravel, saveGame, loadGame, startDevPlay,
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); return renderer.info.render; },
@@ -418,6 +420,28 @@ function selfTests() {
     for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
     Object.assign(G, snap); resetCaches();
     return ok && C.open === 0 ? CACHES.list.length : false;
+  });
+  check('kidnap', () => {
+    // the shed, the boards, and a takedown from behind that nobody else hears
+    const snap = JSON.parse(JSON.stringify(G)), p0 = PL.body.pos.clone(), h0 = TOD.hour;
+    let ok = false;
+    try {
+      setupEscape(); step(20);
+      const S = KID.shed, onFloor = Math.abs(PL.body.pos.y - (S.y + 0.38)) < 0.1;
+      const boards = PL.interactTarget && PL.interactTarget.label() === 'Break out the rotten boards';
+      breakPlanks(); step(40);
+      const e = KID.enc.live.find(x => x.patrol && !x.dead), fx = Math.sin(e.face), fz = Math.cos(e.face);
+      const px = e.pos.x - fx * 1.1, pz = e.pos.z - fz * 1.1;
+      placePlayerAt(px, groundAt(px, pz, e.pos.y + 1), pz, Math.atan2(e.pos.x - px, e.pos.z - pz));
+      IN.keys.add('Mouse0'); IN.edgesDown.add('Mouse0'); frame(1 / 30); IN.keys.delete('Mouse0'); IN.edgesUp.add('Mouse0'); step(25);
+      ok = onFloor && boards && !KID.planks.mesh.visible && e.dead && !KID.detected && KID.active && ALLY.erisNight.active;
+    } finally {
+      KID.active = false; if (ALLY.erisNight) ALLY.erisNight.leave();
+      for (const e of [...ENT.enemies]) e.remove(); despawnEncounter(KID.enc); restorePlanks();
+      for (const k of Object.keys(G)) if (!(k in snap)) delete G[k];
+      Object.assign(G, snap); TOD.hour = h0; PL.body.pos.copy(p0); step(2);
+    }
+    return ok;
   });
   GAME.skipRender = false;
   R.failures = fail; R.ok = fail.length === 0;

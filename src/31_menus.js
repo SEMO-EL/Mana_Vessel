@@ -161,6 +161,7 @@ function continueJourney() {
   let where = W.name;
   if (at) { let bd = Infinity; for (const pl of Object.values(PLACES)) { const d = Math.hypot(pl.x - at.x, pl.z - at.z) - pl.r; if (d < bd) { bd = d; where = pl.name; } } }
   banner(where, 'The journey continues');
+  if (typeof kidnapResume === 'function') kidnapResume();      // saved mid-escape: back to the shed
 }
 // world state that follows G (quest-dependent objects, beaten bosses)
 function resetWorldState() {
@@ -178,6 +179,7 @@ function resetWorldState() {
   if (typeof resetCaches === 'function') resetCaches();
   if (typeof resetWilds === 'function') resetWilds();
   if (typeof resetTownErrands === 'function') resetTownErrands();
+  if (typeof resetKidnap === 'function') resetKidnap();
   buildSpellBar();
 }
 function enterPlay() {

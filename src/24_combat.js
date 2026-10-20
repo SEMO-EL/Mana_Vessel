@@ -28,6 +28,12 @@ function playerSwingHits(move) {
     if (d > e.r + 0.4 && ang > move.arc) continue;
     PL.attackHits.add(e);
     const base = 16 * S.dmg * R.sword * (1 + G.lvl * 0.12) * move.dmg * swordGearMul();
+    // a guard who hasn't noticed you, struck from behind: down without a sound
+    const back = Math.abs(wrapAngle(Math.atan2(-dx, -dz) - e.face)) > 2.0;     // you're behind: the way to you is opposite the way they face
+    if (e.def.suspicious && !e.aggro && e.state !== 'dormant' && back) {
+      damageEnemy(e, e.hp + 999, { dir: new THREE.Vector3(dx, 0, dz).normalize(), silent: true, kind: 'sword', crit: true });
+      BUS.emit('takedown', e); hitstop(0.08); continue;
+    }
     const crit = e.staggerT > 0 || e.riposte;
     _hv.set(dx, 0, dz).normalize();
     damageEnemy(e, base * (crit ? 2.2 : 1), {
@@ -73,7 +79,7 @@ function damageEnemy(e, dmg, o = {}) {
   e.hp -= dmg;
   e.hurtT = 0.16;
   e.lastHitT = GAME.time;
-  if (!e.aggro) alertEnemy(e, true);
+  if (!e.aggro && !(o.silent && e.hp <= 0)) alertEnemy(e, true);   // a silent takedown raises no alarm
   if (e.def.spar && e.hp < 1) e.hp = 1;   // a sparring partner yields; he never dies
   numbers(e, dmg, o.crit);
   if (o.burn) { e.burn = Math.max(e.burn || 0, o.burn); e.burnT = 2.8; }

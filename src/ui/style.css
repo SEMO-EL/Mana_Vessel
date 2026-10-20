@@ -252,3 +252,5 @@ body.lb #bossCard{bottom:12.5%}     /* in a letterboxed shot the HUD is gone: si
 body.lb #bark{bottom:13vh}
 
 .padFocus{outline:2px solid var(--hot);outline-offset:3px;box-shadow:0 0 16px rgba(240,207,98,.45)}
+.susMark{position:absolute;transform:translate(-50%,-100%);font-family:var(--display);font-weight:900;font-size:24px;color:#f4ead0;text-shadow:0 0 8px #000,0 2px 4px #000;pointer-events:none}
+.susMark.alarm{color:#ff5a3a}

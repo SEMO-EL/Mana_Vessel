@@ -23,6 +23,7 @@ const FEATS = [
   { id: 'errands',   name: 'Good Neighbour',     desc: 'See all four errands through (Gerard, Lilia, Gerd, Hilde).', test: () => ['flock', 'moon', 'ashback', 'caravan'].every(k => G.flags[k] === 'done') },
   { id: 'bestiary',  name: 'Bestiary',           desc: 'Fell one of every beast of the wilds: wolf, jackal, boar, bear, scorpion, wisp.', test: () => bestiaryGot() === BESTIARY.length },
   { id: 'mud',       name: 'Mudslinger',         desc: 'Learn Quagmire from Magister Wenna.',          test: () => !!G.flags.spell_quagmire },
+  { id: 'unseen',    name: 'Unseen',             desc: "Get Eris out of the brigands' farmstead without being seen.", test: () => !!G.flags.kidStealth },
   { id: 'rider',     name: 'Horselord',          desc: 'Ride Kestrel for five kilometres.',           test: () => (G.flags.rideM || 0) >= 5000 },
   { id: 'chapter2',  name: 'The Boreas Girl',    desc: 'See Chapter II through.',                     test: () => G.quest === 'done' },
 ];

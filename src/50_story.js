@@ -385,6 +385,7 @@ function leaveRest() {
 // Elden Ring's rule: no travelling out of a fight, or up out of the ground.
 function travelBlock() {
   if (GAME.inCave) return 'The cave holds you. Find the way out first.';
+  if (typeof KID !== 'undefined' && (KID.active || G.quest === 'followEris' && KID.busy)) return "You are somebody's prisoner. Get out first.";
   if (ENT.enemies.some(e => !e.dead && e.aggro && e.dist() < 50)) return 'Not with enemies this close.';
   return null;
 }
@@ -459,6 +460,7 @@ BUS.on('playerDied', () => {
 });
 async function riseAgain() {
   closeAllScreens();
+  if (G.quest === 'escape' && typeof restartEscape === 'function') { for (const e of [...ENT.enemies]) e.remove(); return restartEscape(); }
   if (SHOT.fn) { SHOT.fn = null; CAM.override = null; letterbox(false); }
   await fadeOut(0.5);
   leaveCaveNow();

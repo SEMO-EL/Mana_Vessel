@@ -69,6 +69,7 @@ class Companion {
     this.barkCd = 6 + Math.random() * 4;
   }
   pickTarget() {
+    if (this.passive) return null;          // unarmed (the night of the kidnapping): she follows, she doesn't fight
     const P = PL.body.pos;
     let best = null, bd = 1e9;
     for (const e of ENT.enemies) {
@@ -175,6 +176,6 @@ class Companion {
   }
 }
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler();
-function updateAllies(dt) { if (ALLY.eris) ALLY.eris.update(dt); }
-function allyBodies() { return ALLY.eris && ALLY.eris.active && !ALLY.eris.riding ? [ALLY.eris.body] : []; }
+function updateAllies(dt) { if (ALLY.eris) ALLY.eris.update(dt); if (ALLY.erisNight) ALLY.erisNight.update(dt); }
+function allyBodies() { return [ALLY.eris, ALLY.erisNight].filter(a => a && a.active && !a.riding).map(a => a.body); }
 BUS.on('vesselBreak', () => { if (ALLY.eris && ALLY.eris.active) later(1.2, () => ALLY.eris.bark('vessel', true)); });

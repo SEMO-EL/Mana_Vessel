@@ -133,8 +133,7 @@ async function talkEris(n) {
     if (q === 'toRoa') setQuest('findEris', { quiet: true });
     await npcSay(n, SCRIPT2.eris1);
     await erisPunch(n);
-    await npcSay(n, SCRIPT2.eris2);
-    setQuest('ghislaine');
+    await kidnapBegin(n);              // she storms off at dusk, and the night goes wrong (62_kidnap)
     return;
   }
   if (q === 'ghislaine') return npcSay(n, [{ p: 'eris', s: 'Eris Boreas Greyrat', t: 'Ghislaine is in the YARD. Go. Before I get bored and punch you again.' }]);
