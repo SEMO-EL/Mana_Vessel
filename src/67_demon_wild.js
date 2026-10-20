@@ -92,7 +92,11 @@ function defineDemonEncounters() {
   E('dcStorm2', 1110, 1610, [['ogre', 0, 0], ['stormWisp', 7, 3], ['stormWisp', -6, 4]]);
   E('dcStorm3', 1150, 1700, [['bwolf', 0, 0], ['bwolf', 4, -3], ['bwolf', -3, -4], ['stormWisp', 0, -9]]);
   E('dcRim', 1120, 1950, [['rustScorp', 0, 0], ['rustScorp', 5, -4]]);
+  // after dark, lights drift among the bones
+  E('dcGraveLights', 735, 1880, [['graveWisp', 0, 0], ['graveWisp', 8, 4], ['graveWisp', -7, 6]], { night: true });
 }
+ENEMY_DEFS.graveWisp = { ...ENEMY_DEFS.wisp, name: 'Grave Light', hp: 64, xp: 38,
+  attacks: ENEMY_DEFS.wisp.attacks.map(a => ({ ...a, ranged: { ...a.ranged, dmg: 18 } })) };
 
 /* ───────────── lightning ───────────── */
 const BOLTS = [];

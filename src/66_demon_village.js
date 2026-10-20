@@ -172,6 +172,12 @@ function updateMigurd(dt) {
     if (Math.random() < 0.5) emit(1, { pos: DC_DRESS.fire, col: '#ffb060', col2: '#ff5a20', vel: { x: 0, y: 1.6, z: 0 }, velSpread: 0.5, spread: 0.3, life: 0.8, size: 0.16, bright: 2 });
   }
   if (G.quest === 'dcMigurd' && !MIG.busy && !UI.dlg && PL.state === 'move' && Math.hypot(p.x - M.x, p.z - M.z) < 52) migurdArrive();
+  // at night the village goes indoors — all but the two keeping the fire, and the traders
+  const night = SKY_NOW.night > 0.6 && !MIG.fireOn;
+  if (night !== MIG.night) {
+    MIG.night = night;
+    for (const k of ['mig2', 'mig3', 'mig4', 'mig5']) if (NPCS[k]) NPCS[k].setVisible(!night);     // (the traders keep late hours)
+  }
 }
 async function migurdArrive() {
   MIG.busy = true;
