@@ -22,10 +22,12 @@ function closeAllScreens() { for (const s of SCREENS) $(s).classList.remove('on'
 const TITLE_PATH = [[-690, 100, 715], [-640, 90, 680], [-590, 84, 655], [-530, 78, 642], [-460, 82, 650], [-390, 90, 668], [-330, 100, 690]];
 // once a save has reached Roa, the title flies over Roa instead (the sun still on the left)
 const ROA_TITLE_PATH = [[1700, 95, 600], [1660, 88, 585], [1615, 82, 572], [1565, 80, 568], [1515, 82, 572], [1470, 88, 585], [1430, 95, 600]];
-let _titleT = 0, _titleRoa = false;
+// and once it's on the Demon Continent: past the Bone Field, the mesas behind
+const DC_TITLE_PATH = [[600, 72, 1975], [640, 68, 1985], [680, 66, 1990], [720, 64, 1992], [760, 66, 1990], [800, 68, 1985], [840, 72, 1975]];
+let _titleT = 0, _titleRoa = false, _titleDC = false;
 function titleCamera(dt) {
   _titleT += dt * 0.012;
-  const pts = _titleRoa ? ROA_TITLE_PATH : TITLE_PATH, n = pts.length - 1;
+  const pts = _titleDC ? DC_TITLE_PATH : _titleRoa ? ROA_TITLE_PATH : TITLE_PATH, n = pts.length - 1;
   const u = (Math.sin(_titleT) * 0.5 + 0.5) * n;
   const i = Math.min(n - 1, Math.floor(u)), t = u - i;
   const P = k => pts[clamp(k, 0, n)];
@@ -33,6 +35,7 @@ function titleCamera(dt) {
   const x = cr(P(i - 1)[0], P(i)[0], P(i + 1)[0], P(i + 2)[0], t), y = cr(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1], t), z = cr(P(i - 1)[2], P(i)[2], P(i + 1)[2], P(i + 2)[2], t);
   camera.position.set(x, Math.max(y, heightAt(x, z) + 25), z);
   const k = u / n;
+  if (_titleDC) { const lx = lerp(690, 750, k); camera.lookAt(lx, 44, 1885); GAME.focus.set(lx, 36, 1900); return; }
   if (_titleRoa) { const lx = lerp(1600, 1520, k); camera.lookAt(lx, 50, 372); GAME.focus.set(lx, 36, 400); return; }
   const lx = lerp(-475, -385, k);
   camera.lookAt(lx, 74, 330);
@@ -41,7 +44,8 @@ function titleCamera(dt) {
 function showTitle() {
   GAME.state = 'title';
   const sv = loadGame();
-  _titleRoa = !!sv && (sv.quest === 'done' || ROA_STEPS.includes(sv.quest));
+  _titleDC = !!sv && DEMON.built && savedInDemon();
+  _titleRoa = !_titleDC && !!sv && (sv.quest === 'done' || ROA_STEPS.includes(sv.quest));
   leaveCaveNow();
   if (typeof clearWhiteOut === 'function') { clearWhiteOut(); OMEN.reset(); }
   TOD.hour = 17.2; TOD.frozen = true;

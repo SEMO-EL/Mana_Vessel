@@ -473,9 +473,18 @@ function selfTests() {
   R.failures = fail; R.ok = fail.length === 0;
   return R;
 }
-function runTests() {
+async function runTests() {
   const report = { bootMs: GAME.bootMs, ok: true };
   try { if (typeof selfTests === 'function') Object.assign(report, selfTests()); } catch (e) { report.ok = false; report.error = String(e.stack || e); }
+  // then Chapter III played through (async: it rides the story's own fades and timers); ?test=1&noc3 skips it
+  if (typeof chapterThreeTest === 'function' && !QS.has('noc3')) {
+    const t0 = performance.now();
+    try {
+      const r = await chapterThreeTest();
+      report.c3 = r.c3; report.c3ms = Math.round(performance.now() - t0);
+      if (!r.c3ok) { report.ok = false; (report.failures || (report.failures = [])).push('chapter3: ' + (r.c3fail || '?')); }
+    } catch (e) { report.ok = false; (report.failures || (report.failures = [])).push('chapter3 threw: ' + String(e.stack || e).slice(0, 300)); }
+  }
   const pre = document.createElement('pre'); pre.id = '__report'; pre.style.display = 'none';
   pre.textContent = JSON.stringify(report); document.body.appendChild(pre);
   document.title = 'MV-TEST-DONE';

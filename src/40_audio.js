@@ -880,7 +880,7 @@ function auAmbience(dt, tick) {
   }
   // birds by day — busier in the forest, quiet at altitude, gone in rain and at night
   if ((AUDIO.birdT -= dt) <= 0) {
-    const ok = !cave && night < 0.5 && rain < 0.3;
+    const ok = !cave && night < 0.5 && rain < 0.3 && REGION.k < 0.5;     // (no songbirds over the waste)
     const forest = Math.hypot(cp.x - PLACES.forest.x, cp.z - PLACES.forest.z) < PLACES.forest.r;
     const rate = ok ? (forest ? 1 : 0.35) * (1 - smooth(0.3, 0.5, night)) * (1 - alt * 0.7) : 0;
     if (rate > 0.02) { auBird(cp); AUDIO.birdT = Math.min(12, rnd(1, 4) / rate); } else AUDIO.birdT = 2;
@@ -902,6 +902,12 @@ const AUDIO_MOODS = {
   // Roa: a city's bright major, quicker steps; the outskirts: dry, hollow, sparse
   roa:     { root: 146.83, scale: [0, 4, 7, 9, 11], step: 1.8, cut: 640, drone: 0.036 },
   outskirts: { root: 98.0, scale: [0, 1, 5, 7, 8],  step: 2.8, cut: 380, drone: 0.048 },
+  // the Demon Continent: a low double-harmonic drone over the waste, a gentler mode among the Migurd,
+  // the storm's darkest and slowest, and something uneasy over the nest
+  waste:   { root: 92.5,   scale: [0, 1, 4, 5, 7, 8], step: 3.0, cut: 340, drone: 0.05 },
+  migurd:  { root: 123.47, scale: [0, 2, 3, 7, 9],   step: 2.3, cut: 520, drone: 0.036 },
+  storm:   { root: 77.78,  scale: [0, 1, 3, 6, 7],   step: 3.4, cut: 240, drone: 0.055 },
+  nest:    { root: 82.41,  scale: [0, 1, 5, 6, 8],   step: 2.6, cut: 300, drone: 0.052 },
 };
 // eighth-note ostinati in semitones from the region root (null = rest)
 const AUDIO_OSTINATO = [[0, 0, 7, 0, 3, 0, 7, 10], [0, 0, 7, 0, 8, 7, 3, 2]];
@@ -911,6 +917,12 @@ function auRegionAt(x, z) {
   if (GAME.inCave) return 'cave';
   const cur = AUDIO.mus.region;
   const inside = (P, key) => Math.hypot(x - P.x, z - P.z) < P.r * (cur === key ? 1.12 : 1);   // hysteresis
+  if (inDemon(z)) {
+    if (inside(PLACES.migurd, 'migurd')) return 'migurd';
+    if (dcStormW(x, z) > (cur === 'storm' ? 0.25 : 0.4)) return 'storm';
+    if (Math.hypot(x - DC_SPOTS.nest.x, z - DC_SPOTS.nest.z) < DC_SPOTS.nest.r + (cur === 'nest' ? 50 : 35)) return 'nest';
+    return 'waste';
+  }
   if (inside(PLACES.village, 'village')) return 'village';
   if (inside(PLACES.forest, 'forest')) return 'forest';
   if (x > 900) {
