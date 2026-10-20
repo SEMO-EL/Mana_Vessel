@@ -12,7 +12,7 @@
    Everything rigid is merged into a few meshes; colliders are the usual
    circles and boxes, so you walk round the spires and under the ribs.
    ═══════════════════════════════════════════════════════════════════════ */
-const DC_DRESS = { rocks: 0, spires: 0, trees: 0, huts: [], mats: {} };
+const DC_DRESS = { rocks: 0, spires: 0, trees: 0, huts: [], mats: {}, spireAt: [], treeAt: [], wagons: [], skel: null };
 const DC_WAYSTONES = [
   { id: 'dcWake',   x: 318, z: 2006, name: 'The Red Waste' },
   { id: 'dcMigurd', x: 392, z: 1626, name: 'Migurd Village' },
@@ -95,7 +95,7 @@ function spirePieces(out, x, z, h, r, R, palette) {
   }
   out.push([new THREE.ConeGeometry(rr, rr * 1.6, 6), palette[segs % palette.length], x, y + rr * 0.8, z, 1, 1, 1, 0, R() * TAU, 0]);
   addCircle(x, z, r * 0.95, y0, y0 + h + 1, 'spire');
-  DC_DRESS.spires++;
+  DC_DRESS.spires++; DC_DRESS.spireAt.push([x, z, r, palette[0]]);
 }
 function dcSpires(R) {
   const red = ['#6e4436', '#8a5a44', '#5a3a30', '#7c4c3a'], black = ['#3b302d', '#4a3c37', '#2f2725', '#433530'], sand = ['#a8865e', '#bd9a6e', '#977552'];
@@ -138,7 +138,7 @@ function deadTreePieces(out, x, z, s, R) {
     out.push([b, bark, x + Math.sin(lean) * by, y + by, z, 1, 1, 1, Math.cos(a) * up, 0, Math.sin(a) * up]);
   }
   addCircle(x, z, 0.3 * s, y - 1, y + h, 'tree').thin = true;
-  DC_DRESS.trees++;
+  DC_DRESS.trees++; DC_DRESS.treeAt.push([x, z]);
 }
 function dcDeadTrees(R) {
   const out = [], M = DC_SPOTS.migurd;
@@ -170,6 +170,7 @@ function dcSkeleton() {
   const spine = [];
   for (let i = 0; i <= 12; i++) { const t = -26 + i * 4.6; spine.push(at(t, 0, 11.5 - Math.pow((i - 6) / 6, 2) * 2.5 - (i > 9 ? (i - 9) * 1.6 : 0))); }
   tube(spine, 0.75, boneD);
+  DC_DRESS.skel = { spine: spine.map(p => [p.x, p.z]), ribs: [], skull: null };
   for (let i = 1; i < 12; i++) out.push([new THREE.BoxGeometry(1.1, 1.6, 0.9), bone, spine[i].x, spine[i].y + 0.9, spine[i].z, 1, 1, 1, 0, -0.5, 0]);
   // ribs: eleven pairs arching down into the dust (the last few broken short)
   for (let i = 0; i < 11; i++) {
@@ -180,6 +181,8 @@ function dcSkeleton() {
       if (!broken) pts.push(at(t + 1.3, s * w * 0.9, -0.6));
       tube(pts, 0.42 - i * 0.012, i % 2 ? bone : boneD);
       if (!broken) { const f = at(t + 1.3, s * w * 0.9, 0); addCircle(f.x, f.z, 0.7, y0 - 1, y0 + 6, 'bone'); }
+      const a0 = at(t, 0, 0), a1 = at(t + 1.2, s * w * (broken ? 0.85 : 1), 0);
+      DC_DRESS.skel.ribs.push([a0.x, a0.z, a1.x, a1.z]);
     }
   }
   // the skull, at the head end: a long brow, sockets, a jaw in the sand, two horns sweeping back
@@ -192,6 +195,7 @@ function dcSkeleton() {
     const jaw = at(-34, s * 1.8, 0.3); out.push([new THREE.BoxGeometry(0.7, 0.8, 6), bone, jaw.x, jaw.y, jaw.z, 1, 1, 1, 0, -0.5 + Math.PI / 2 + s * 0.12, 0]);
   }
   addCircle(sk.x, sk.z, 4.2, y0 - 1, y0 + 8, 'bone');
+  DC_DRESS.skel.skull = [sk.x, sk.z, snout.x, snout.z];
   // the tail, vertebrae trailing off and going under
   for (let i = 0; i < 9; i++) { const p = at(30 + i * 2.6, Math.sin(i * 0.5) * 2, 2.2 - i * 0.32); out.push([new THREE.BoxGeometry(1.1 - i * 0.08, 0.9 - i * 0.06, 1.2), i % 2 ? bone : boneD, p.x, p.y, p.z, 1, 1, 1, 0, -0.5 + i * 0.1, 0]); }
   // a scatter of smaller bones round it
@@ -281,6 +285,7 @@ function wagonPieces(out, x, z, rot, tilt, R) {
   for (const lz of [-1.4, 0, 1.4]) out.push([new THREE.TorusGeometry(0.95, 0.05, 4, 10, Math.PI), woodD, ...L(0, 1.0, lz), 1, 1, 1, 0, rot + Math.PI / 2, 0]);
   out.push([new THREE.CylinderGeometry(0.97, 0.97, 1.5, 10, 1, true, 0, Math.PI * 0.6), '#cbbd9e', ...L(0, 1.0, 0.7), 1, 1, 1, Math.PI / 2, rot, 0]);
   addBox(x, z, 1.1, 2.1, -rot, y - 1, y + 1.6, 'wagon');
+  DC_DRESS.wagons.push([x, z, rot]);
 }
 function dcNestWreckage(R) {
   const N = DC_SPOTS.nest, out = [];
@@ -301,4 +306,62 @@ function dcNestWreckage(R) {
   }
   const m = mergedPart(out, dcMat('vc', { vertexColors: true })); m.receiveShadow = true;
   STRUCT.group.add(m);
+}
+
+/* ───────────── on the map: the waste's own marks ───────────── */
+// Called by mapBuild for the Demon Continent's sheet (map px via mapX/mapY, MAP_PPM px per metre).
+function mapPaintDemon(ctx) {
+  const S = MAP_PPM, D = DC_DRESS;
+  ctx.lineCap = ctx.lineJoin = 'round';
+  // the nest: a stippled sand bowl
+  const N = DC_SPOTS.nest, NX = mapX(N.x), NY = mapY(N.z), NR = N.r * S;
+  const g = ctx.createRadialGradient(NX, NY, NR * 0.2, NX, NY, NR * 1.25);
+  g.addColorStop(0, 'rgba(232,212,160,0.75)'); g.addColorStop(0.75, 'rgba(222,196,140,0.45)'); g.addColorStop(1, 'rgba(222,196,140,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(NX, NY, NR * 1.25, 0, TAU); ctx.fill();
+  const R = mulberry32(919);
+  ctx.fillStyle = 'rgba(120,90,50,0.35)';
+  for (let i = 0; i < 260; i++) { const a = R() * TAU, d = Math.sqrt(R()) * NR; ctx.fillRect(NX + Math.cos(a) * d, NY + Math.sin(a) * d, 1.2, 1.2); }
+  ctx.strokeStyle = 'rgba(90,64,36,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.arc(NX, NY, NR, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  // the storm: rain hatching over the plateau
+  const T = DC_SPOTS.storm, TX = mapX(T.x), TY = mapY(T.z), TR = T.r * S;
+  ctx.save(); ctx.beginPath(); ctx.arc(TX, TY, TR, 0, TAU); ctx.clip();
+  ctx.strokeStyle = 'rgba(60,70,96,0.28)'; ctx.lineWidth = 1;
+  ctx.beginPath(); for (let k = -TR * 2; k < TR * 2; k += 7) { ctx.moveTo(TX + k - TR, TY - TR); ctx.lineTo(TX + k + TR * 0.4, TY + TR); } ctx.stroke();
+  ctx.restore();
+  // spires: little inked needles, black on the plateau
+  for (const [x, z, r, col] of D.spireAt) {
+    const X = mapX(x), Y = mapY(z), w = Math.max(1.6, r * S * 0.9), h = w * 2.4;
+    ctx.beginPath(); ctx.moveTo(X, Y - h); ctx.lineTo(X + w, Y + w * 0.5); ctx.lineTo(X - w, Y + w * 0.5); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 0.7; ctx.strokeStyle = MAP_COL.ink; ctx.stroke();
+  }
+  // dead trees: scratches
+  ctx.strokeStyle = 'rgba(58,42,30,0.8)'; ctx.lineWidth = 0.9; ctx.beginPath();
+  for (const [x, z] of D.treeAt) { const X = mapX(x), Y = mapY(z); ctx.moveTo(X, Y + 2.5); ctx.lineTo(X, Y - 2.5); ctx.moveTo(X, Y - 1); ctx.lineTo(X + 2, Y - 3); ctx.moveTo(X, Y - 0.2); ctx.lineTo(X - 2, Y - 2.2); }
+  ctx.stroke();
+  // the bones: spine, ribs and skull, drawn the way a surveyor would
+  if (D.skel) {
+    ctx.strokeStyle = '#efe6cf'; ctx.lineWidth = 3.2; const bone = new Path2D();
+    D.skel.spine.forEach(([x, z], i) => { if (i) bone.lineTo(mapX(x), mapY(z)); else bone.moveTo(mapX(x), mapY(z)); });
+    for (const [x0, z0, x1, z1] of D.skel.ribs) { bone.moveTo(mapX(x0), mapY(z0)); bone.lineTo(mapX(x1), mapY(z1)); }
+    ctx.stroke(bone); ctx.strokeStyle = 'rgba(70,54,36,0.85)'; ctx.lineWidth = 1.1; ctx.stroke(bone);
+    if (D.skel.skull) { const [sx, sz, nx, nz] = D.skel.skull; ctx.beginPath(); ctx.ellipse(mapX((sx + nx) / 2), mapY((sz + nz) / 2), 5 * S, 3.2 * S, Math.atan2(nz - sz, nx - sx), 0, TAU); ctx.fillStyle = '#efe6cf'; ctx.fill(); ctx.stroke(); }
+  }
+  // the Migurd village: palisade ring, round huts with their doors, the longhouse
+  const M = DC_SPOTS.migurd;
+  ctx.strokeStyle = '#4a3422'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(mapX(M.x), mapY(M.z), 34 * S, 0.3, 1.2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mapX(M.x), mapY(M.z), 34 * S, 1.55, TAU - 0.06); ctx.stroke();
+  for (const h of D.huts) {
+    const X = mapX(h.x), Y = mapY(h.z), r = 2.9 * S;
+    ctx.beginPath(); ctx.arc(X + 1.2, Y + 1.5, r, 0, TAU); ctx.fillStyle = 'rgba(40,24,14,0.35)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(X, Y, r, 0, TAU); ctx.fillStyle = '#a8865e'; ctx.fill(); ctx.lineWidth = 0.9; ctx.strokeStyle = '#3b2216'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(X, Y, r * 0.35, 0, TAU); ctx.fillStyle = '#6e5636'; ctx.fill();
+  }
+  if (D.longhouse) { const X = mapX(D.longhouse.x), Y = mapY(D.longhouse.z - 4.2); ctx.fillStyle = '#9a7a54'; ctx.fillRect(X - 5.5 * S, Y - 2.7 * S, 11 * S, 5.4 * S); ctx.strokeStyle = '#3b2216'; ctx.lineWidth = 0.9; ctx.strokeRect(X - 5.5 * S, Y - 2.7 * S, 11 * S, 5.4 * S); }
+  // the wagons it ate: small broken boxes
+  for (const [x, z, rot] of D.wagons) {
+    ctx.save(); ctx.translate(mapX(x), mapY(z)); ctx.rotate(-rot);
+    ctx.fillStyle = '#6a4a30'; ctx.fillRect(-1.1 * S, -2 * S, 2.2 * S, 4 * S); ctx.strokeStyle = MAP_COL.ink; ctx.lineWidth = 0.8; ctx.strokeRect(-1.1 * S, -2 * S, 2.2 * S, 4 * S);
+    ctx.restore();
+  }
 }

@@ -226,6 +226,8 @@ async function raiseDemonLand() {
   buildTerrainChunks(nA, nB, Math.round((WORLD.zF - WORLD.z0) / 100), Math.round((WORLD.z1 - WORLD.z0) / 100), DEMON.xr, inner);
   DEMON.ms = Math.round(performance.now() - t0);
   if (typeof buildDemonDressing === 'function') { await nextFrame(); buildDemonDressing(); }
+  // the waste's own map sheet, painted now (it's the white of the teleport, or the boot screen) rather than at first glance
+  if (typeof mapBuildPage === 'function') { await nextFrame(); mapBuildPage('demon'); }
 }
 // the places people live and fight want level ground: each at the median of the land under it, eased back out
 function sculptDemonSites(n) {

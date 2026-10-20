@@ -26,14 +26,24 @@
    runs while open. The menus own GAME.state — mapClose() just hides, and
    the main loop notices the map is gone and returns to play.
    ═══════════════════════════════════════════════════════════════════════ */
-// The frame: the playable rectangle plus a 20 m margin (Buena alone was ±800).
-const MAP_X0 = WORLD.px0 - 20, MAP_X1 = WORLD.px1 + 20, MAP_Z0 = WORLD.pz0 - 20, MAP_Z1 = WORLD.pz1 + 20;
-const MAP_W = MAP_X1 - MAP_X0, MAP_H = MAP_Z1 - MAP_Z0;
-const MAP_PPM = Math.min(1.28, 3600 / Math.max(MAP_W, MAP_H));   // map px per metre (1.28 at Buena's size)
-const MAP_RES_X = Math.round(MAP_W * MAP_PPM), MAP_RES_Z = Math.round(MAP_H * MAP_PPM);   // painted map, px
+// PAGES: each continent is its own sheet — its frame (the playable rectangle plus a 20 m
+// margin), painted canvas, fog-of-war mask and fog image. MAP.page names the one in use and
+// the MAP_* frame values below are that page's; mapUsePage() swaps them.
 const MAP_TEXEL = 12.5;                        // fog-of-war mask texel, metres
-const MAP_RVX = Math.round(MAP_W / MAP_TEXEL), MAP_RVZ = Math.round(MAP_H / MAP_TEXEL);
-const MAP_FOGX = MAP_RVX * 2, MAP_FOGZ = MAP_RVZ * 2;   // the mask, softly upsampled for drawing
+const MAP_PAGE_DEFS = {
+  fittoa: () => ({ x0: WORLD.px0 - 20, x1: WORLD.px1 + 20, z0: WORLD.pz0 - 20, z1: WORLD.pz1 + 20, title: 'THE BORDERLANDS OF FITTOA', sub: 'The Asura Kingdom', save: 'mapReveal' }),
+  demon:  () => ({ x0: DEMON.px0 - 20, x1: DEMON.px1 + 20, z0: DEMON.pz0 - 20, z1: DEMON.pz1 + 20, title: 'THE RED WASTE', sub: 'Biegoya · The Demon Continent', save: 'mapRevealDC', compass: [900, 2040] }),
+};
+let MAP_X0, MAP_X1, MAP_Z0, MAP_Z1, MAP_W, MAP_H, MAP_PPM, MAP_RES_X, MAP_RES_Z, MAP_RVX, MAP_RVZ, MAP_FOGX, MAP_FOGZ;
+function mapSetDims(F) {
+  MAP_X0 = F.x0; MAP_X1 = F.x1; MAP_Z0 = F.z0; MAP_Z1 = F.z1;
+  MAP_W = MAP_X1 - MAP_X0; MAP_H = MAP_Z1 - MAP_Z0;
+  MAP_PPM = Math.min(1.28, 3600 / Math.max(MAP_W, MAP_H));                 // map px per metre (1.28 at Buena's size)
+  MAP_RES_X = Math.round(MAP_W * MAP_PPM); MAP_RES_Z = Math.round(MAP_H * MAP_PPM);   // painted map, px
+  MAP_RVX = Math.round(MAP_W / MAP_TEXEL); MAP_RVZ = Math.round(MAP_H / MAP_TEXEL);
+  MAP_FOGX = MAP_RVX * 2; MAP_FOGZ = MAP_RVZ * 2;                         // the mask, softly upsampled for drawing
+}
+mapSetDims(MAP_PAGE_DEFS.fittoa());
 const MAP_REVEAL_R = 70;                       // reveal radius on foot, metres
 const MAP_ZOOM = { min: 1, max: 4, open: 2 };
 const MAP_COL = {
@@ -45,6 +55,11 @@ const MAP_COL = {
 const MAP_RAMP = [
   [0, '#93a866'], [22, '#9db06a'], [40, '#aab36e'], [62, '#b6ad6a'], [90, '#bca36b'],
   [125, '#ae9572'], [165, '#9e8f7f'], [210, '#b9b1a3'], [260, '#ddd7c8'], [330, '#f2ede1'],
+];
+// the waste's: pale sand low, red-brown earth, rust on the mesas, ash-grey peaks
+const MAP_RAMP_DC = [
+  [0, '#d6bf96'], [24, '#cfae86'], [34, '#c39a76'], [46, '#b9876a'], [62, '#a9765e'],
+  [90, '#9c7464'], [130, '#94786e'], [200, '#a49186'], [280, '#c2b6aa'], [340, '#ddd4c8'],
 ];
 // where each place name sits relative to its spot (metres), and how large
 const MAP_LABELS = {
@@ -60,10 +75,14 @@ const MAP_LABELS = {
   outskirts: { dx: 170, dz: 190, size: 'mid', spread: 0.3 },
   wagons: { dz: -36 },                            firstWall: { dz: -48 },
   sunstones: { dz: -24 }, colossus: { dz: -26 }, hermit: { dz: -22 }, crag: { dz: -20 },
+  // the Demon Continent's page
+  dcWaste: { dz: 64, size: 'mid' }, migurd: { dz: -72, size: 'big' }, dcCanyon: { dx: -46, dz: 10 },
+  dcBones: { dz: 52, size: 'mid' }, dcStorm: { dz: -40, size: 'big', spread: 0.3 }, dcNest: { dz: 84, size: 'mid' },
 };
 const MAP_LABEL_PX = { big: 15, mid: 12.5, small: 10.5 };   // screen px at 1× (grow with √zoom)
 
 const MAP = {
+  page: 'fittoa', def: MAP_PAGE_DEFS.fittoa(), pages: {},    // the sheet in use, and the others' state
   canvas: null, buildMs: 0,                                  // the painted map
   reveal: new Uint8Array(MAP_RVX * MAP_RVZ), owner: null, revealT: 0,
   fog: null, fogCtx: null, fogImg: null, fogNoise: null, fogDirty: true,
@@ -75,7 +94,30 @@ const mapHex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
 // world metres → painted-map pixels, and "is this inside the frame (± margin)"
 const mapX = x => (x - MAP_X0) * MAP_PPM, mapY = z => (z - MAP_Z0) * MAP_PPM;
 const inMapFrame = (x, z, m = 0) => x > MAP_X0 - m && x < MAP_X1 + m && z > MAP_Z0 - m && z < MAP_Z1 + m;
-const mapWaystones = () => (typeof WSTONE !== 'undefined' && WSTONE.list.length ? WSTONE.list : WAYSTONES);
+const mapWaystones = () => (typeof WSTONE !== 'undefined' && WSTONE.list.length ? WSTONE.list : WAYSTONES).filter(w => inMapFrame(w.x, w.z, 40));
+
+// which sheet: the continent you're standing on (the waste's once it exists)
+function mapPageFor() { return G && PL.body && DEMON.built && inDemon(PL.body.pos.z) ? 'demon' : 'fittoa'; }
+const MAP_PAGE_KEYS = ['canvas', 'buildMs', 'reveal', 'fog', 'fogCtx', 'fogImg', 'fogNoise'];
+function mapUsePage(key) {
+  if (MAP.page === key) return;
+  const cur = MAP.pages[MAP.page] || (MAP.pages[MAP.page] = {});
+  for (const k of MAP_PAGE_KEYS) cur[k] = MAP[k];
+  cur.def = MAP.def; cur.rvx = MAP_RVX;
+  MAP.page = key; MAP.def = MAP_PAGE_DEFS[key]();
+  mapSetDims(MAP.def);
+  const nx = MAP.pages[key] || (MAP.pages[key] = {});
+  for (const k of MAP_PAGE_KEYS) MAP[k] = nx[k] ?? null;
+  if (!MAP.reveal) { MAP.reveal = new Uint8Array(MAP_RVX * MAP_RVZ); mapReadMask(MAP.reveal); }
+  MAP.fogDirty = true; MAP.sel = null; MAP.hover = null;
+}
+// paint a page that isn't in use (the waste's, as soon as it's raised), then go back
+function mapBuildPage(key) {
+  const was = MAP.page;
+  mapUsePage(key);
+  try { mapBuild(); } catch (e) { console.error('map', e); }
+  mapUsePage(was);
+}
 
 /* ───────────── painting ───────────── */
 function mapBuild() {
@@ -92,7 +134,7 @@ function mapBuild() {
   const steps = [
     () => mapPaintRelief(ctx, g), () => mapPaintContours(ctx, g), () => mapPaintWater(ctx, g),
     () => mapPaintProps(ctx, 'ground'), () => mapPaintForest(ctx), () => mapPaintRoad(ctx),
-    () => mapPaintProps(ctx, 'build'), () => mapPaintPaper(ctx),
+    () => mapPaintProps(ctx, 'build'), () => { if (MAP.page === 'demon') mapPaintDemon(ctx); }, () => mapPaintPaper(ctx),
   ];
   // one failed layer must not cost the whole map
   for (const step of steps) { ctx.save(); try { step(); } catch (e) { console.error('map', e); } ctx.restore(); }
@@ -103,8 +145,8 @@ function mapBuild() {
   return true;
 }
 
-function mapRampLUT(n, hMax) {
-  const st = MAP_RAMP.map(([h, c]) => [h, ...mapHex(c)]), lut = new Uint8Array(n * 3);
+function mapRampLUT(n, hMax, ramp = MAP_RAMP) {
+  const st = ramp.map(([h, c]) => [h, ...mapHex(c)]), lut = new Uint8Array(n * 3);
   for (let i = 0, s = 0; i < n; i++) {
     const h = i / (n - 1) * hMax;
     while (s < st.length - 2 && h > st[s + 1][0]) s++;
@@ -118,7 +160,7 @@ function mapRampLUT(n, hMax) {
    softness reads as watercolour, and it's ~6× fewer samples than 2048². */
 function mapPaintRelief(ctx, { BX, BZ, ix0, iz0 }) {
   const N = TER.NX, H = TER.H, GR = TER.GRASS, inv2c = 1 / (2 * WORLD.cell);
-  const LUTN = 1024, HMAX = 340, lut = mapRampLUT(LUTN, HMAX), lk = (LUTN - 1) / HMAX;
+  const dc = MAP.page === 'demon', LUTN = 1024, HMAX = 340, lut = mapRampLUT(LUTN, HMAX, dc ? MAP_RAMP_DC : MAP_RAMP), lk = (LUTN - 1) / HMAX;
   // light from the north-west (−x, −z), ~42° up; heights exaggerated so gentle hills still model
   const EX = 2.4, Ln = Math.hypot(1, 1.3, 1), LX = -1 / Ln, LY = 1.3 / Ln, LZ = -1 / Ln;
   const img = ctx.createImageData(BX, BZ), d = img.data;
@@ -132,7 +174,7 @@ function mapPaintRelief(ctx, { BX, BZ, ix0, iz0 }) {
       const li = ((h < 0 ? 0 : h > HMAX ? HMAX : h) * lk | 0) * 3;
       let r = lut[li], g = lut[li + 1], b = lut[li + 2];
       // thick meadow grass greens the lowlands a little
-      if (GR && h < 110) {
+      if (GR && h < 110 && !dc) {
         const t = GR[gi] * (0.14 / 255) * (h < 60 ? 1 : (110 - h) / 50);
         r += (112 - r) * t; g += (146 - g) * t; b += (80 - b) * t;
       }
@@ -288,7 +330,7 @@ function mapPaintProps(ctx, pass) {
     ctx.restore();
   }
   // the cave mouth: a dark arch in the cliff, open to the south
-  const m = pass === 'build' && typeof STRUCT !== 'undefined' && STRUCT.caveMouth;
+  const m = pass === 'build' && typeof STRUCT !== 'undefined' && STRUCT.caveMouth && inMapFrame(STRUCT.caveMouth.x, STRUCT.caveMouth.z) && STRUCT.caveMouth;
   if (m) {
     const X = mapX(m.x), Y = mapY(m.z), r = 7 * MAP_PPM;
     ctx.beginPath(); ctx.ellipse(X, Y + r * 0.15, r, r * 0.8, 0, Math.PI, TAU); ctx.closePath();
@@ -329,7 +371,8 @@ function mapPaintForest(ctx) {
 
 /* The road: a pale worn verge under a warm-brown dashed line. */
 function mapPaintRoad(ctx) {
-  const pts = TER.roadPath || catmull(ROAD, 8), S = MAP_PPM, path = new Path2D();
+  const pts = MAP.page === 'demon' ? TER.dcTrack : TER.roadPath || catmull(ROAD, 8), S = MAP_PPM, path = new Path2D();
+  if (!pts) return;
   pts.forEach(([x, z], i) => { const X = mapX(x), Y = mapY(z); if (i) path.lineTo(X, Y); else path.moveTo(X, Y); });
   ctx.lineCap = ctx.lineJoin = 'round';
   ctx.strokeStyle = 'rgba(240,229,200,0.6)'; ctx.lineWidth = 6.5; ctx.stroke(path);
@@ -403,6 +446,7 @@ function mapRevealUpdate(dt) {
   if (MAP.revealT < 0.25) return;
   MAP.revealT = 0;
   if (GAME.inCave) return;                       // underground you learn nothing of the land above
+  mapUsePage(mapPageFor());
   const p = PL.body.pos, above = TER.H ? Math.max(0, p.y - heightAt(p.x, p.z)) : 0;
   mapRevealAt(p.x, p.z, MAP_REVEAL_R + Math.min(above, 150) * 1.4);
 }
@@ -410,32 +454,40 @@ function mapRevealUpdate(dt) {
 function mapSerialize() {
   if (!G) return;
   mapSyncOwner();
+  const enc = rv => { let s = ''; for (let i = 0; i < rv.length; i += 0x2000) s += String.fromCharCode.apply(null, rv.subarray(i, i + 0x2000)); return btoa(s); };
   try {
-    let s = '';
-    for (let i = 0; i < MAP.reveal.length; i += 0x2000) s += String.fromCharCode.apply(null, MAP.reveal.subarray(i, i + 0x2000));
-    G.mapReveal = btoa(s); G.mapRevealW = MAP_RVX;
+    // every sheet you've a mask for: the one in use, and the other continent's if it's been opened
+    G[MAP.def.save] = enc(MAP.reveal); G[MAP.def.save + 'W'] = MAP_RVX;
+    for (const k in MAP.pages) { const P = MAP.pages[k]; if (k !== MAP.page && P.reveal && P.def) { G[P.def.save] = enc(P.reveal); G[P.def.save + 'W'] = P.rvx; } }
   } catch (e) { console.error('map save', e); }
 }
 
 function mapDeserialize() {
-  MAP.reveal.fill(0);
   MAP.owner = G || null;
   MAP.revealT = 0;
-  if (G && typeof G.mapReveal === 'string' && G.mapReveal) {
+  for (const k in MAP.pages) if (k !== MAP.page) MAP.pages[k].reveal = null;      // re-read when that sheet is next in use
+  mapReadMask(MAP.reveal);
+  MAP.fogDirty = true;
+}
+// The current page's mask, from G (its own field per page).
+function mapReadMask(rv) {
+  rv.fill(0);
+  const field = MAP.def.save, str = G && G[field];
+  if (typeof str === 'string' && str) {
     try {
-      const s = atob(G.mapReveal), W = G.mapRevealW || 128;     // saves before Roa: a 128×128 mask over Buena's ±800
-      if (s.length === MAP.reveal.length && W === MAP_RVX) for (let i = 0; i < s.length; i++) MAP.reveal[i] = s.charCodeAt(i);
-      else if (s.length % W === 0) {
+      const s = atob(str), W = G[field + 'W'] || 128;     // saves before Roa: a 128×128 mask over Buena's ±800
+      if (s.length === rv.length && W === MAP_RVX) for (let i = 0; i < s.length; i++) rv[i] = s.charCodeAt(i);
+      else if (s.length % W === 0 && MAP.page === 'fittoa') {
         // an older, smaller mask: same texel size, same north-west corner — copy it row by row
         const H = s.length / W, ox = Math.round((-WORLD.half - MAP_X0) / MAP_TEXEL), oz = Math.round((-WORLD.half - MAP_Z0) / MAP_TEXEL);
         for (let j = 0; j < H; j++) for (let k = 0; k < W; k++) {
           const tx = k + ox, tz = j + oz;
-          if (tx >= 0 && tx < MAP_RVX && tz >= 0 && tz < MAP_RVZ) MAP.reveal[tz * MAP_RVX + tx] = s.charCodeAt(j * W + k);
+          if (tx >= 0 && tx < MAP_RVX && tz >= 0 && tz < MAP_RVZ) rv[tz * MAP_RVX + tx] = s.charCodeAt(j * W + k);
         }
       }
     } catch (e) { /* a damaged map is just an unexplored one */ }
   }
-  if (DEV && /[?&]reveal\b/.test(location.search)) MAP.reveal.fill(255);
+  if (DEV && /[?&]reveal\b/.test(location.search)) rv.fill(255);
   MAP.fogDirty = true;
 }
 
@@ -582,8 +634,9 @@ function mapEnsureDom() {
 function mapOpen() {
   document.exitPointerLock?.();
   mapEnsureDom();
-  if (!MAP.canvas && TER.H) { try { mapBuild(); } catch (e) { console.error('map', e); } }
   if (G) mapSyncOwner();
+  mapUsePage(mapPageFor());
+  if (!MAP.canvas && TER.H) { try { mapBuild(); } catch (e) { console.error('map', e); } }
   if (MAP.open) return;
   MAP.open = true; MAP.travelling = false; MAP.sel = null; MAP.hover = null; MAP.drag = null;
   MAP.frame = null; MAP.lastT = 0; MAP.err = false;
@@ -701,7 +754,8 @@ function mapDraw(t) {
   mapDrawLabels(ctx, f);
   mapDrawServices(ctx, f);
   mapDrawBorder(ctx, f);
-  mapDrawCompass(ctx, f.ox + (MAP_X1 - 150) * s, f.oy + (MAP_Z1 - 150) * s, 70 * s);
+  const cp = MAP.def.compass || [MAP_X1 - 150, MAP_Z1 - 150];          // (a sheet can put its rose where it covers nothing)
+  mapDrawCompass(ctx, f.ox + cp[0] * s, f.oy + cp[1] * s, 70 * s);
   mapDrawCartouche(ctx, f);
   mapDrawMarkers(ctx, f, t);
   // the travel panel rides above its waystone
@@ -742,8 +796,10 @@ function mapText(ctx, str, x, y, font, sp, fill, halo, haloW) {
 function mapDrawLabels(ctx, f) {
   const zs = f.k * Math.sqrt(MAP.view.zoom);
   for (const key in PLACES) {
-    const p = PLACES[key], o = MAP_LABELS[key] || { dz: -30 }, a = smooth(0.3, 0.75, mapSeen(p.x, p.z));
-    if (a <= 0.01 || o.hide) continue;
+    const p = PLACES[key], o = MAP_LABELS[key] || { dz: -30 };
+    if (o.hide || !inMapFrame(p.x, p.z, 30)) continue;
+    const a = smooth(0.3, 0.75, mapSeen(p.x, p.z));
+    if (a <= 0.01) continue;
     const px = MAP_LABEL_PX[o.size || 'small'] * zs, X = f.ox + (p.x + (o.dx || 0)) * f.s, Y = f.oy + (p.z + (o.dz || 0)) * f.s;
     if (X < -400 || X > f.vw + 400 || Y < -80 || Y > f.vh + 80) continue;
     ctx.globalAlpha = a;
@@ -773,6 +829,7 @@ function mapDrawServices(ctx, f) {
   const z = MAP.view.zoom; if (z < 2.8) return;
   const a0 = smooth(2.8, 3.2, z), px = 9.5 * f.k * Math.sqrt(z);
   for (const S of mapServices()) {
+    if (!inMapFrame(S.x, S.z)) continue;
     const a = a0 * smooth(0.3, 0.75, mapSeen(S.x, S.z));
     if (a <= 0.01) continue;
     const X = f.ox + S.x * f.s, Y = f.oy + S.z * f.s;
@@ -858,12 +915,12 @@ function mapDrawCartouche(ctx, f) {
   ribbon(0); ctx.fillStyle = '#f0e7cf'; ctx.fill();
   ctx.strokeStyle = MAP_COL.rule; ctx.lineWidth = Math.max(1.2, 2 * s); ctx.stroke();
   ribbon(5 * s); ctx.strokeStyle = MAP_COL.gold; ctx.lineWidth = Math.max(0.8, s); ctx.stroke();
-  const title = 'THE BORDERLANDS OF FITTOA', font = p => `700 ${p}px Cinzel, Georgia, serif`;
+  const title = MAP.def.title, font = p => `700 ${p}px Cinzel, Georgia, serif`;
   let px = 17 * s;
   const room = 2 * (w - nd) - 16 * s, tw = mapMeasure(ctx, title, font(px), px * 0.16);
   if (tw > room) px *= room / tw;
   mapText(ctx, title, 0, -h * 0.18, font(px), px * 0.16, MAP_COL.ink, null, 0);
-  mapText(ctx, 'The Asura Kingdom', 0, h * 0.5, `italic 400 ${10.5 * s}px Spectral, Georgia, serif`, 0.5, '#5a4630', null, 0);
+  mapText(ctx, MAP.def.sub, 0, h * 0.5, `italic 400 ${10.5 * s}px Spectral, Georgia, serif`, 0.5, '#5a4630', null, 0);
   ctx.strokeStyle = 'rgba(90,70,48,0.7)'; ctx.lineWidth = Math.max(0.6, 0.8 * s); ctx.beginPath();
   ctx.moveTo(-70 * s, h * 0.5); ctx.lineTo(-48 * s, h * 0.5); ctx.moveTo(48 * s, h * 0.5); ctx.lineTo(70 * s, h * 0.5);
   ctx.stroke();
@@ -954,7 +1011,7 @@ function mapDrawMarkers(ctx, f, t) {
     }
   }
   // mana crystals you've seen: a small blue shard (hollow once taken)
-  if (G && typeof CRYSTALS !== 'undefined') for (const c of CRYSTALS.list) {
+  if (G && typeof CRYSTALS !== 'undefined' && MAP.page === 'fittoa') for (const c of CRYSTALS.list) {
     const seen = G.crystalsSeen && G.crystalsSeen.includes(c.id), got = G.crystals && G.crystals.includes(c.id);
     if (!seen && !got) continue;
     const X = f.ox + c.x * f.s, Y = f.oy + c.z * f.s, r = 5.5 * k;
@@ -965,7 +1022,7 @@ function mapDrawMarkers(ctx, f, t) {
   }
   // hidden chests you've opened: a small inked box (a record, never a hint — unless you bought the smuggler's chart:
   // then the ones still shut are crossed in red)
-  if (G && typeof CACHES !== 'undefined') for (const C of CACHES.list) {
+  if (G && typeof CACHES !== 'undefined' && MAP.page === 'fittoa') for (const C of CACHES.list) {
     const opened = !!G.caches && G.caches.includes(C.id);
     if (!opened && !(G.gear && G.gear.chart)) continue;
     if (!opened) {
@@ -1017,6 +1074,8 @@ function mapDrawMarkers(ctx, f, t) {
 function mapMinimapDraw(ctx, size, zoomMetres = 140) {
   if (!ctx || !(size > 0)) return;
   if (G) mapSyncOwner();
+  mapUsePage(mapPageFor());
+  if (!MAP.canvas && TER.H) { try { mapBuild(); } catch (e) { console.error('map', e); } }
   const R = size / 2, zm = Math.max(20, zoomMetres || 140), s = R / zm, t = performance.now() / 1000;
   const p = G && PL.body ? PL.body.pos : null, cx = p ? p.x : 0, cz = p ? p.z : 0;
   const ox = R - cx * s, oy = R - cz * s, k = clamp(size / 180, 0.55, 1.2);
