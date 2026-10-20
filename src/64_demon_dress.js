@@ -240,7 +240,7 @@ function dcMigurdVillage(R) {
     addCircle(x, z, 0.3, y - 1, y + 4, 'post');
   }
   // round huts in two rings, doors toward the square
-  const spots = [[14, 0.9], [14, 2.1], [14, 3.4], [14, 4.6], [24, 0.5], [24, 1.9], [24, 2.6], [24, 3.3], [25, 4.2], [24, 5.3]];
+  const spots = [[14, 0.9], [14, 2.1], [14, 3.4], [14, 4.0], [24, 0.5], [24, 1.9], [24, 2.6], [24, 3.3], [25, 4.2], [24, 5.3]];
   for (const [d, a] of spots) {
     const x = M.x + Math.cos(a) * d, z = M.z + Math.sin(a) * d;
     hutPieces(out, x, z, Math.atan2(M.x - x, M.z - z), d > 20 ? 1 : 1.15);

@@ -112,16 +112,16 @@ const DC_LINES = {
     { p: 'eris', s: 'Eris Boreas Greyrat', t: 'Fine. FINE. Questions later. Stay behind me!' },
   ],
   move: [
-    { p: 'ruijerd', s: '???', t: 'Move.' },
+    { s: '???', t: 'Move.' },
     { t: 'The spear takes the wolf out of the air before you see the man who threw it. Green hair. A jewel set in his forehead, like a third eye. A race whose name empties a street.' },
   ],
   ruijerd: [
     { p: 'eris', s: 'Eris Boreas Greyrat', t: 'A — a SUPERD. {name}, get behind me. Grandfather says they eat children. He says it EVERY winter.' },
-    { p: 'ruijerd', s: 'Ruijerd Superdia', t: 'Superd. Yes. You may run. Most do.' },
+    { s: 'Ruijerd Superdia', t: 'Superd. Yes. You may run. Most do.' },
     { t: 'Somewhere behind your eyes, a man with no face says: trust him.' },
-    { p: 'ruijerd', s: 'Ruijerd Superdia', t: '...You did not run.' },
-    { p: 'ruijerd', s: 'Ruijerd Superdia', t: 'Two children, alone in the Red Waste, dressed for a party. I do not know how you came here. I know you will not leave it alone.' },
-    { p: 'ruijerd', s: 'Ruijerd Superdia', t: 'I am Ruijerd. North of here live the Migurd. They will feed you, and they will not scream at me. Follow the track; I will walk behind.' },
+    { s: 'Ruijerd Superdia', t: '...You did not run.' },
+    { s: 'Ruijerd Superdia', t: 'Two children, alone in the Red Waste, dressed for a party. I do not know how you came here. I know you will not leave it alone.' },
+    { s: 'Ruijerd Superdia', t: 'I am Ruijerd. North of here live the Migurd. They will feed you, and they will not scream at me. Follow the track; I will walk behind.' },
     { p: 'eris', s: 'Eris Boreas Greyrat', t: '...If he eats us, I\'m blaming you.' },
   ],
 };

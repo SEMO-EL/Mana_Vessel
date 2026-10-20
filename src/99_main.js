@@ -115,6 +115,7 @@ function startDevPlay() {
   if (QS.has('allspells')) for (const k in G.prof) G.prof[k] = 130;
   if (QS.has('gate')) G.flags.gateOpen = true;                 // dev: the pass gate already open
   if (QS.has('eris')) G.flags.erisWith = true;                 // dev: Eris along
+  if (QS.has('rui')) G.flags.ruiWith = true;                   // dev: Ruijerd along (on the waste)
   if (QS.has('horse')) G.flags.horse = true;                   // dev: Kestrel lent already
   if (QS.has('event')) EVENTS.t = 3;                            // dev: a road event as soon as there's room for one
   TOD.hour = +(QS.get('hour') || 16.5); TOD.frozen = QS.has('freeze');
@@ -168,6 +169,7 @@ function frame(dtReal) {
       updateWilds(dt);
       updateKidnap(dt);
       updateDemonStory(dt);
+      updateMigurd(dt);
     }
     lockSwitch(dtReal);
     updateCamera(dtReal, PL.body.pos, { fovKick: PL.sprinting ? 6 : 0, noLook: s !== 'play' });
